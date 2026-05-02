@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+
+# Vite / build frontend
+dist/
+dist-ssr/
+
+# Variables de entorno (secretos)
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDEs
+.idea/
+*.swp
+*.swo
+*~
+
+# Tests / cobertura
+coverage/
+
+# Cachés y artefactos TS
+.cache/
+.turbo/
+*.tsbuildinfo
+
+# SQLite / bases locales (desarrollo)
+*.sqlite
+*.sqlite3
+*.db
+
+# Rust / Tauri (compilados; src-tauri también tiene su .gitignore)
+**/target/
+
+# Temporales
+*.local
+.tmp/

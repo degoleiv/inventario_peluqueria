@@ -1,0 +1,29 @@
+/**
+ * Tokens de espaciado y radios (escala 8px).
+ * Referencia visual clay: sombras externas + dos inset (convexo / cóncavo) —
+ * https://hype4.academy/articles/design/claymorphism-in-user-interfaces
+ */
+:root:has(body.theme-default),
+:root:has(body.theme-neon),
+:root:has(body.theme-girly),
+:root:has(body.theme-purple),
+:root:has(body.theme-ocean),
+:root:has(body.theme-slate) {
+  --space-0: 0;
+  --space-1: 0.25rem; /* 4px */
+  --space-2: 0.5rem; /* 8px */
+  --space-3: 0.75rem; /* 12px */
+  --space-4: 1rem; /* 16px */
+  --space-5: 1.25rem; /* 20px */
+  --space-6: 1.5rem; /* 24px */
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  /** Controles “inflados” (inputs / botones clay) — entre admin y píldora total */
+  --radius-clay: 22px;
+  --radius-pill: 999px;
+  --bp-sm: 640px;
+  --bp-md: 768px;
+  --bp-lg: 1024px;
+  --font-ui: "Segoe UI", system-ui, -apple-system, sans-serif;
+}

@@ -6,6 +6,7 @@ export type NavKey =
   | "citas"
   | "clientes"
   | "inventario"
+  | "proveedores"
   | "pedidos_proveedores"
   | "finanzas"
   | "facturas"
@@ -22,6 +23,7 @@ export const PERMISO_MODULOS: PermisoModulo[] = [
   "citas",
   "clientes",
   "inventario",
+  "proveedores",
   "pedidos_proveedores",
   "finanzas",
   "facturas",
@@ -34,6 +36,7 @@ export const NAV_LABEL: Record<NavKey, string> = {
   citas: "Agenda",
   clientes: "Clientes",
   inventario: "Inventario",
+  proveedores: "Proveedores",
   pedidos_proveedores: "Pedidos proveedores",
   finanzas: "Finanzas",
   facturas: "Facturas",
@@ -45,7 +48,7 @@ export const NAV_LABEL: Record<NavKey, string> = {
 export const NAV_GROUPS: { label: string; items: NavKey[] }[] = [
   { label: "Principal", items: ["inicio"] },
   { label: "Operación", items: ["ventas", "citas"] },
-  { label: "Gestión", items: ["clientes", "inventario", "pedidos_proveedores"] },
+  { label: "Gestión", items: ["clientes", "inventario", "proveedores", "pedidos_proveedores"] },
   { label: "Finanzas", items: ["finanzas", "facturas", "reportes"] },
   { label: "Administración", items: ["configuracion", "empleados"] },
 ];

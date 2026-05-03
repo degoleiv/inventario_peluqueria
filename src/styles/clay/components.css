@@ -1,0 +1,292 @@
+/**
+ * Design system Clay — Fase 2: botones e inputs “inflados” / hundidos
+ * (sombras externas + dos inset, según HYPE4 — Claymorphism).
+ * https://hype4.academy/articles/design/claymorphism-in-user-interfaces
+ *
+ * | Clase              | Uso |
+ * |--------------------|-----|
+ * | .clay-card         | Contenedor elevado tipo “plástico” |
+ * | .clay-btn          | Base botón |
+ * | .clay-btn--primary | Relleno (acción principal) |
+ * | .clay-btn--secondary | Superficie convexa suave |
+ * | .clay-btn--ghost   | Mínimo relieve |
+ * | .clay-field        | Label + control |
+ * | .clay-input        | Campo cóncavo (hundido) |
+ * | .clay-input--pill  | Radio píldora total (opcional) |
+ * | .clay-modal        | Panel modal (hijo de backdrop) |
+ * | .clay-modal-backdrop | Capa clic para cerrar |
+ * | .clay-table        | Tabla con filas espaciadas |
+ * | .clay-empty        | Estado vacío centrado |
+ */
+
+.clay-card {
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  box-shadow: var(--clay-raise);
+}
+
+@media (max-width: 768px) {
+  .clay-card {
+    box-shadow: var(--clay-shadow-a), var(--clay-shadow-b);
+  }
+}
+
+.clay-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.9rem;
+  border-radius: var(--radius-clay);
+  padding: 0.55rem 1.15rem;
+  cursor: pointer;
+  border: none;
+  transition:
+    transform 0.14s ease,
+    box-shadow 0.14s ease,
+    filter 0.14s ease;
+}
+
+.clay-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+}
+
+.clay-btn:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+.clay-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.clay-btn--primary {
+  background: var(--primary);
+  color: #fff;
+  box-shadow: var(--clay-raise-primary);
+}
+
+.clay-btn--primary:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.clay-btn--primary:active:not(:disabled) {
+  box-shadow: var(--clay-primary-pressed);
+}
+
+.clay-btn--secondary {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  box-shadow: var(--clay-raise);
+}
+
+.clay-btn--secondary:hover:not(:disabled) {
+  filter: brightness(1.02);
+}
+
+.clay-btn--secondary:active:not(:disabled) {
+  box-shadow: var(--clay-btn-active);
+}
+
+.clay-btn--ghost {
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
+  color: var(--text-muted);
+  border: 1px dashed color-mix(in srgb, var(--border) 85%, var(--text-muted) 15%);
+  box-shadow: 2px 3px 8px rgba(0, 0, 0, 0.06), inset 1px 1px 3px rgba(255, 255, 255, 0.35),
+    inset -1px -2px 4px rgba(0, 0, 0, 0.04);
+}
+
+.clay-btn--ghost:hover:not(:disabled) {
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface) 75%, transparent);
+}
+
+.clay-btn--ghost:active:not(:disabled) {
+  box-shadow: var(--clay-btn-active);
+}
+
+.clay-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.clay-field__label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.clay-input {
+  width: 100%;
+  font: inherit;
+  border-radius: var(--radius-clay);
+  padding: 0.6rem 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
+  background: var(--input-bg);
+  color: var(--text);
+  outline: none;
+  box-shadow: var(--clay-sink);
+  transition:
+    box-shadow 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.clay-input--pill {
+  border-radius: var(--radius-pill);
+}
+
+.clay-input::placeholder {
+  color: color-mix(in srgb, var(--text-muted) 72%, transparent);
+}
+
+.clay-input:focus {
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
+  box-shadow: var(--clay-sink), 0 0 0 3px var(--focus-ring), 0 0 20px color-mix(in srgb, var(--primary) 22%, transparent);
+}
+
+.clay-input[aria-invalid="true"],
+.clay-input.clay-input--error {
+  border-color: var(--danger);
+  box-shadow: var(--clay-sink), 0 0 0 3px color-mix(in srgb, var(--danger) 38%, transparent);
+}
+
+.clay-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: rgba(0, 0, 0, 0.42);
+  border: none;
+  cursor: pointer;
+}
+
+.clay-modal {
+  position: relative;
+  cursor: default;
+  width: min(480px, 100%);
+  max-height: min(88vh, 720px);
+  overflow: auto;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+  box-shadow: var(--clay-raise);
+  padding: var(--space-5);
+  animation: clay-modal-in 0.22s ease;
+}
+
+@keyframes clay-modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (max-width: 640px) {
+  .clay-modal-backdrop {
+    padding: 0;
+    align-items: stretch;
+  }
+  .clay-modal {
+    width: 100%;
+    max-height: 100%;
+    min-height: 100%;
+    border-radius: 0;
+    animation: clay-modal-in-mobile 0.2s ease;
+  }
+}
+
+@keyframes clay-modal-in-mobile {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.clay-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 var(--space-2);
+  font-size: 0.92rem;
+}
+
+.clay-table thead th {
+  text-align: left;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  padding: 0 var(--space-2) var(--space-1);
+  border: none;
+}
+
+.clay-table tbody tr {
+  background: var(--surface);
+  box-shadow: var(--clay-shadow-a);
+  border-radius: var(--radius-md);
+}
+
+.clay-table tbody td {
+  padding: var(--space-3) var(--space-2);
+  border: none;
+  vertical-align: middle;
+}
+
+.clay-table tbody tr td:first-child {
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+}
+.clay-table tbody tr td:last-child {
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+}
+
+.clay-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--primary) 6%, var(--surface));
+}
+
+.clay-empty {
+  text-align: center;
+  padding: var(--space-6) var(--space-4);
+  color: var(--text-muted);
+  border-radius: var(--radius-lg);
+  border: 1px dashed var(--border);
+  background: color-mix(in srgb, var(--surface) 92%, var(--primary) 8%);
+  box-shadow: var(--clay-sink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .clay-modal {
+    animation: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .clay-btn--primary,
+  .clay-btn--secondary {
+    box-shadow: var(--clay-shadow-a), var(--clay-shadow-b);
+  }
+  .clay-btn--primary:active:not(:disabled) {
+    box-shadow: var(--clay-primary-pressed);
+  }
+  .clay-btn--secondary:active:not(:disabled) {
+    box-shadow: var(--clay-btn-active);
+  }
+}

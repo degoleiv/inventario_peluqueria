@@ -15,6 +15,7 @@ import { CitasPage } from "./pages/CitasPage";
 import { VentasPage } from "./pages/VentasPage";
 import { VentaClienteDisplayPage } from "./pages/VentaClienteDisplayPage";
 import { PedidosProveedoresPage } from "./pages/PedidosProveedoresPage";
+import { ProveedoresPage } from "./pages/ProveedoresPage";
 import { FacturasPage } from "./pages/FacturasPage";
 import { FinanzasPage } from "./pages/FinanzasPage";
 import { ReportesPage } from "./pages/ReportesPage";
@@ -42,7 +43,6 @@ import {
   readEmpleadosTab,
   readLastTab,
 } from "./lib/moduleRoutes";
-
 export function AuthenticatedShell() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -178,6 +178,7 @@ export function AuthenticatedShell() {
       "citas",
       "clientes",
       "inventario",
+      "proveedores",
       "pedidos_proveedores",
       "finanzas",
       "facturas",
@@ -340,6 +341,7 @@ export function AuthenticatedRoutes() {
         />
         <Route path="clientes/:tab" element={<ClientesPage />} />
         <Route path="compras" element={<Navigate to="/pedidos-proveedores" replace />} />
+        <Route path="proveedores" element={<ProveedoresPage />} />
         <Route path="pedidos-proveedores" element={<PedidosProveedoresPage />} />
         <Route path="finanzas" element={<FinanzasPage />} />
         <Route path="facturas" element={<FacturasPage />} />

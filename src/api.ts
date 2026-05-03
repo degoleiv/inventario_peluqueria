@@ -131,13 +131,13 @@ async function requestJson<T>(
     headers,
   });
   if (!res.ok) {
+    const text = await res.text();
     let msg = res.statusText;
     try {
-      const j = (await res.json()) as { error?: string };
+      const j = JSON.parse(text) as { error?: string };
       if (j.error) msg = j.error;
     } catch {
-      const t = await res.text();
-      if (t) msg = t;
+      if (text.trim()) msg = text;
     }
     throw new Error(msg);
   }
@@ -400,13 +400,13 @@ export async function previewCertificadoLaboral(empleadoId: number): Promise<voi
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
+    const text = await res.text();
     let msg = res.statusText;
     try {
-      const j = (await res.json()) as { error?: string };
+      const j = JSON.parse(text) as { error?: string };
       if (j.error) msg = j.error;
     } catch {
-      const t = await res.text();
-      if (t) msg = t;
+      if (text.trim()) msg = text;
     }
     throw new Error(msg);
   }
@@ -427,13 +427,13 @@ export async function downloadCertificadoLaboral(empleadoId: number): Promise<vo
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
+    const text = await res.text();
     let msg = res.statusText;
     try {
-      const j = (await res.json()) as { error?: string };
+      const j = JSON.parse(text) as { error?: string };
       if (j.error) msg = j.error;
     } catch {
-      const t = await res.text();
-      if (t) msg = t;
+      if (text.trim()) msg = text;
     }
     throw new Error(msg);
   }
@@ -540,18 +540,60 @@ export async function emitFacturaElectronicaVenta(
 export type Proveedor = {
   id: number;
   nombre: string;
+  nit: string;
   telefono: string | null;
   email: string | null;
-  notas: string | null;
-  created_at: string;
+  direccion: string | null;
+  estado: "activo" | "inactivo";
+  fecha_creacion: string;
+  fecha_actualizacion: string;
 };
 
-export async function fetchProveedores(): Promise<Proveedor[]> {
-  return requestJson("/api/proveedores");
+export async function fetchProveedores(opts?: {
+  incluirInactivos?: boolean;
+  search?: string;
+  estado?: "todos" | "activo" | "inactivo";
+}): Promise<Proveedor[]> {
+  const q = new URLSearchParams();
+  if (opts?.incluirInactivos) q.set("incluir_inactivos", "1");
+  if (opts?.search?.trim()) q.set("search", opts.search.trim());
+  if (opts?.estado && opts.estado !== "todos") q.set("estado", opts.estado);
+  const suffix = q.toString() ? `?${q}` : "";
+  return requestJson(`/api/proveedores${suffix}`);
 }
 
-export async function createProveedor(body: Partial<Proveedor>): Promise<Proveedor> {
+export async function patchProveedorEstado(
+  id: number,
+  estado: "activo" | "inactivo"
+): Promise<Proveedor> {
+  return requestJson(`/api/proveedores/${id}/estado`, {
+    method: "PATCH",
+    body: JSON.stringify({ estado }),
+  });
+}
+
+export async function fetchProveedor(id: number): Promise<Proveedor> {
+  return requestJson(`/api/proveedores/${id}`);
+}
+
+export async function createProveedor(
+  body: Pick<Proveedor, "nombre" | "nit"> &
+    Partial<Pick<Proveedor, "telefono" | "email" | "direccion" | "estado">>
+): Promise<Proveedor> {
   return requestJson("/api/proveedores", { method: "POST", body: JSON.stringify(body) });
+}
+
+export async function updateProveedor(
+  id: number,
+  body: Partial<
+    Pick<Proveedor, "nombre" | "nit" | "telefono" | "email" | "direccion" | "estado">
+  >
+): Promise<Proveedor> {
+  return requestJson(`/api/proveedores/${id}`, { method: "PUT", body: JSON.stringify(body) });
+}
+
+export async function deleteProveedor(id: number): Promise<void> {
+  await requestJson<void>(`/api/proveedores/${id}`, { method: "DELETE" });
 }
 
 export type PedidoProveedor = {

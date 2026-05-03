@@ -1,7 +1,6 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import puppeteer from "puppeteer";
 import type { Browser } from "puppeteer";
 import { AppError } from "../lib/AppError.js";
 import { usuariosRepo } from "../repositories/usuarios.js";
@@ -21,9 +20,24 @@ function escapeHtml(s: string): string {
 /** Puppeteer: una instancia de navegador compartida entre solicitudes. */
 let browserPromise: Promise<Browser> | null = null;
 
+/**
+ * Import dinámico: el API puede arrancar sin `puppeteer` en node_modules; solo falla al pedir un PDF.
+ */
 async function getBrowser(): Promise<Browser> {
   if (!browserPromise) {
-    browserPromise = puppeteer.launch({
+    let launch: typeof import("puppeteer").default.launch;
+    try {
+      launch = (await import("puppeteer")).default.launch;
+    } catch (e) {
+      const code = e && typeof e === "object" && "code" in e ? (e as NodeJS.ErrnoException).code : undefined;
+      throw new AppError(
+        code === "ERR_MODULE_NOT_FOUND"
+          ? "Falta el paquete puppeteer: ejecutá npm install en la raíz del proyecto."
+          : "No se pudo cargar puppeteer para generar PDFs.",
+        503
+      );
+    }
+    browserPromise = launch({
       headless: true,
       args: [
         "--no-sandbox",

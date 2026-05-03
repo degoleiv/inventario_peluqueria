@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   createPedidoProveedor,
-  createProveedor,
   fetchPedidosProveedores,
   fetchProductos,
   fetchProveedores,
@@ -66,12 +66,6 @@ export function PedidosProveedoresPage() {
   const [error, setError] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
 
-  const [provNombre, setProvNombre] = useState("");
-  const [provTel, setProvTel] = useState("");
-  const [provEmail, setProvEmail] = useState("");
-  const [provNotas, setProvNotas] = useState("");
-  const [provBusy, setProvBusy] = useState(false);
-
   const [proveedorId, setProveedorId] = useState<number | "">("");
   const [fechaPedido, setFechaPedido] = useState(() => new Date().toISOString().slice(0, 10));
   const [fechaPagoDesc, setFechaPagoDesc] = useState("");
@@ -117,6 +111,20 @@ export function PedidosProveedoresPage() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (!edit) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setEdit(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [edit]);
+
+  const proveedoresActivos = useMemo(
+    () => proveedores.filter((p) => p.estado === "activo"),
+    [proveedores]
+  );
+
   function setLinea(i: number, patch: Partial<Linea>) {
     setLineas((prev) => prev.map((l, j) => (j === i ? { ...l, ...patch } : l)));
   }
@@ -129,39 +137,11 @@ export function PedidosProveedoresPage() {
     setLineas((prev) => prev.filter((_, j) => j !== i));
   }
 
-  async function onProveedorSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!provNombre.trim()) {
-      setError("Nombre del proveedor es obligatorio");
-      return;
-    }
-    setProvBusy(true);
-    setError(null);
-    try {
-      await createProveedor({
-        nombre: provNombre.trim(),
-        telefono: provTel.trim() || null,
-        email: provEmail.trim() || null,
-        notas: provNotas.trim() || null,
-      });
-      setOkMsg("Proveedor guardado. Podés asignarlo al pedido abajo.");
-      setProvNombre("");
-      setProvTel("");
-      setProvEmail("");
-      setProvNotas("");
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al crear proveedor");
-    } finally {
-      setProvBusy(false);
-    }
-  }
-
   async function onPedidoSubmit(e: React.FormEvent) {
     e.preventDefault();
     setOkMsg(null);
     if (proveedorId === "") {
-      setError("Elegí un proveedor de la lista (formulario separado arriba para altas nuevas).");
+      setError("Elegí un proveedor activo de la lista o gestioná altas en el módulo Proveedores.");
       return;
     }
     const built: Record<string, unknown>[] = [];
@@ -288,51 +268,6 @@ export function PedidosProveedoresPage() {
       ) : null}
 
       <section className="card">
-        <h2 className="card-title">Proveedores</h2>
-        <p className="hint">
-          Alta de proveedores en este formulario. Los pedidos se arman aparte y siempre enlazan un
-          proveedor ya guardado.
-        </p>
-        <form className="form" onSubmit={onProveedorSubmit}>
-          <div className="grid-2">
-            <label className="field">
-              <span>Nombre *</span>
-              <input value={provNombre} onChange={(e) => setProvNombre(e.target.value)} required />
-            </label>
-            <label className="field">
-              <span>Teléfono</span>
-              <input value={provTel} onChange={(e) => setProvTel(e.target.value)} />
-            </label>
-            <label className="field">
-              <span>Email</span>
-              <input type="email" value={provEmail} onChange={(e) => setProvEmail(e.target.value)} />
-            </label>
-            <label className="field">
-              <span>Notas</span>
-              <input value={provNotas} onChange={(e) => setProvNotas(e.target.value)} />
-            </label>
-          </div>
-          <div className="actions">
-            <button type="submit" className="btn primary" disabled={provBusy}>
-              Guardar proveedor
-            </button>
-          </div>
-        </form>
-        {proveedores.length > 0 ? (
-          <ul className="muted" style={{ marginTop: "1rem", columns: 2 }}>
-            {proveedores.map((p) => (
-              <li key={p.id}>
-                {p.nombre}
-                {p.telefono ? ` · ${p.telefono}` : ""}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="muted">Sin proveedores aún.</p>
-        )}
-      </section>
-
-      <section className="card">
         <h2 className="card-title">Nuevo pedido a proveedor</h2>
         <p className="hint">
           Cada pedido debe tener un proveedor de la lista. Actualiza stock (ENTRADA) y opcionalmente
@@ -342,20 +277,26 @@ export function PedidosProveedoresPage() {
           <div className="grid-2">
             <label className="field">
               <span>Proveedor *</span>
-              <select
-                value={proveedorId === "" ? "" : String(proveedorId)}
-                onChange={(e) =>
-                  setProveedorId(e.target.value === "" ? "" : Number(e.target.value))
-                }
-                required
-              >
-                <option value="">— Elegir —</option>
-                {proveedores.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombre}
-                  </option>
-                ))}
-              </select>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
+                <select
+                  style={{ flex: "1 1 12rem", minWidth: 0 }}
+                  value={proveedorId === "" ? "" : String(proveedorId)}
+                  onChange={(e) =>
+                    setProveedorId(e.target.value === "" ? "" : Number(e.target.value))
+                  }
+                  required
+                >
+                  <option value="">— Elegir —</option>
+                  {proveedoresActivos.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nombre}
+                    </option>
+                  ))}
+                </select>
+                <Link to="/proveedores" className="btn ghost small">
+                  Proveedores
+                </Link>
+              </div>
             </label>
             <label className="field">
               <span>Fecha del pedido *</span>
@@ -618,24 +559,12 @@ export function PedidosProveedoresPage() {
       {edit ? (
         <div
           className="drawer-overlay"
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.45)",
-            zIndex: 50,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "1rem",
-          }}
           role="dialog"
           aria-modal
           aria-labelledby="edit-pedido-title"
+          onClick={() => setEdit(null)}
         >
-          <div
-            className="card"
-            style={{ maxWidth: 520, width: "100%", maxHeight: "90vh", overflow: "auto" }}
-          >
+          <div className="card drawer-overlay-card" onClick={(e) => e.stopPropagation()}>
             <h3 id="edit-pedido-title" className="card-title">
               Editar pedido #{edit.id}
             </h3>

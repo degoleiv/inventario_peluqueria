@@ -1,0 +1,1426 @@
+/**
+ * Puente progresivo: mapea layout y componentes existentes (.card, .btn, …)
+ * a variables del tema activo en <body> sin tocar la lógica React.
+ */
+body.theme-default,
+body.theme-neon,
+body.theme-girly,
+body.theme-purple,
+body.theme-ocean,
+body.theme-slate {
+  font-family: var(--font-ui);
+  color: var(--text);
+  background-color: var(--background);
+}
+
+html {
+  background-color: var(--background, #f9fafb);
+}
+
+#root {
+  color: var(--text);
+}
+
+body.theme-default .app-root,
+body.theme-neon .app-root,
+body.theme-girly .app-root,
+body.theme-purple .app-root,
+body.theme-ocean .app-root,
+body.theme-slate .app-root {
+  background: var(--background);
+  color: var(--text);
+}
+
+body.theme-default .main-pro,
+body.theme-neon .main-pro,
+body.theme-girly .main-pro,
+body.theme-purple .main-pro,
+body.theme-ocean .main-pro,
+body.theme-slate .main-pro {
+  background: var(--background);
+  color: var(--text);
+}
+
+body.theme-default .main-pro-title,
+body.theme-neon .main-pro-title,
+body.theme-girly .main-pro-title,
+body.theme-purple .main-pro-title,
+body.theme-ocean .main-pro-title,
+body.theme-slate .main-pro-title {
+  color: var(--text);
+}
+
+body.theme-default .topbar,
+body.theme-neon .topbar,
+body.theme-girly .topbar,
+body.theme-purple .topbar,
+body.theme-ocean .topbar,
+body.theme-slate .topbar {
+  background: var(--topbar-bg);
+  border-bottom-color: var(--border);
+  box-shadow: var(--clay-shadow-a);
+}
+
+body.theme-default .topbar-brand,
+body.theme-neon .topbar-brand,
+body.theme-girly .topbar-brand,
+body.theme-purple .topbar-brand,
+body.theme-ocean .topbar-brand,
+body.theme-slate .topbar-brand {
+  color: var(--text);
+}
+
+body.theme-default .topbar-user,
+body.theme-neon .topbar-user,
+body.theme-girly .topbar-user,
+body.theme-purple .topbar-user,
+body.theme-ocean .topbar-user,
+body.theme-slate .topbar-user {
+  color: var(--text-muted);
+}
+
+body.theme-default .sidebar-pro,
+body.theme-neon .sidebar-pro,
+body.theme-girly .sidebar-pro,
+body.theme-purple .sidebar-pro,
+body.theme-ocean .sidebar-pro,
+body.theme-slate .sidebar-pro {
+  background: var(--sidebar-bg);
+  color: var(--sidebar-text);
+  border-right-color: var(--border);
+}
+
+body.theme-default .sidebar-link,
+body.theme-neon .sidebar-link,
+body.theme-girly .sidebar-link,
+body.theme-purple .sidebar-link,
+body.theme-ocean .sidebar-link,
+body.theme-slate .sidebar-link {
+  color: var(--sidebar-text);
+}
+
+body.theme-default .sidebar-link--active,
+body.theme-neon .sidebar-link--active,
+body.theme-girly .sidebar-link--active,
+body.theme-purple .sidebar-link--active,
+body.theme-ocean .sidebar-link--active,
+body.theme-slate .sidebar-link--active {
+  background: var(--sidebar-active);
+  color: #fff;
+}
+
+body.theme-default .sidebar-group-label,
+body.theme-neon .sidebar-group-label,
+body.theme-girly .sidebar-group-label,
+body.theme-purple .sidebar-group-label,
+body.theme-ocean .sidebar-group-label,
+body.theme-slate .sidebar-group-label {
+  color: color-mix(in srgb, var(--sidebar-text) 55%, transparent);
+}
+
+body.theme-default .btn-icon,
+body.theme-neon .btn-icon,
+body.theme-girly .btn-icon,
+body.theme-purple .btn-icon,
+body.theme-ocean .btn-icon,
+body.theme-slate .btn-icon {
+  background: var(--surface);
+  color: var(--text);
+  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  box-shadow: var(--clay-raise);
+  transition:
+    box-shadow 0.14s ease,
+    transform 0.12s ease;
+}
+
+body.theme-default .btn-icon:hover,
+body.theme-neon .btn-icon:hover,
+body.theme-girly .btn-icon:hover,
+body.theme-purple .btn-icon:hover,
+body.theme-ocean .btn-icon:hover,
+body.theme-slate .btn-icon:hover {
+  filter: brightness(1.03);
+}
+
+body.theme-default .btn-icon:active,
+body.theme-neon .btn-icon:active,
+body.theme-girly .btn-icon:active,
+body.theme-purple .btn-icon:active,
+body.theme-ocean .btn-icon:active,
+body.theme-slate .btn-icon:active {
+  box-shadow: var(--clay-btn-active);
+  transform: scale(0.97);
+}
+
+body.theme-default .btn-icon:focus-visible,
+body.theme-neon .btn-icon:focus-visible,
+body.theme-girly .btn-icon:focus-visible,
+body.theme-purple .btn-icon:focus-visible,
+body.theme-ocean .btn-icon:focus-visible,
+body.theme-slate .btn-icon:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+body.theme-default .subnav-wrap,
+body.theme-neon .subnav-wrap,
+body.theme-girly .subnav-wrap,
+body.theme-purple .subnav-wrap,
+body.theme-ocean .subnav-wrap,
+body.theme-slate .subnav-wrap {
+  background: var(--background);
+  border-bottom-color: var(--border);
+}
+
+body.theme-default .subnav-link,
+body.theme-neon .subnav-link,
+body.theme-girly .subnav-link,
+body.theme-purple .subnav-link,
+body.theme-ocean .subnav-link,
+body.theme-slate .subnav-link {
+  color: var(--text-muted);
+}
+
+body.theme-default .subnav-link--active,
+body.theme-neon .subnav-link--active,
+body.theme-girly .subnav-link--active,
+body.theme-purple .subnav-link--active,
+body.theme-ocean .subnav-link--active,
+body.theme-slate .subnav-link--active {
+  color: var(--text);
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--surface) 92%, var(--primary) 8%);
+}
+
+/* —— Cards / estadísticas (clay) —— */
+body.theme-default .card,
+body.theme-neon .card,
+body.theme-girly .card,
+body.theme-purple .card,
+body.theme-ocean .card,
+body.theme-slate .card,
+body.theme-default .card-pro,
+body.theme-neon .card-pro,
+body.theme-girly .card-pro,
+body.theme-purple .card-pro,
+body.theme-ocean .card-pro,
+body.theme-slate .card-pro,
+body.theme-default .stat-card,
+body.theme-neon .stat-card,
+body.theme-girly .stat-card,
+body.theme-purple .stat-card,
+body.theme-ocean .stat-card,
+body.theme-slate .stat-card {
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--clay-raise);
+  color: var(--text);
+}
+
+@media (max-width: 768px) {
+  body.theme-default .card,
+  body.theme-neon .card,
+  body.theme-girly .card,
+  body.theme-purple .card,
+  body.theme-ocean .card,
+  body.theme-slate .card,
+  body.theme-default .card-pro,
+  body.theme-neon .card-pro,
+  body.theme-girly .card-pro,
+  body.theme-purple .card-pro,
+  body.theme-ocean .card-pro,
+  body.theme-slate .card-pro,
+  body.theme-default .stat-card,
+  body.theme-neon .stat-card,
+  body.theme-girly .stat-card,
+  body.theme-purple .stat-card,
+  body.theme-ocean .stat-card,
+  body.theme-slate .stat-card {
+    box-shadow: var(--clay-shadow-a), var(--clay-shadow-b);
+  }
+}
+
+body.theme-default .title,
+body.theme-neon .title,
+body.theme-girly .title,
+body.theme-purple .title,
+body.theme-ocean .title,
+body.theme-slate .title,
+body.theme-default .card-title,
+body.theme-neon .card-title,
+body.theme-girly .card-title,
+body.theme-purple .card-title,
+body.theme-ocean .card-title,
+body.theme-slate .card-title,
+body.theme-default .card-pro-title,
+body.theme-neon .card-pro-title,
+body.theme-girly .card-pro-title,
+body.theme-purple .card-pro-title,
+body.theme-ocean .card-pro-title,
+body.theme-slate .card-pro-title {
+  color: var(--text);
+}
+
+body.theme-default .subtitle,
+body.theme-neon .subtitle,
+body.theme-girly .subtitle,
+body.theme-purple .subtitle,
+body.theme-ocean .subtitle,
+body.theme-slate .subtitle,
+body.theme-default .muted,
+body.theme-neon .muted,
+body.theme-girly .muted,
+body.theme-purple .muted,
+body.theme-ocean .muted,
+body.theme-slate .muted,
+body.theme-default .stat-label,
+body.theme-neon .stat-label,
+body.theme-girly .stat-label,
+body.theme-purple .stat-label,
+body.theme-ocean .stat-label,
+body.theme-slate .stat-label,
+body.theme-default .stat-meta,
+body.theme-neon .stat-meta,
+body.theme-girly .stat-meta,
+body.theme-purple .stat-meta,
+body.theme-ocean .stat-meta,
+body.theme-slate .stat-meta {
+  color: var(--text-muted);
+}
+
+body.theme-default .stat-value,
+body.theme-neon .stat-value,
+body.theme-girly .stat-value,
+body.theme-purple .stat-value,
+body.theme-ocean .stat-value,
+body.theme-slate .stat-value {
+  color: var(--text);
+}
+
+/* —— Botones existentes (Fase 2 — relieve clay) —— */
+body.theme-default .btn,
+body.theme-neon .btn,
+body.theme-girly .btn,
+body.theme-purple .btn,
+body.theme-ocean .btn,
+body.theme-slate .btn {
+  transition:
+    box-shadow 0.14s ease,
+    transform 0.12s ease,
+    filter 0.12s ease;
+}
+
+body.theme-default .btn.primary,
+body.theme-neon .btn.primary,
+body.theme-girly .btn.primary,
+body.theme-purple .btn.primary,
+body.theme-ocean .btn.primary,
+body.theme-slate .btn.primary {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-clay);
+  box-shadow: var(--clay-raise-primary);
+}
+
+body.theme-default .btn.primary:hover:not(:disabled),
+body.theme-neon .btn.primary:hover:not(:disabled),
+body.theme-girly .btn.primary:hover:not(:disabled),
+body.theme-purple .btn.primary:hover:not(:disabled),
+body.theme-ocean .btn.primary:hover:not(:disabled),
+body.theme-slate .btn.primary:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+body.theme-default .btn.primary:active:not(:disabled),
+body.theme-neon .btn.primary:active:not(:disabled),
+body.theme-girly .btn.primary:active:not(:disabled),
+body.theme-purple .btn.primary:active:not(:disabled),
+body.theme-ocean .btn.primary:active:not(:disabled),
+body.theme-slate .btn.primary:active:not(:disabled) {
+  box-shadow: var(--clay-primary-pressed);
+  transform: scale(0.985);
+}
+
+body.theme-default .btn.primary:focus-visible,
+body.theme-neon .btn.primary:focus-visible,
+body.theme-girly .btn.primary:focus-visible,
+body.theme-purple .btn.primary:focus-visible,
+body.theme-ocean .btn.primary:focus-visible,
+body.theme-slate .btn.primary:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
+body.theme-default .btn.secondary,
+body.theme-neon .btn.secondary,
+body.theme-girly .btn.secondary,
+body.theme-purple .btn.secondary,
+body.theme-ocean .btn.secondary,
+body.theme-slate .btn.secondary {
+  background: color-mix(in srgb, var(--surface) 82%, var(--secondary) 18%);
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: var(--radius-clay);
+  box-shadow: var(--clay-raise);
+}
+
+body.theme-default .btn.secondary:hover:not(:disabled),
+body.theme-neon .btn.secondary:hover:not(:disabled),
+body.theme-girly .btn.secondary:hover:not(:disabled),
+body.theme-purple .btn.secondary:hover:not(:disabled),
+body.theme-ocean .btn.secondary:hover:not(:disabled),
+body.theme-slate .btn.secondary:hover:not(:disabled) {
+  filter: brightness(1.02);
+}
+
+body.theme-default .btn.secondary:active:not(:disabled),
+body.theme-neon .btn.secondary:active:not(:disabled),
+body.theme-girly .btn.secondary:active:not(:disabled),
+body.theme-purple .btn.secondary:active:not(:disabled),
+body.theme-ocean .btn.secondary:active:not(:disabled),
+body.theme-slate .btn.secondary:active:not(:disabled) {
+  box-shadow: var(--clay-btn-active);
+  transform: scale(0.985);
+}
+
+body.theme-default .btn.ghost,
+body.theme-neon .btn.ghost,
+body.theme-girly .btn.ghost,
+body.theme-purple .btn.ghost,
+body.theme-ocean .btn.ghost,
+body.theme-slate .btn.ghost {
+  background: color-mix(in srgb, var(--surface) 45%, transparent);
+  color: var(--text-muted);
+  border: 1px dashed color-mix(in srgb, var(--border) 85%, var(--text-muted) 15%);
+  border-radius: var(--radius-clay);
+  box-shadow:
+    2px 3px 8px rgba(0, 0, 0, 0.05), inset 1px 1px 3px rgba(255, 255, 255, 0.28),
+    inset -1px -2px 4px rgba(0, 0, 0, 0.04);
+}
+
+body.theme-default .btn.ghost:hover:not(:disabled),
+body.theme-neon .btn.ghost:hover:not(:disabled),
+body.theme-girly .btn.ghost:hover:not(:disabled),
+body.theme-purple .btn.ghost:hover:not(:disabled),
+body.theme-ocean .btn.ghost:hover:not(:disabled),
+body.theme-slate .btn.ghost:hover:not(:disabled) {
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface) 65%, transparent);
+}
+
+body.theme-default .btn.ghost:active:not(:disabled),
+body.theme-neon .btn.ghost:active:not(:disabled),
+body.theme-girly .btn.ghost:active:not(:disabled),
+body.theme-purple .btn.ghost:active:not(:disabled),
+body.theme-ocean .btn.ghost:active:not(:disabled),
+body.theme-slate .btn.ghost:active:not(:disabled) {
+  box-shadow: var(--clay-btn-active);
+}
+
+body.theme-default .btn-quick--accent,
+body.theme-neon .btn-quick--accent,
+body.theme-girly .btn-quick--accent,
+body.theme-purple .btn-quick--accent,
+body.theme-ocean .btn-quick--accent,
+body.theme-slate .btn-quick--accent {
+  background: linear-gradient(180deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 78%, #000) 100%);
+  color: #1a1a1a;
+  border: none;
+  border-radius: var(--radius-clay);
+  box-shadow: var(--clay-raise-primary);
+}
+
+body.theme-neon .btn-quick--accent,
+body.theme-girly .btn-quick--accent,
+body.theme-purple .btn-quick--accent,
+body.theme-ocean .btn-quick--accent,
+body.theme-slate .btn-quick--accent {
+  color: #111;
+}
+
+body.theme-default .btn-quick--accent:active:not(:disabled),
+body.theme-neon .btn-quick--accent:active:not(:disabled),
+body.theme-girly .btn-quick--accent:active:not(:disabled),
+body.theme-purple .btn-quick--accent:active:not(:disabled),
+body.theme-ocean .btn-quick--accent:active:not(:disabled),
+body.theme-slate .btn-quick--accent:active:not(:disabled) {
+  box-shadow: var(--clay-primary-pressed);
+  transform: scale(0.985);
+}
+
+body.theme-default .btn-quick--ghost,
+body.theme-neon .btn-quick--ghost,
+body.theme-girly .btn-quick--ghost,
+body.theme-purple .btn-quick--ghost,
+body.theme-ocean .btn-quick--ghost,
+body.theme-slate .btn-quick--ghost {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: var(--radius-clay);
+  box-shadow: var(--clay-raise);
+}
+
+body.theme-default .btn-quick--ghost:active:not(:disabled),
+body.theme-neon .btn-quick--ghost:active:not(:disabled),
+body.theme-girly .btn-quick--ghost:active:not(:disabled),
+body.theme-purple .btn-quick--ghost:active:not(:disabled),
+body.theme-ocean .btn-quick--ghost:active:not(:disabled),
+body.theme-slate .btn-quick--ghost:active:not(:disabled) {
+  box-shadow: var(--clay-btn-active);
+}
+
+@media (max-width: 768px) {
+  body.theme-default .btn.primary,
+  body.theme-neon .btn.primary,
+  body.theme-girly .btn.primary,
+  body.theme-purple .btn.primary,
+  body.theme-ocean .btn.primary,
+  body.theme-slate .btn.primary,
+  body.theme-default .btn.secondary,
+  body.theme-neon .btn.secondary,
+  body.theme-girly .btn.secondary,
+  body.theme-purple .btn.secondary,
+  body.theme-ocean .btn.secondary,
+  body.theme-slate .btn.secondary,
+  body.theme-default .btn-quick--accent,
+  body.theme-neon .btn-quick--accent,
+  body.theme-girly .btn-quick--accent,
+  body.theme-purple .btn-quick--accent,
+  body.theme-ocean .btn-quick--accent,
+  body.theme-slate .btn-quick--accent,
+  body.theme-default .btn-quick--ghost,
+  body.theme-neon .btn-quick--ghost,
+  body.theme-girly .btn-quick--ghost,
+  body.theme-purple .btn-quick--ghost,
+  body.theme-ocean .btn-quick--ghost,
+  body.theme-slate .btn-quick--ghost {
+    box-shadow: var(--clay-shadow-a), var(--clay-shadow-b);
+  }
+
+  body.theme-default .btn.primary:active:not(:disabled),
+  body.theme-neon .btn.primary:active:not(:disabled),
+  body.theme-girly .btn.primary:active:not(:disabled),
+  body.theme-purple .btn.primary:active:not(:disabled),
+  body.theme-ocean .btn.primary:active:not(:disabled),
+  body.theme-slate .btn.primary:active:not(:disabled),
+  body.theme-default .btn-quick--accent:active:not(:disabled),
+  body.theme-neon .btn-quick--accent:active:not(:disabled),
+  body.theme-girly .btn-quick--accent:active:not(:disabled),
+  body.theme-purple .btn-quick--accent:active:not(:disabled),
+  body.theme-ocean .btn-quick--accent:active:not(:disabled),
+  body.theme-slate .btn-quick--accent:active:not(:disabled) {
+    box-shadow: var(--clay-primary-pressed);
+  }
+
+  body.theme-default .btn.secondary:active:not(:disabled),
+  body.theme-neon .btn.secondary:active:not(:disabled),
+  body.theme-girly .btn.secondary:active:not(:disabled),
+  body.theme-purple .btn.secondary:active:not(:disabled),
+  body.theme-ocean .btn.secondary:active:not(:disabled),
+  body.theme-slate .btn.secondary:active:not(:disabled),
+  body.theme-default .btn-quick--ghost:active:not(:disabled),
+  body.theme-neon .btn-quick--ghost:active:not(:disabled),
+  body.theme-girly .btn-quick--ghost:active:not(:disabled),
+  body.theme-purple .btn-quick--ghost:active:not(:disabled),
+  body.theme-ocean .btn-quick--ghost:active:not(:disabled),
+  body.theme-slate .btn-quick--ghost:active:not(:disabled) {
+    box-shadow: var(--clay-btn-active);
+  }
+}
+
+/* —— Inputs / selects (hundidos — inset) —— */
+body.theme-default input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not(
+    [type="hidden"]
+  ):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]),
+body.theme-neon input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not(
+    [type="hidden"]
+  ):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]),
+body.theme-girly input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not(
+    [type="hidden"]
+  ):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]),
+body.theme-purple input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not(
+    [type="hidden"]
+  ):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]),
+body.theme-ocean input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not(
+    [type="hidden"]
+  ):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]),
+body.theme-slate input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not(
+    [type="hidden"]
+  ):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]),
+body.theme-default textarea,
+body.theme-neon textarea,
+body.theme-girly textarea,
+body.theme-purple textarea,
+body.theme-ocean textarea,
+body.theme-slate textarea,
+body.theme-default select,
+body.theme-neon select,
+body.theme-girly select,
+body.theme-purple select,
+body.theme-ocean select,
+body.theme-slate select,
+body.theme-default .busca-input,
+body.theme-neon .busca-input,
+body.theme-girly .busca-input,
+body.theme-purple .busca-input,
+body.theme-ocean .busca-input,
+body.theme-slate .busca-input,
+body.theme-default .palette-input,
+body.theme-neon .palette-input,
+body.theme-girly .palette-input,
+body.theme-purple .palette-input,
+body.theme-ocean .palette-input,
+body.theme-slate .palette-input {
+  background: var(--input-bg);
+  border: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
+  border-radius: var(--radius-clay);
+  color: var(--text);
+  outline: none;
+  box-shadow: var(--clay-sink);
+  transition:
+    box-shadow 0.15s ease,
+    border-color 0.15s ease;
+}
+
+body.theme-default input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not(
+    [type="hidden"]
+  ):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]):focus,
+body.theme-neon input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not(
+    [type="hidden"]
+  ):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]):focus,
+body.theme-girly input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not(
+    [type="hidden"]
+  ):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]):focus,
+body.theme-purple input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not(
+    [type="hidden"]
+  ):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]):focus,
+body.theme-ocean input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not(
+    [type="hidden"]
+  ):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]):focus,
+body.theme-slate input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not(
+    [type="hidden"]
+  ):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]):focus,
+body.theme-default textarea:focus,
+body.theme-neon textarea:focus,
+body.theme-girly textarea:focus,
+body.theme-purple textarea:focus,
+body.theme-ocean textarea:focus,
+body.theme-slate textarea:focus,
+body.theme-default select:focus,
+body.theme-neon select:focus,
+body.theme-girly select:focus,
+body.theme-purple select:focus,
+body.theme-ocean select:focus,
+body.theme-slate select:focus,
+body.theme-default .busca-input:focus,
+body.theme-neon .busca-input:focus,
+body.theme-girly .busca-input:focus,
+body.theme-purple .busca-input:focus,
+body.theme-ocean .busca-input:focus,
+body.theme-slate .busca-input:focus,
+body.theme-default .palette-input:focus,
+body.theme-neon .palette-input:focus,
+body.theme-girly .palette-input:focus,
+body.theme-purple .palette-input:focus,
+body.theme-ocean .palette-input:focus,
+body.theme-slate .palette-input:focus {
+  border-color: color-mix(in srgb, var(--primary) 50%, var(--border));
+  outline: none;
+  box-shadow:
+    var(--clay-sink), 0 0 0 3px var(--focus-ring),
+    0 0 18px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+@media (max-width: 768px) {
+  body.theme-default input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not(
+      [type="hidden"]
+    ):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]),
+  body.theme-neon input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not(
+      [type="hidden"]
+    ):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]),
+  body.theme-girly input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not(
+      [type="hidden"]
+    ):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]),
+  body.theme-purple input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not(
+      [type="hidden"]
+    ):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]),
+  body.theme-ocean input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not(
+      [type="hidden"]
+    ):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]),
+  body.theme-slate input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not(
+      [type="hidden"]
+    ):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]),
+  body.theme-default textarea,
+  body.theme-neon textarea,
+  body.theme-girly textarea,
+  body.theme-purple textarea,
+  body.theme-ocean textarea,
+  body.theme-slate textarea,
+  body.theme-default select,
+  body.theme-neon select,
+  body.theme-girly select,
+  body.theme-purple select,
+  body.theme-ocean select,
+  body.theme-slate select,
+  body.theme-default .busca-input,
+  body.theme-neon .busca-input,
+  body.theme-girly .busca-input,
+  body.theme-purple .busca-input,
+  body.theme-ocean .busca-input,
+  body.theme-slate .busca-input,
+  body.theme-default .palette-input,
+  body.theme-neon .palette-input,
+  body.theme-girly .palette-input,
+  body.theme-purple .palette-input,
+  body.theme-ocean .palette-input,
+  body.theme-slate .palette-input {
+    box-shadow:
+      inset 2px 2px 6px color-mix(in srgb, var(--text) 12%, transparent),
+      inset -2px -2px 8px color-mix(in srgb, var(--surface) 80%, var(--background));
+  }
+}
+
+/* Inputs compactos (POS / tablas) */
+body.theme-default input.input-compact,
+body.theme-neon input.input-compact,
+body.theme-girly input.input-compact,
+body.theme-purple input.input-compact,
+body.theme-ocean input.input-compact,
+body.theme-slate input.input-compact {
+  border-radius: var(--radius-md);
+}
+
+body.theme-default .field span,
+body.theme-neon .field span,
+body.theme-girly .field span,
+body.theme-purple .field span,
+body.theme-ocean .field span,
+body.theme-slate .field span,
+body.theme-default .field-label-strong,
+body.theme-neon .field-label-strong,
+body.theme-girly .field-label-strong,
+body.theme-purple .field-label-strong,
+body.theme-ocean .field-label-strong,
+body.theme-slate .field-label-strong {
+  color: var(--text-muted);
+}
+
+/* —— Tablas —— */
+body.theme-default .table-wrap,
+body.theme-neon .table-wrap,
+body.theme-girly .table-wrap,
+body.theme-purple .table-wrap,
+body.theme-ocean .table-wrap,
+body.theme-slate .table-wrap {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+}
+
+body.theme-default .table th,
+body.theme-neon .table th,
+body.theme-girly .table th,
+body.theme-purple .table th,
+body.theme-ocean .table th,
+body.theme-slate .table th,
+body.theme-default .table td,
+body.theme-neon .table td,
+body.theme-girly .table td,
+body.theme-purple .table td,
+body.theme-ocean .table td,
+body.theme-slate .table td {
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+body.theme-default .table th,
+body.theme-neon .table th,
+body.theme-girly .table th,
+body.theme-purple .table th,
+body.theme-ocean .table th,
+body.theme-slate .table th {
+  color: var(--text-muted);
+}
+
+body.theme-default .table-row-click:hover,
+body.theme-neon .table-row-click:hover,
+body.theme-girly .table-row-click:hover,
+body.theme-purple .table-row-click:hover,
+body.theme-ocean .table-row-click:hover,
+body.theme-slate .table-row-click:hover {
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface));
+}
+
+body.theme-default .cell-main,
+body.theme-neon .cell-main,
+body.theme-girly .cell-main,
+body.theme-purple .cell-main,
+body.theme-ocean .cell-main,
+body.theme-slate .cell-main {
+  color: var(--text);
+}
+
+body.theme-default .cell-sub,
+body.theme-neon .cell-sub,
+body.theme-girly .cell-sub,
+body.theme-purple .cell-sub,
+body.theme-ocean .cell-sub,
+body.theme-slate .cell-sub {
+  color: var(--text-muted);
+}
+
+/* —— Drawer / “modal” lateral —— */
+body.theme-default .drawer-backdrop,
+body.theme-neon .drawer-backdrop,
+body.theme-girly .drawer-backdrop,
+body.theme-purple .drawer-backdrop,
+body.theme-ocean .drawer-backdrop,
+body.theme-slate .drawer-backdrop {
+  background: rgba(0, 0, 0, 0.48);
+}
+
+body.theme-default .drawer-panel,
+body.theme-neon .drawer-panel,
+body.theme-girly .drawer-panel,
+body.theme-purple .drawer-panel,
+body.theme-ocean .drawer-panel,
+body.theme-slate .drawer-panel {
+  background: var(--surface);
+  color: var(--text);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--clay-raise);
+  animation: clay-drawer-in 0.24s ease;
+}
+
+body.theme-default .drawer-title,
+body.theme-neon .drawer-title,
+body.theme-girly .drawer-title,
+body.theme-purple .drawer-title,
+body.theme-ocean .drawer-title,
+body.theme-slate .drawer-title {
+  color: var(--text);
+}
+
+body.theme-default .drawer-header,
+body.theme-neon .drawer-header,
+body.theme-girly .drawer-header,
+body.theme-purple .drawer-header,
+body.theme-ocean .drawer-header,
+body.theme-slate .drawer-header,
+body.theme-default .drawer-actions,
+body.theme-neon .drawer-actions,
+body.theme-girly .drawer-actions,
+body.theme-purple .drawer-actions,
+body.theme-ocean .drawer-actions,
+body.theme-slate .drawer-actions {
+  border-color: var(--border);
+}
+
+@keyframes clay-drawer-in {
+  from {
+    opacity: 0.9;
+    transform: translateX(10px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@media (max-width: 640px) {
+  body.theme-default .drawer-panel,
+  body.theme-neon .drawer-panel,
+  body.theme-girly .drawer-panel {
+    width: 100%;
+    max-width: 100%;
+    animation: clay-drawer-in-mobile 0.22s ease;
+  }
+}
+
+@keyframes clay-drawer-in-mobile {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.theme-default .drawer-panel,
+  body.theme-neon .drawer-panel,
+  body.theme-girly .drawer-panel {
+    animation: none;
+  }
+}
+
+/* —— POS: chips y cantidad (misma familia clay) —— */
+body.theme-default .qty-btn,
+body.theme-neon .qty-btn,
+body.theme-girly .qty-btn,
+body.theme-purple .qty-btn,
+body.theme-ocean .qty-btn,
+body.theme-slate .qty-btn,
+body.theme-default .pos-pay-chip,
+body.theme-neon .pos-pay-chip,
+body.theme-girly .pos-pay-chip,
+body.theme-purple .pos-pay-chip,
+body.theme-ocean .pos-pay-chip,
+body.theme-slate .pos-pay-chip {
+  border-radius: var(--radius-clay);
+  box-shadow: var(--clay-raise);
+  border-color: color-mix(in srgb, var(--border) 85%, transparent);
+}
+
+body.theme-default .qty-btn:active,
+body.theme-neon .qty-btn:active,
+body.theme-girly .qty-btn:active,
+body.theme-purple .qty-btn:active,
+body.theme-ocean .qty-btn:active,
+body.theme-slate .qty-btn:active,
+body.theme-default .pos-pay-chip:active,
+body.theme-neon .pos-pay-chip:active,
+body.theme-girly .pos-pay-chip:active,
+body.theme-purple .pos-pay-chip:active,
+body.theme-ocean .pos-pay-chip:active,
+body.theme-slate .pos-pay-chip:active {
+  box-shadow: var(--clay-btn-active);
+}
+
+/* —— Badges inventario (HU2) —— */
+body.theme-default .stock-badge,
+body.theme-neon .stock-badge,
+body.theme-girly .stock-badge,
+body.theme-purple .stock-badge,
+body.theme-ocean .stock-badge,
+body.theme-slate .stock-badge {
+  background: var(--stock-ok-bg);
+  color: var(--stock-ok-fg);
+}
+
+body.theme-default .stock-badge--low,
+body.theme-neon .stock-badge--low,
+body.theme-girly .stock-badge--low,
+body.theme-purple .stock-badge--low,
+body.theme-ocean .stock-badge--low,
+body.theme-slate .stock-badge--low {
+  background: var(--stock-low-bg);
+  color: var(--stock-low-fg);
+}
+
+body.theme-default .stock-badge--out,
+body.theme-neon .stock-badge--out,
+body.theme-girly .stock-badge--out,
+body.theme-purple .stock-badge--out,
+body.theme-ocean .stock-badge--out,
+body.theme-slate .stock-badge--out {
+  background: var(--stock-out-bg);
+  color: var(--stock-out-fg);
+}
+
+/* —— Banners / toasts / enlaces —— */
+body.theme-default .banner-error,
+body.theme-neon .banner-error,
+body.theme-girly .banner-error,
+body.theme-purple .banner-error,
+body.theme-ocean .banner-error,
+body.theme-slate .banner-error {
+  background: color-mix(in srgb, var(--danger) 12%, var(--surface));
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 35%, var(--border));
+}
+
+body.theme-default .link,
+body.theme-neon .link,
+body.theme-girly .link,
+body.theme-purple .link,
+body.theme-ocean .link,
+body.theme-slate .link {
+  color: var(--primary);
+}
+
+body.theme-default .breadcrumb-link,
+body.theme-neon .breadcrumb-link,
+body.theme-girly .breadcrumb-link,
+body.theme-purple .breadcrumb-link,
+body.theme-ocean .breadcrumb-link,
+body.theme-slate .breadcrumb-link {
+  color: var(--primary);
+}
+
+body.theme-default .kbd-mini,
+body.theme-neon .kbd-mini,
+body.theme-girly .kbd-mini,
+body.theme-purple .kbd-mini,
+body.theme-ocean .kbd-mini,
+body.theme-slate .kbd-mini {
+  background: var(--input-bg);
+  border-color: var(--border);
+  color: var(--text-muted);
+}
+
+/* Paleta de comandos */
+body.theme-default .palette-panel,
+body.theme-neon .palette-panel,
+body.theme-girly .palette-panel,
+body.theme-purple .palette-panel,
+body.theme-ocean .palette-panel,
+body.theme-slate .palette-panel {
+  background: var(--surface);
+  border-color: var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--clay-raise);
+}
+
+body.theme-default .palette-head,
+body.theme-neon .palette-head,
+body.theme-girly .palette-head,
+body.theme-purple .palette-head,
+body.theme-ocean .palette-head,
+body.theme-slate .palette-head {
+  color: var(--text);
+}
+
+body.theme-default .palette-item:hover,
+body.theme-neon .palette-item:hover,
+body.theme-girly .palette-item:hover,
+body.theme-purple .palette-item:hover,
+body.theme-ocean .palette-item:hover,
+body.theme-slate .palette-item:hover,
+body.theme-default .palette-item--active,
+body.theme-neon .palette-item--active,
+body.theme-girly .palette-item--active,
+body.theme-purple .palette-item--active,
+body.theme-ocean .palette-item--active,
+body.theme-slate .palette-item--active {
+  background: color-mix(in srgb, var(--primary) 12%, var(--surface));
+}
+
+/* Selector de paleta (topbar) */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.theme-picker-wrap {
+  display: inline-flex;
+  align-items: center;
+}
+
+body.theme-default .theme-picker,
+body.theme-neon .theme-picker,
+body.theme-girly .theme-picker,
+body.theme-purple .theme-picker,
+body.theme-ocean .theme-picker,
+body.theme-slate .theme-picker {
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.38rem 0.55rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--input-bg);
+  color: var(--text);
+  max-width: 9.5rem;
+  cursor: pointer;
+}
+
+body.theme-default .theme-picker:focus,
+body.theme-neon .theme-picker:focus,
+body.theme-girly .theme-picker:focus,
+body.theme-purple .theme-picker:focus,
+body.theme-ocean .theme-picker:focus,
+body.theme-slate .theme-picker:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+/* —— Fase 3: modales centrados (.drawer-overlay — proveedores, pedidos) —— */
+body.theme-default .drawer-overlay,
+body.theme-neon .drawer-overlay,
+body.theme-girly .drawer-overlay,
+body.theme-purple .drawer-overlay,
+body.theme-ocean .drawer-overlay,
+body.theme-slate .drawer-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: rgba(0, 0, 0, 0.48);
+  cursor: pointer;
+  animation: clay-dialog-backdrop-in 0.2s ease;
+}
+
+@keyframes clay-dialog-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+body.theme-default .drawer-overlay-card,
+body.theme-neon .drawer-overlay-card,
+body.theme-girly .drawer-overlay-card,
+body.theme-purple .drawer-overlay-card,
+body.theme-ocean .drawer-overlay-card,
+body.theme-slate .drawer-overlay-card {
+  position: relative;
+  z-index: 1;
+  max-width: 520px;
+  width: 100%;
+  max-height: min(90vh, 720px);
+  overflow: auto;
+  margin: 0;
+  cursor: default;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--clay-raise);
+  animation: clay-dialog-panel-in 0.22s ease;
+}
+
+@keyframes clay-dialog-panel-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (max-width: 640px) {
+  body.theme-default .drawer-overlay,
+  body.theme-neon .drawer-overlay,
+  body.theme-girly .drawer-overlay {
+    padding: 0;
+    align-items: stretch;
+  }
+
+  body.theme-default .drawer-overlay-card,
+  body.theme-neon .drawer-overlay-card,
+  body.theme-girly .drawer-overlay-card {
+    max-width: none;
+    max-height: none;
+    min-height: 100%;
+    border-radius: 0;
+    animation: clay-dialog-panel-in-mobile 0.2s ease;
+  }
+}
+
+@keyframes clay-dialog-panel-in-mobile {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.theme-default .drawer-overlay,
+  body.theme-neon .drawer-overlay,
+  body.theme-girly .drawer-overlay,
+  body.theme-default .drawer-overlay-card,
+  body.theme-neon .drawer-overlay-card,
+  body.theme-girly .drawer-overlay-card {
+    animation: none;
+  }
+}
+
+body.theme-default .drawer-footer,
+body.theme-neon .drawer-footer,
+body.theme-girly .drawer-footer,
+body.theme-purple .drawer-footer,
+body.theme-ocean .drawer-footer,
+body.theme-slate .drawer-footer {
+  flex-shrink: 0;
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 96%, var(--background));
+}
+
+/* —— Fase 4–5: tablas con separación suave + dashboard + shell móvil —— */
+body.theme-default .table-wrap > .table,
+body.theme-neon .table-wrap > .table,
+body.theme-girly .table-wrap > .table,
+body.theme-purple .table-wrap > .table,
+body.theme-ocean .table-wrap > .table,
+body.theme-slate .table-wrap > .table {
+  border-collapse: separate;
+  border-spacing: 0 0.45rem;
+}
+
+body.theme-default .table-wrap > .table thead th,
+body.theme-neon .table-wrap > .table thead th,
+body.theme-girly .table-wrap > .table thead th,
+body.theme-purple .table-wrap > .table thead th,
+body.theme-ocean .table-wrap > .table thead th,
+body.theme-slate .table-wrap > .table thead th {
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+  padding-bottom: var(--space-2);
+}
+
+body.theme-default .table-wrap > .table tbody td,
+body.theme-neon .table-wrap > .table tbody td,
+body.theme-girly .table-wrap > .table tbody td,
+body.theme-purple .table-wrap > .table tbody td,
+body.theme-ocean .table-wrap > .table tbody td,
+body.theme-slate .table-wrap > .table tbody td {
+  border-bottom: none;
+  background: var(--surface);
+  vertical-align: middle;
+}
+
+body.theme-default .table-wrap > .table tbody tr:hover td,
+body.theme-neon .table-wrap > .table tbody tr:hover td,
+body.theme-girly .table-wrap > .table tbody tr:hover td,
+body.theme-purple .table-wrap > .table tbody tr:hover td,
+body.theme-ocean .table-wrap > .table tbody tr:hover td,
+body.theme-slate .table-wrap > .table tbody tr:hover td {
+  background: color-mix(in srgb, var(--primary) 7%, var(--surface));
+}
+
+body.theme-default .table-wrap > .table tbody tr td:first-child,
+body.theme-neon .table-wrap > .table tbody tr td:first-child,
+body.theme-girly .table-wrap > .table tbody tr td:first-child,
+body.theme-purple .table-wrap > .table tbody tr td:first-child,
+body.theme-ocean .table-wrap > .table tbody tr td:first-child,
+body.theme-slate .table-wrap > .table tbody tr td:first-child {
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+}
+
+body.theme-default .table-wrap > .table tbody tr td:last-child,
+body.theme-neon .table-wrap > .table tbody tr td:last-child,
+body.theme-girly .table-wrap > .table tbody tr td:last-child,
+body.theme-purple .table-wrap > .table tbody tr td:last-child,
+body.theme-ocean .table-wrap > .table tbody tr td:last-child,
+body.theme-slate .table-wrap > .table tbody tr td:last-child {
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+}
+
+@media (max-width: 640px) {
+  body.theme-default .table-wrap > .table tbody td,
+  body.theme-neon .table-wrap > .table tbody td,
+  body.theme-girly .table-wrap > .table tbody td {
+    padding: 0.65rem 0.5rem;
+  }
+}
+
+body.theme-default .bar-chart-bar,
+body.theme-neon .bar-chart-bar,
+body.theme-girly .bar-chart-bar,
+body.theme-purple .bar-chart-bar,
+body.theme-ocean .bar-chart-bar,
+body.theme-slate .bar-chart-bar {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--primary) 75%, #fff) 0%,
+    color-mix(in srgb, var(--primary) 92%, #000) 100%
+  );
+  border-radius: var(--radius-md) var(--radius-md) var(--radius-sm) var(--radius-sm);
+  box-shadow: inset 0 -2px 4px color-mix(in srgb, var(--primary) 40%, rgba(0, 0, 0, 0.25));
+}
+
+body.theme-default .top-products-bar,
+body.theme-neon .top-products-bar,
+body.theme-girly .top-products-bar,
+body.theme-purple .top-products-bar,
+body.theme-ocean .top-products-bar,
+body.theme-slate .top-products-bar {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--primary) 70%, var(--accent)) 0%,
+    var(--primary) 100%
+  );
+}
+
+body.theme-default .top-products-bar-wrap,
+body.theme-neon .top-products-bar-wrap,
+body.theme-girly .top-products-bar-wrap,
+body.theme-purple .top-products-bar-wrap,
+body.theme-ocean .top-products-bar-wrap,
+body.theme-slate .top-products-bar-wrap {
+  background: color-mix(in srgb, var(--border) 55%, var(--surface));
+  border-radius: var(--radius-pill);
+}
+
+body.theme-default .empty-state,
+body.theme-neon .empty-state,
+body.theme-girly .empty-state,
+body.theme-purple .empty-state,
+body.theme-ocean .empty-state,
+body.theme-slate .empty-state {
+  border-radius: var(--radius-lg);
+  border: 1px dashed color-mix(in srgb, var(--border) 90%, var(--text-muted));
+  background: color-mix(in srgb, var(--surface) 88%, var(--primary) 12%);
+  box-shadow: var(--clay-sink);
+}
+
+body.theme-default .toast,
+body.theme-neon .toast,
+body.theme-girly .toast,
+body.theme-purple .toast,
+body.theme-ocean .toast,
+body.theme-slate .toast {
+  border-radius: var(--radius-clay);
+  box-shadow: var(--clay-raise);
+}
+
+body.theme-default .context-menu-panel,
+body.theme-neon .context-menu-panel,
+body.theme-girly .context-menu-panel,
+body.theme-purple .context-menu-panel,
+body.theme-ocean .context-menu-panel,
+body.theme-slate .context-menu-panel {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--clay-raise);
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+}
+
+body.theme-default .login-wrap .card,
+body.theme-neon .login-wrap .card,
+body.theme-girly .login-wrap .card,
+body.theme-purple .login-wrap .card,
+body.theme-ocean .login-wrap .card,
+body.theme-slate .login-wrap .card {
+  box-shadow: var(--clay-raise);
+}
+
+/* Sidebar: mejor táctil en móvil */
+@media (max-width: 640px) {
+  body.theme-default .sidebar-link,
+  body.theme-neon .sidebar-link,
+  body.theme-girly .sidebar-link,
+  body.theme-purple .sidebar-link,
+  body.theme-ocean .sidebar-link,
+  body.theme-slate .sidebar-link {
+    min-height: 44px;
+    padding-top: 0.55rem;
+    padding-bottom: 0.55rem;
+  }
+
+  body.theme-default .topbar,
+  body.theme-neon .topbar,
+  body.theme-girly .topbar,
+  body.theme-purple .topbar,
+  body.theme-ocean .topbar,
+  body.theme-slate .topbar {
+    padding-top: 0.4rem;
+    padding-bottom: 0.4rem;
+  }
+}
+
+/* POS / catálogo: fichas con relieve clay */
+body.theme-default .product-tile:not(.product-tile--disabled),
+body.theme-neon .product-tile:not(.product-tile--disabled),
+body.theme-girly .product-tile:not(.product-tile--disabled),
+body.theme-purple .product-tile:not(.product-tile--disabled),
+body.theme-ocean .product-tile:not(.product-tile--disabled),
+body.theme-slate .product-tile:not(.product-tile--disabled) {
+  border-radius: var(--radius-md);
+  box-shadow: var(--clay-raise);
+  border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+}
+
+body.theme-default .product-tile:not(.product-tile--disabled):hover,
+body.theme-neon .product-tile:not(.product-tile--disabled):hover,
+body.theme-girly .product-tile:not(.product-tile--disabled):hover,
+body.theme-purple .product-tile:not(.product-tile--disabled):hover,
+body.theme-ocean .product-tile:not(.product-tile--disabled):hover,
+body.theme-slate .product-tile:not(.product-tile--disabled):hover {
+  box-shadow: var(--clay-raise), 0 0 0 1px color-mix(in srgb, var(--primary) 35%, transparent);
+}
+
+@media (max-width: 768px) {
+  body.theme-default .product-tile:not(.product-tile--disabled),
+  body.theme-neon .product-tile:not(.product-tile--disabled),
+  body.theme-girly .product-tile:not(.product-tile--disabled),
+  body.theme-purple .product-tile:not(.product-tile--disabled),
+  body.theme-ocean .product-tile:not(.product-tile--disabled),
+  body.theme-slate .product-tile:not(.product-tile--disabled) {
+    box-shadow: var(--clay-shadow-a), var(--clay-shadow-b);
+  }
+}
+
+/* Inventario: tabla → tarjetas con etiqueta (móvil) */
+@media (max-width: 640px) {
+  .table-wrap.table--cards-sm thead {
+    display: none;
+  }
+
+  .table-wrap.table--cards-sm .table tbody tr {
+    display: block;
+    margin-bottom: var(--space-4, 1rem);
+    padding: var(--space-2, 0.5rem) 0;
+    border-radius: var(--radius-md, 14px);
+    background: var(--surface, #fff);
+    box-shadow: var(--clay-shadow-a, 0 4px 12px rgba(0, 0, 0, 0.08));
+    border: 1px solid color-mix(in srgb, var(--border, #e5e7eb) 80%, transparent);
+  }
+
+  .table-wrap.table--cards-sm .table tbody td {
+    display: block;
+    text-align: right;
+    padding: 0.45rem 0.75rem;
+    border: none;
+    border-bottom: 1px solid color-mix(in srgb, var(--border, #e5e7eb) 55%, transparent);
+    background: transparent;
+    border-radius: 0;
+  }
+
+  .table-wrap.table--cards-sm .table tbody td:last-child {
+    border-bottom: none;
+  }
+
+  .table-wrap.table--cards-sm .table tbody td::before {
+    content: attr(data-label);
+    display: block;
+    float: left;
+    clear: left;
+    max-width: 46%;
+    text-align: left;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted, #6b7280);
+    padding-top: 0.12rem;
+  }
+
+  .table-wrap.table--cards-sm .table tbody td::after {
+    content: "";
+    display: table;
+    clear: both;
+  }
+
+  .table-wrap.table--cards-sm .row-actions,
+  .table-wrap.table--cards-sm .cell-with-meta {
+    text-align: left;
+  }
+
+  .table-wrap.table--cards-sm .row-quick-actions {
+    opacity: 1;
+    justify-content: flex-start;
+    margin-top: 0.35rem;
+  }
+}

@@ -12,7 +12,6 @@ import { clienteService } from "./services/cliente.service.js";
 import { citaService } from "./services/cita.service.js";
 import { ventaService } from "./services/venta.service.js";
 import { pedidoProveedorService } from "./services/pedidoProveedor.service.js";
-import { proveedorService } from "./services/proveedor.service.js";
 import { facturaElectronicaService } from "./services/facturaElectronica.service.js";
 import { configuracionService } from "./services/configuracion.service.js";
 import { smtpService } from "./services/smtp.service.js";
@@ -30,6 +29,7 @@ import { commissionService } from "./services/commission.service.js";
 import { turnoService } from "./services/turno.service.js";
 import { empleadoMovimientoService } from "./services/empleadoMovimiento.service.js";
 import { certificadoController } from "./controllers/certificado.controller.js";
+import { proveedoresController } from "./controllers/proveedores.controller.js";
 
 function parseId(req: Request, res: Response): number | null {
   const id = Number(req.params.id);
@@ -357,12 +357,60 @@ export function registerHttpRoutes(app: Express) {
     }
   });
 
-  api.get("/proveedores", requirePermiso("pedidos_proveedores"), (_req, res) =>
-    res.json(proveedorService.list())
+  api.get(
+    "/proveedores",
+    requireAlguno("proveedores", "pedidos_proveedores"),
+    (req, res, next) => {
+      try {
+        proveedoresController.list(req, res);
+      } catch (e) {
+        next(e);
+      }
+    }
   );
 
-  api.post("/proveedores", requirePermiso("pedidos_proveedores"), (req, res) => {
-    res.status(201).json(proveedorService.create(req.body as Record<string, unknown>));
+  api.get(
+    "/proveedores/:id",
+    requireAlguno("proveedores", "pedidos_proveedores"),
+    (req, res, next) => {
+      try {
+        proveedoresController.getById(req, res);
+      } catch (e) {
+        next(e);
+      }
+    }
+  );
+
+  api.post("/proveedores", requirePermiso("proveedores"), (req, res, next) => {
+    try {
+      proveedoresController.create(req, res);
+    } catch (e) {
+      next(e);
+    }
+  });
+
+  api.put("/proveedores/:id", requirePermiso("proveedores"), (req, res, next) => {
+    try {
+      proveedoresController.update(req, res);
+    } catch (e) {
+      next(e);
+    }
+  });
+
+  api.patch("/proveedores/:id/estado", requirePermiso("proveedores"), (req, res, next) => {
+    try {
+      proveedoresController.patchEstado(req, res);
+    } catch (e) {
+      next(e);
+    }
+  });
+
+  api.delete("/proveedores/:id", requirePermiso("proveedores"), (req, res, next) => {
+    try {
+      proveedoresController.remove(req, res);
+    } catch (e) {
+      next(e);
+    }
   });
 
   api.get("/pedidos-proveedores", requirePermiso("pedidos_proveedores"), (req, res) => {

@@ -8,6 +8,7 @@ export const MODULO_KEYS = [
   "citas",
   "clientes",
   "inventario",
+  "proveedores",
   "pedidos_proveedores",
   "finanzas",
   "facturas",

@@ -2,17 +2,18 @@
   font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  color: #1a1614;
-  background-color: #f6f0eb;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 }
 
+/* color-scheme y colores base: definidos por tema en `styles/themes/body-themes.css` + clase en body */
 :root[data-theme="dark"] {
   color-scheme: dark;
-  color: #f2ebe6;
-  background-color: #12110f;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
 }
 
 * {

@@ -44,6 +44,27 @@ function migrateComprasAPedidosProveedor(db: Database.Database) {
   db.prepare(`UPDATE pedidos_proveedor SET proveedor_id = ? WHERE proveedor_id IS NULL`).run(phId);
 }
 
+/** Añade permiso `proveedores` a roles que ya tenían gestión de pedidos a proveedores. */
+function migrateRolesAgregarProveedores(db: Database.Database) {
+  const rows = db.prepare(`SELECT slug, permisos FROM roles_app`).all() as {
+    slug: string;
+    permisos: string;
+  }[];
+  for (const row of rows) {
+    try {
+      const arr = JSON.parse(row.permisos) as unknown;
+      if (!Array.isArray(arr)) continue;
+      if (arr.includes("*")) continue;
+      if (!arr.includes("pedidos_proveedores") && !arr.includes("compras")) continue;
+      if (arr.includes("proveedores")) continue;
+      const next = [...arr, "proveedores"];
+      db.prepare(`UPDATE roles_app SET permisos = ? WHERE slug = ?`).run(JSON.stringify(next), row.slug);
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
 function migrateRolesPermisoComprasAPedidos(db: Database.Database) {
   const rows = db.prepare(`SELECT slug, permisos FROM roles_app`).all() as {
     slug: string;
@@ -144,10 +165,15 @@ export function applyMigrations(db: Database.Database) {
     CREATE TABLE IF NOT EXISTS proveedores (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       nombre TEXT NOT NULL,
+      nit TEXT,
       telefono TEXT,
       email TEXT,
+      direccion TEXT,
+      estado TEXT NOT NULL DEFAULT 'activo',
+      fecha_creacion TEXT NOT NULL DEFAULT (datetime('now')),
+      fecha_actualizacion TEXT NOT NULL DEFAULT (datetime('now')),
       notas TEXT,
-      created_at TEXT NOT NULL
+      created_at TEXT
     );
 
     CREATE TABLE IF NOT EXISTS pedidos_proveedor (
@@ -215,6 +241,38 @@ export function applyMigrations(db: Database.Database) {
 
     CREATE INDEX IF NOT EXISTS idx_facturas_fecha ON facturas_electronicas(fecha_emision);
   `);
+
+  if (tableExists(db, "proveedores")) {
+    const prCols = db.prepare(`PRAGMA table_info(proveedores)`).all() as { name: string }[];
+    const prNames = new Set(prCols.map((c) => c.name));
+    if (!prNames.has("nit")) {
+      db.exec(`ALTER TABLE proveedores ADD COLUMN nit TEXT`);
+    }
+    if (!prNames.has("direccion")) {
+      db.exec(`ALTER TABLE proveedores ADD COLUMN direccion TEXT`);
+    }
+    if (!prNames.has("estado")) {
+      db.exec(`ALTER TABLE proveedores ADD COLUMN estado TEXT NOT NULL DEFAULT 'activo'`);
+    }
+    if (!prNames.has("fecha_creacion")) {
+      db.exec(`ALTER TABLE proveedores ADD COLUMN fecha_creacion TEXT`);
+    }
+    if (!prNames.has("fecha_actualizacion")) {
+      db.exec(`ALTER TABLE proveedores ADD COLUMN fecha_actualizacion TEXT`);
+    }
+    db.exec(
+      `UPDATE proveedores SET estado = 'activo' WHERE estado IS NULL OR trim(estado) = ''`
+    );
+    db.exec(`UPDATE proveedores SET fecha_creacion = COALESCE(nullif(trim(fecha_creacion),''), created_at, datetime('now')) WHERE fecha_creacion IS NULL OR trim(fecha_creacion) = ''`);
+    db.exec(
+      `UPDATE proveedores SET fecha_actualizacion = COALESCE(nullif(trim(fecha_actualizacion),''), created_at, fecha_creacion, datetime('now')) WHERE fecha_actualizacion IS NULL OR trim(fecha_actualizacion) = ''`
+    );
+    db.exec(
+      `UPDATE proveedores SET nit = 'MIGRA-' || printf('%09d', id) WHERE nit IS NULL OR trim(nit) = ''`
+    );
+    db.exec(`DROP INDEX IF EXISTS idx_proveedores_nit_unique`);
+    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_proveedores_nit_unique ON proveedores(nit)`);
+  }
 
   const movCols = db.prepare(`PRAGMA table_info(movimientos_inventario)`).all() as { name: string }[];
   const movNames = new Set(movCols.map((c) => c.name));
@@ -358,6 +416,7 @@ export function applyMigrations(db: Database.Database) {
         "citas",
         "clientes",
         "inventario",
+        "proveedores",
         "pedidos_proveedores",
         "facturas",
         "reportes",
@@ -491,4 +550,5 @@ export function applyMigrations(db: Database.Database) {
     db.exec(`ALTER TABLE clientes ADD COLUMN activo INTEGER NOT NULL DEFAULT 1`);
   }
   migrateRolesPermisoComprasAPedidos(db);
+  migrateRolesAgregarProveedores(db);
 }

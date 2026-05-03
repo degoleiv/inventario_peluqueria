@@ -623,7 +623,7 @@ export function InventarioPage() {
             </button>
           </div>
         ) : (
-          <div className="table-wrap">
+          <div className="table-wrap table--cards-sm">
             <table className="table">
               <thead>
                 <tr>
@@ -646,7 +646,7 @@ export function InventarioPage() {
                     }}
                     title="Clic: editar · Clic derecho: menú"
                   >
-                    <td>
+                    <td data-label="Producto">
                       <div className="cell-with-meta">
                         <div>
                           <div className="cell-main">{p.nombre}</div>
@@ -680,8 +680,10 @@ export function InventarioPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="mono">{p.codigo_barras ?? "—"}</td>
-                    <td>
+                    <td className="mono" data-label="Código">
+                      {p.codigo_barras ?? "—"}
+                    </td>
+                    <td data-label="Stock">
                       <span
                         className={
                           p.stock === 0
@@ -694,7 +696,7 @@ export function InventarioPage() {
                         {p.stock}
                       </span>
                     </td>
-                    <td onClick={(e) => e.stopPropagation()}>
+                    <td data-label="P. venta" onClick={(e) => e.stopPropagation()}>
                       {priceEdit?.id === p.id ? (
                         <input
                           className="input-inline-price"
@@ -721,7 +723,11 @@ export function InventarioPage() {
                         </button>
                       )}
                     </td>
-                    <td className="row-actions" onClick={(e) => e.stopPropagation()}>
+                    <td
+                      className="row-actions"
+                      data-label="Acciones"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <button type="button" className="link" onClick={() => onEditar(p)}>
                         Editar
                       </button>
@@ -751,7 +757,7 @@ export function InventarioPage() {
           {alertasProductos.length === 0 ? (
             <p className="muted">No hay alertas: todo por encima del mínimo.</p>
           ) : (
-            <div className="table-wrap">
+            <div className="table-wrap table--cards-sm">
               <table className="table">
                 <thead>
                   <tr>
@@ -764,8 +770,8 @@ export function InventarioPage() {
                 <tbody>
                   {alertasProductos.map((p) => (
                     <tr key={p.id}>
-                      <td>{p.nombre}</td>
-                      <td>
+                      <td data-label="Producto">{p.nombre}</td>
+                      <td data-label="Stock">
                         <span
                           className={
                             p.stock === 0
@@ -776,8 +782,8 @@ export function InventarioPage() {
                           {p.stock}
                         </span>
                       </td>
-                      <td>{p.stock_minimo ?? "—"}</td>
-                      <td className="row-actions">
+                      <td data-label="Mínimo">{p.stock_minimo ?? "—"}</td>
+                      <td className="row-actions" data-label="Acciones">
                         <button type="button" className="link" onClick={() => onEditar(p)}>
                           Editar
                         </button>

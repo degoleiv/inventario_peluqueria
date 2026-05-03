@@ -63,6 +63,15 @@ function IconTruck() {
     </svg>
   );
 }
+function IconStorefront() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M3 9h18v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9z" />
+      <path d="M3 9V7a1 1 0 0 1 .38-.78l3-2.33A1 1 0 0 1 7 3h10a1 1 0 0 1 .62.22l3 2.33A1 1 0 0 1 21 7v2" />
+      <line x1="9" y1="14" x2="15" y2="14" />
+    </svg>
+  );
+}
 function IconWallet() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -114,6 +123,7 @@ const ICONS: Partial<Record<NavKey, React.ReactElement>> = {
   citas: <IconCalendar />,
   clientes: <IconUsers />,
   inventario: <IconBox />,
+  proveedores: <IconStorefront />,
   pedidos_proveedores: <IconTruck />,
   finanzas: <IconWallet />,
   facturas: <IconFile />,
@@ -238,13 +248,6 @@ export function AppLayout({
           <span className="topbar-user" title={userEmail ?? ""}>
             {userEmail ?? "Usuario"}
           </span>
-          <button
-            type="button"
-            className="btn ghost btn-compact"
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          >
-            {theme === "dark" ? "☀️" : "🌙"}
-          </button>
           <button type="button" className="btn ghost btn-compact" onClick={onLogout}>
             Salir
           </button>
@@ -276,6 +279,22 @@ export function AppLayout({
               </div>
             ))}
           </nav>
+          <div className="sidebar-footer">
+            <button
+              type="button"
+              className="sidebar-link sidebar-theme-toggle"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              title={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+              aria-label={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+            >
+              <span className="sidebar-icon" aria-hidden>
+                {theme === "dark" ? "☀️" : "🌙"}
+              </span>
+              {!collapsed ? (
+                <span className="sidebar-text">{theme === "dark" ? "Modo claro" : "Modo oscuro"}</span>
+              ) : null}
+            </button>
+          </div>
         </aside>
 
         <main className="main-pro">

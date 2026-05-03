@@ -711,11 +711,13 @@ select {
   color: #f6f0eb;
   display: flex;
   flex-direction: column;
-  padding: 0.5rem 0.35rem 1rem;
+  padding: 0.5rem 0.35rem 0.5rem;
   border-right: 1px solid #1a1512;
   transition: width 0.2s ease;
   overflow-x: hidden;
-  overflow-y: auto;
+  overflow-y: hidden;
+  min-height: 0;
+  align-self: stretch;
 }
 
 .app-root--collapsed .sidebar-pro {
@@ -727,6 +729,22 @@ select {
   flex-direction: column;
   gap: 0.75rem;
   padding-top: 0.25rem;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.sidebar-footer {
+  flex-shrink: 0;
+  margin-top: auto;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.sidebar-theme-toggle {
+  margin-top: 0.15rem;
 }
 
 .sidebar-group-label {
@@ -830,7 +848,9 @@ select {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  /* visible: evita recortar formularios con varias tarjetas (p. ej. Configuración > Apariencia). El scroll sigue en .main-pro-content */
+  overflow-x: hidden;
+  overflow-y: visible;
 }
 
 .drawer-root {
@@ -1027,6 +1047,10 @@ select {
   padding: 1rem 1.1rem 1.5rem;
   overflow: auto;
   flex: 1;
+}
+
+.drawer-footer {
+  flex-shrink: 0;
 }
 
 .toast-stack {

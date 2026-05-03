@@ -3,7 +3,6 @@ import { HashRouter } from "react-router-dom";
 import { getAccessToken } from "./auth/token";
 import { LoginPage } from "./pages/LoginPage";
 import { AuthenticatedRoutes } from "./AuthenticatedShell";
-import "./App.css";
 
 function App() {
   const [sessionKey, setSessionKey] = useState(0);

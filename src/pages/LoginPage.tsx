@@ -5,7 +5,6 @@ import {
   loginApi,
 } from "../api";
 import { setAccessToken } from "../auth/token";
-import "../App.css";
 
 type Props = { onLoggedIn: () => void };
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Navigate, useParams } from "react-router-dom";
 import {
   fetchBranding,
@@ -14,15 +14,32 @@ import {
 import { SubNav } from "../components/SubNav";
 import { CONFIG_TABS, readLastTab, type ConfigTab } from "../lib/moduleRoutes";
 import { useToast } from "../context/ToastContext";
+import { useThemeUi } from "../context/ThemeUiContext";
+import { THEME_CATALOG } from "../lib/themeCatalog";
 
 export function ConfiguracionPage() {
   const { tab: tabParam } = useParams<{ tab: string }>();
   const toast = useToast();
+  const {
+    prefs: uiPrefs,
+    setPreset,
+    setDensity,
+    setRadius,
+    setClayStyle,
+    setCustomPrimary,
+    setCustomAccent,
+    resetUiCustom,
+  } = useThemeUi();
 
   const [branding, setBranding] = useState<BrandingConfig | null>(null);
   const [tienda, setTienda] = useState<TiendaConfig | null>(null);
   const [sistema, setSistema] = useState<SistemaPrefs | null>(null);
   const [loading, setLoading] = useState(true);
+  /** Con icono cargado: el input file solo se muestra tras «Modificar icono». */
+  const [iconoEditando, setIconoEditando] = useState(false);
+  const iconoInputRef = useRef<HTMLInputElement>(null);
+  const nombreMarcaSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const uiPrefsToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -48,16 +65,39 @@ export function ConfiguracionPage() {
     void load();
   }, [load]);
 
-  async function guardarBranding(partial: Partial<BrandingConfig>) {
+  useEffect(() => {
+    return () => {
+      if (nombreMarcaSaveTimerRef.current) clearTimeout(nombreMarcaSaveTimerRef.current);
+      if (uiPrefsToastTimerRef.current) clearTimeout(uiPrefsToastTimerRef.current);
+    };
+  }, []);
+
+  async function guardarBranding(partial: Partial<BrandingConfig>, mensajeExito = "Apariencia guardada.") {
     try {
       const b = await updateBranding(partial);
       setBranding(b);
       document.documentElement.style.setProperty("--brand-primary", b.color_primario);
       document.documentElement.style.setProperty("--brand-secondary", b.color_secundario);
-      toast("Apariencia guardada.", "success");
+      toast(mensajeExito, "success");
     } catch (e) {
       toast(e instanceof Error ? e.message : "Error", "error");
     }
+  }
+
+  function scheduleAutoGuardarNombreMarca(nombre: string) {
+    if (nombreMarcaSaveTimerRef.current) clearTimeout(nombreMarcaSaveTimerRef.current);
+    nombreMarcaSaveTimerRef.current = setTimeout(() => {
+      nombreMarcaSaveTimerRef.current = null;
+      void guardarBranding({ nombre_negocio: nombre }, "Marca guardada.");
+    }, 650);
+  }
+
+  function scheduleToastInterfazLocal() {
+    if (uiPrefsToastTimerRef.current) clearTimeout(uiPrefsToastTimerRef.current);
+    uiPrefsToastTimerRef.current = setTimeout(() => {
+      uiPrefsToastTimerRef.current = null;
+      toast("Interfaz guardada en este navegador.", "success");
+    }, 500);
   }
 
   async function guardarTienda(partial: Partial<TiendaConfig>) {
@@ -80,31 +120,68 @@ export function ConfiguracionPage() {
     }
   }
 
-  function onLogoFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    if (!f.type.startsWith("image/")) {
-      toast("Subí una imagen (PNG, JPG, WebP…)", "warning");
-      return;
+  const ACCEPT_ICONO = "image/png,image/jpeg,image/svg+xml,.png,.jpg,.jpeg,.svg";
+
+  function validarArchivoIcono(f: File): string | null {
+    const extOk = /\.(png|jpe?g|svg)$/i.test(f.name);
+    const mimeOk =
+      f.type === "image/png" ||
+      f.type === "image/jpeg" ||
+      f.type === "image/svg+xml" ||
+      (f.type === "" && extOk);
+    if (!mimeOk && !extOk) {
+      return "Formato no permitido. Usá PNG, JPG o SVG.";
     }
     if (f.size > 320 * 1024) {
-      toast("Imagen demasiado grande (máx. ~300 KB).", "warning");
+      return "El archivo es demasiado grande (máximo ~300 KB).";
+    }
+    return null;
+  }
+
+  function onLogoFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    const input = e.target;
+    input.value = "";
+    if (!f) return;
+    const err = validarArchivoIcono(f);
+    if (err) {
+      toast(err, "warning");
       return;
     }
     const reader = new FileReader();
+    reader.onerror = () => toast("No se pudo leer el archivo.", "error");
     reader.onload = () => {
       const dataUrl = String(reader.result ?? "");
-      void guardarBranding({ logo_data_url: dataUrl });
+      void (async () => {
+        await guardarBranding({ logo_data_url: dataUrl }, "Icono guardado.");
+        setIconoEditando(false);
+      })();
     };
     reader.readAsDataURL(f);
-    e.target.value = "";
   }
+
+  async function quitarIcono() {
+    await guardarBranding({ logo_data_url: null }, "Icono eliminado.");
+    setIconoEditando(false);
+  }
+
+  useEffect(() => {
+    if (!branding?.logo_data_url) setIconoEditando(false);
+  }, [branding?.logo_data_url]);
+
+  useEffect(() => {
+    if (iconoEditando) iconoInputRef.current?.focus();
+  }, [iconoEditando]);
 
   const tabOk = tabParam != null && CONFIG_TABS.includes(tabParam as ConfigTab);
   if (!tabOk) {
     return <Navigate to={`/configuracion/${readLastTab("configuracion", "general")}`} replace />;
   }
   const tab = tabParam as ConfigTab;
+
+  const uiPresetEntry = THEME_CATALOG.find((t) => t.id === uiPrefs.preset);
+  const uiPrimaryFallback = uiPresetEntry?.swatch[0] ?? "#4F46E5";
+  const uiAccentFallback = uiPresetEntry?.swatch[1] ?? "#10B981";
 
   if (loading && !branding) {
     return <p className="muted">Cargando configuración…</p>;
@@ -122,8 +199,9 @@ export function ConfiguracionPage() {
         ]}
       />
 
+      <div className="config-page-body">
       {tab === "general" ? (
-        <section className="card">
+        <section className="card config-settings-card">
           <h2 className="card-title">General</h2>
           <p className="muted">
             Personalizá la marca, los datos fiscales/comerciales y el comportamiento del sistema desde
@@ -138,105 +216,213 @@ export function ConfiguracionPage() {
       ) : null}
 
       {tab === "apariencia" && branding ? (
-        <section className="card">
-          <h2 className="card-title">Apariencia</h2>
-          <p className="muted small">
-            Colores en formato <strong>#RRGGBB</strong>. El logo debe ser imagen pequeña (≤ ~300 KB).
+        <section className="card config-settings-card">
+          <h2 className="card-title">Marca e interfaz</h2>
+          <p className="muted small" style={{ marginBottom: "1rem" }}>
+            Nombre e icono para la barra y PDFs (se guardan en el servidor). Paleta, densidad y demás se
+            guardan en este navegador. Icono: PNG, JPG o SVG; máximo ~300 KB.
           </p>
+
+          <span className="config-section-label">Marca</span>
+          <label className="field" style={{ marginBottom: "1rem" }}>
+            <span>Nombre del negocio</span>
+            <input
+              value={branding.nombre_negocio}
+              onChange={(e) => {
+                const v = e.target.value;
+                setBranding((b) => (b ? { ...b, nombre_negocio: v } : b));
+                scheduleAutoGuardarNombreMarca(v);
+              }}
+            />
+          </label>
+          <div className="field" style={{ marginBottom: "1.25rem" }}>
+            <span>Icono de la aplicación</span>
+            {!branding.logo_data_url ? (
+              <>
+                <p className="muted small" style={{ margin: "0.25rem 0 0.5rem" }}>
+                  Sube un icono para tu aplicación (PNG, JPG o SVG, máx. ~300 KB).
+                </p>
+                <input
+                  ref={iconoInputRef}
+                  type="file"
+                  accept={ACCEPT_ICONO}
+                  onChange={onLogoFile}
+                  aria-label="Subir icono"
+                />
+              </>
+            ) : !iconoEditando ? (
+              <div className="config-icon-block">
+                <img
+                  src={branding.logo_data_url}
+                  alt="Icono actual"
+                  className="config-icon-img"
+                  width={72}
+                  height={72}
+                />
+                <div className="config-icon-actions">
+                  <button
+                    type="button"
+                    className="btn secondary small"
+                    onClick={() => setIconoEditando(true)}
+                  >
+                    Modificar icono
+                  </button>
+                  <button type="button" className="btn ghost small" onClick={() => void quitarIcono()}>
+                    Quitar icono
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <p className="muted small" style={{ margin: "0.25rem 0 0.5rem" }}>
+                  Elegí un archivo PNG, JPG o SVG (máx. ~300 KB).
+                </p>
+                <input
+                  ref={iconoInputRef}
+                  type="file"
+                  accept={ACCEPT_ICONO}
+                  onChange={onLogoFile}
+                  aria-label="Reemplazar icono"
+                />
+                <div className="actions" style={{ marginTop: "0.5rem" }}>
+                  <button type="button" className="btn ghost small" onClick={() => setIconoEditando(false)}>
+                    Cancelar
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+
+          <span className="config-section-label" style={{ marginTop: "0.25rem" }}>
+            Interfaz
+          </span>
+          <p className="muted small" style={{ marginBottom: "0.75rem" }}>
+            Se aplica al elegir cada opción. Paleta, densidad, bordes y colores opcionales del tema.
+          </p>
+
+          <span className="config-section-label">Paleta</span>
+          <div className="config-palette-grid">
+            {THEME_CATALOG.map((t) => {
+              const selected = uiPrefs.preset === t.id;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  className={`btn ${selected ? "primary" : "secondary"}`}
+                  style={{
+                    textAlign: "left",
+                    padding: "0.65rem 0.75rem",
+                    borderWidth: selected ? 2 : 1,
+                  }}
+                  onClick={() => {
+                    setPreset(t.id);
+                    scheduleToastInterfazLocal();
+                  }}
+                  title={t.hint}
+                >
+                  <div style={{ display: "flex", gap: 6, marginBottom: 4 }}>
+                    {t.swatch.map((c) => (
+                      <span
+                        key={c}
+                        style={{
+                          width: 18,
+                          height: 18,
+                          borderRadius: 6,
+                          background: c,
+                          boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.12)",
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <strong style={{ fontSize: "0.9rem" }}>{t.label}</strong>
+                  <div className="muted small" style={{ marginTop: 2, lineHeight: 1.25 }}>
+                    {t.hint}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
           <div className="grid-2" style={{ marginBottom: "1rem" }}>
             <label className="field">
-              <span>Nombre del negocio</span>
-              <input
-                value={branding.nombre_negocio}
-                onChange={(e) => setBranding((b) => (b ? { ...b, nombre_negocio: e.target.value } : b))}
-              />
-            </label>
-            <label className="field">
-              <span>Modo tema (preferencia guardada)</span>
+              <span>Densidad</span>
               <select
-                value={branding.theme_mode}
-                onChange={(e) =>
-                  setBranding((b) =>
-                    b
-                      ? {
-                          ...b,
-                          theme_mode: e.target.value as BrandingConfig["theme_mode"],
-                        }
-                      : b
-                  )
-                }
+                value={uiPrefs.density}
+                onChange={(e) => {
+                  setDensity(e.target.value as "comfortable" | "compact");
+                  scheduleToastInterfazLocal();
+                }}
               >
-                <option value="light">Claro</option>
-                <option value="dark">Oscuro</option>
-                <option value="auto">Automático (sistema)</option>
+                <option value="comfortable">Cómoda</option>
+                <option value="compact">Compacta</option>
               </select>
             </label>
             <label className="field">
-              <span>Color principal</span>
+              <span>Forma de bordes</span>
+              <select
+                value={uiPrefs.radius}
+                onChange={(e) => {
+                  setRadius(e.target.value as "default" | "soft" | "pill");
+                  scheduleToastInterfazLocal();
+                }}
+              >
+                <option value="default">Por defecto</option>
+                <option value="soft">Suave</option>
+                <option value="pill">Píldora</option>
+              </select>
+            </label>
+            <label className="field config-field-span-2">
+              <span>Relieve clay</span>
+              <select
+                value={uiPrefs.clayStyle}
+                onChange={(e) => {
+                  setClayStyle(e.target.value as "full" | "soft");
+                  scheduleToastInterfazLocal();
+                }}
+              >
+                <option value="full">Completo</option>
+                <option value="soft">Suave (menos sombra)</option>
+              </select>
+            </label>
+          </div>
+
+          <p className="muted small" style={{ margin: "0.35rem 0 0.5rem" }}>
+            Colores UI opcionales (dejá vacío para usar los del preset elegido).
+          </p>
+          <div className="grid-2" style={{ marginBottom: "1rem" }}>
+            <label className="field">
+              <span>Color principal UI</span>
               <input
                 type="color"
-                value={branding.color_primario}
-                onChange={(e) =>
-                  setBranding((b) => (b ? { ...b, color_primario: e.target.value } : b))
-                }
+                value={uiPrefs.customPrimary ?? uiPrimaryFallback}
+                onChange={(e) => {
+                  setCustomPrimary(e.target.value);
+                  scheduleToastInterfazLocal();
+                }}
               />
             </label>
             <label className="field">
-              <span>Color secundario</span>
+              <span>Color acento UI</span>
               <input
                 type="color"
-                value={branding.color_secundario}
-                onChange={(e) =>
-                  setBranding((b) => (b ? { ...b, color_secundario: e.target.value } : b))
-                }
+                value={uiPrefs.customAccent ?? uiAccentFallback}
+                onChange={(e) => {
+                  setCustomAccent(e.target.value);
+                  scheduleToastInterfazLocal();
+                }}
               />
             </label>
           </div>
-          <label className="field">
-            <span>Logo</span>
-            <input type="file" accept="image/*" onChange={onLogoFile} />
-          </label>
-          {branding.logo_data_url ? (
-            <div className="config-brand-preview">
-              <img src={branding.logo_data_url} alt="Logo" height={56} />
-              <button
-                type="button"
-                className="btn ghost small"
-                onClick={() => void guardarBranding({ logo_data_url: null })}
-              >
-                Quitar logo
-              </button>
-            </div>
-          ) : null}
-          <div
-            className="config-brand-preview"
-            style={{
-              marginTop: "1rem",
-              padding: "1rem",
-              borderRadius: 12,
-              border: "2px solid var(--brand-primary, #b8956a)",
-              background: `linear-gradient(135deg, ${branding.color_primario}22, ${branding.color_secundario}18)`,
-            }}
-          >
-            <strong>Vista previa</strong>
-            <p className="muted small" style={{ margin: "0.35rem 0 0" }}>
-              {branding.nombre_negocio}
-            </p>
-          </div>
-          <div className="actions" style={{ marginTop: "1rem" }}>
+          <div className="actions">
             <button
               type="button"
-              className="btn primary"
-              onClick={() =>
-                void guardarBranding({
-                  nombre_negocio: branding.nombre_negocio,
-                  color_primario: branding.color_primario,
-                  color_secundario: branding.color_secundario,
-                  theme_mode: branding.theme_mode,
-                })
-              }
+              className="btn secondary"
+              onClick={() => {
+                resetUiCustom();
+                toast("Colores personalizados quitados.", "success");
+              }}
             >
-              Guardar apariencia
+              Quitar colores personalizados
             </button>
           </div>
         </section>
@@ -313,7 +499,7 @@ export function ConfiguracionPage() {
       ) : null}
 
       {tab === "sistema" && sistema ? (
-        <section className="card">
+        <section className="card config-settings-card">
           <h2 className="card-title">Sistema</h2>
           <p className="muted small">
             Preferencias almacenadas localmente en el servidor. Backup automático y modo offline
@@ -357,6 +543,7 @@ export function ConfiguracionPage() {
           </label>
         </section>
       ) : null}
+      </div>
     </>
   );
 }

@@ -1,0 +1,292 @@
+/**
+ * Preferencias UI locales: radios, densidad, relieve clay suave.
+ * Controlado desde `document.documentElement.dataset` y clases en `body`.
+ */
+
+:root[data-ui-radius="soft"] {
+  --radius-clay: 16px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+}
+
+:root[data-ui-radius="pill"] {
+  --radius-clay: 999px;
+  --radius-md: 22px;
+  --radius-lg: 24px;
+}
+
+body.ui-density-compact .main-pro-content {
+  padding: 0.35rem 0.85rem 0.65rem;
+}
+
+body.ui-density-compact .card,
+body.ui-density-compact .card-pro {
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.85rem;
+}
+
+body.ui-density-compact .card-head,
+body.ui-density-compact .card-title {
+  margin-bottom: 0.5rem;
+}
+
+body.ui-density-compact .form {
+  gap: 0.65rem;
+}
+
+body.ui-density-compact .field {
+  gap: 0.25rem;
+}
+
+/* Sombras clay más ligeras (todas las paletas) */
+:root[data-clay-style="soft"]:has(body.theme-default),
+:root[data-clay-style="soft"]:has(body.theme-neon),
+:root[data-clay-style="soft"]:has(body.theme-girly),
+:root[data-clay-style="soft"]:has(body.theme-purple),
+:root[data-clay-style="soft"]:has(body.theme-ocean),
+:root[data-clay-style="soft"]:has(body.theme-slate) {
+  --clay-raise:
+    4px 5px 12px color-mix(in srgb, var(--text) 6%, transparent),
+    -2px -3px 8px color-mix(in srgb, var(--surface) 65%, #fff),
+    inset 1px 1px 2px color-mix(in srgb, #fff 35%, transparent),
+    inset -1px -2px 3px color-mix(in srgb, var(--text) 5%, transparent);
+  --clay-raise-primary:
+    3px 4px 10px color-mix(in srgb, var(--primary) 25%, rgba(0, 0, 0, 0.2)),
+    -2px -2px 6px color-mix(in srgb, var(--surface) 50%, #fff),
+    inset 1px 1px 2px color-mix(in srgb, #fff 25%, transparent),
+    inset -1px -2px 4px color-mix(in srgb, var(--primary) 20%, rgba(0, 0, 0, 0.2));
+  --clay-sink:
+    inset 2px 2px 6px color-mix(in srgb, var(--text) 8%, transparent),
+    inset -2px -2px 6px color-mix(in srgb, var(--surface) 75%, var(--background));
+  --clay-btn-active:
+    inset 3px 3px 8px color-mix(in srgb, var(--text) 10%, transparent),
+    inset -2px -2px 6px color-mix(in srgb, var(--surface) 70%, var(--background));
+  --clay-primary-pressed:
+    inset 3px 3px 8px color-mix(in srgb, var(--text) 12%, transparent),
+    inset -2px -2px 5px color-mix(in srgb, var(--surface) 55%, var(--background));
+}
+
+:root[data-theme="dark"][data-clay-style="soft"]:has(body.theme-default),
+:root[data-theme="dark"][data-clay-style="soft"]:has(body.theme-neon),
+:root[data-theme="dark"][data-clay-style="soft"]:has(body.theme-girly),
+:root[data-theme="dark"][data-clay-style="soft"]:has(body.theme-purple),
+:root[data-theme="dark"][data-clay-style="soft"]:has(body.theme-ocean),
+:root[data-theme="dark"][data-clay-style="soft"]:has(body.theme-slate) {
+  --clay-raise:
+    4px 5px 12px rgba(0, 0, 0, 0.35), -2px -2px 6px rgba(255, 255, 255, 0.03),
+    inset 1px 1px 2px rgba(255, 255, 255, 0.04), inset -1px -2px 4px rgba(0, 0, 0, 0.35);
+  --clay-raise-primary:
+    3px 4px 10px rgba(0, 0, 0, 0.38), -1px -2px 5px rgba(255, 255, 255, 0.04),
+    inset 1px 1px 2px rgba(255, 255, 255, 0.06), inset -1px -2px 4px rgba(0, 0, 0, 0.32);
+  --clay-sink:
+    inset 2px 2px 6px rgba(0, 0, 0, 0.45), inset -2px -2px 5px rgba(255, 255, 255, 0.04);
+  --clay-btn-active:
+    inset 3px 3px 8px rgba(0, 0, 0, 0.48), inset -2px -2px 5px rgba(255, 255, 255, 0.03);
+  --clay-primary-pressed:
+    inset 3px 3px 8px rgba(0, 0, 0, 0.45), inset -2px -2px 4px rgba(255, 255, 255, 0.05);
+}
+
+/* Interruptor compacto (ej. estado proveedor) */
+.ui-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  cursor: pointer;
+  user-select: none;
+}
+
+.ui-switch__input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  margin: 0;
+}
+
+.ui-switch__input:focus-visible + .ui-switch__track {
+  outline: 2px solid var(--primary, #6366f1);
+  outline-offset: 2px;
+}
+
+.ui-switch__input:disabled + .ui-switch__track {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ui-switch__track {
+  display: inline-block;
+  width: 2.5rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 22%, var(--surface));
+  box-shadow: var(--clay-sink, inset 1px 1px 3px rgba(0, 0, 0, 0.12));
+  transition: background 0.18s ease;
+  position: relative;
+}
+
+.ui-switch__track::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0.2rem;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: var(--surface);
+  transform: translateY(-50%);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: left 0.18s ease, background 0.18s ease;
+}
+
+.ui-switch__input:checked + .ui-switch__track {
+  background: color-mix(in srgb, var(--primary) 55%, var(--surface));
+}
+
+.ui-switch__input:checked + .ui-switch__track::after {
+  left: calc(100% - 1rem - 0.2rem);
+}
+
+/* —— Configuración: formularios responsive (grids + color pickers) —— */
+.config-settings-card .grid-2 {
+  grid-template-columns: 1fr;
+  min-width: 0;
+}
+
+@media (min-width: 800px) {
+  .config-settings-card .grid-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.config-settings-card .grid-2 > label.field {
+  min-width: 0;
+}
+
+.config-settings-card .config-field-span-2 {
+  grid-column: 1 / -1;
+}
+
+.config-settings-card input[type="color"] {
+  width: 100%;
+  max-width: 100%;
+  min-height: 2.75rem;
+  padding: 0.25rem;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
+.config-settings-card input[type="file"] {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.config-palette-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 152px), 1fr));
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+  min-width: 0;
+}
+
+.config-section-label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin: 0 0 0.35rem;
+  color: var(--text-muted, #6b5f58);
+}
+
+.config-page-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+
+.config-palette-grid .btn {
+  max-width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 520px) {
+  .config-settings-card.card {
+    padding-left: 0.95rem;
+    padding-right: 0.95rem;
+  }
+}
+
+.config-icon-block {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.35rem;
+}
+
+.config-icon-img {
+  flex-shrink: 0;
+  object-fit: contain;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--border, #e8ddd4) 85%, transparent);
+  background: color-mix(in srgb, var(--surface, #fff) 96%, transparent);
+}
+
+.config-icon-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+/* —— Select nativo: flecha con margen estable (pill / móvil) —— */
+body.theme-default select,
+body.theme-neon select,
+body.theme-girly select,
+body.theme-purple select,
+body.theme-ocean select,
+body.theme-slate select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  padding-inline-start: 0.75rem;
+  padding-inline-end: 2.75rem;
+  line-height: 1.4;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9' fill='none' viewBox='0 0 14 9'%3E%3Cpath stroke='%234a4540' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.75' d='M1 1.75 7 7.25 13 1.75'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 14px 9px;
+}
+
+:root[data-theme="dark"] body.theme-default select,
+:root[data-theme="dark"] body.theme-neon select,
+:root[data-theme="dark"] body.theme-girly select,
+:root[data-theme="dark"] body.theme-purple select,
+:root[data-theme="dark"] body.theme-ocean select,
+:root[data-theme="dark"] body.theme-slate select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9' fill='none' viewBox='0 0 14 9'%3E%3Cpath stroke='%23e8dfd7' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.75' d='M1 1.75 7 7.25 13 1.75'/%3E%3C/svg%3E");
+}
+
+@media (max-width: 480px) {
+  body.theme-default select,
+  body.theme-neon select,
+  body.theme-girly select,
+  body.theme-purple select,
+  body.theme-ocean select,
+  body.theme-slate select {
+    padding-inline-end: 2.9rem;
+    background-position: right 0.65rem center;
+  }
+}
+
+.field select {
+  width: 100%;
+}
+
+select::-ms-expand {
+  display: none;
+}

@@ -72,6 +72,8 @@ export function getModuleEntryPath(key: NavKey): string {
       return `/inventario/${readLastTab("inventario", "productos")}`;
     case "clientes":
       return `/clientes/${readLastTab("clientes", "lista")}`;
+    case "proveedores":
+      return "/proveedores";
     case "pedidos_proveedores":
       return "/pedidos-proveedores";
     case "finanzas":
@@ -101,6 +103,7 @@ export function pathToNavKey(pathname: string): NavKey {
     "citas",
     "clientes",
     "inventario",
+    "proveedores",
     "pedidos_proveedores",
     "finanzas",
     "facturas",

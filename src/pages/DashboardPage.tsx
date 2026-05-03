@@ -91,7 +91,11 @@ export function DashboardPage() {
   }
 
   if (!data) {
-    return <p className="muted">Cargando resumen…</p>;
+    return (
+      <div className="clay-empty" role="status">
+        Cargando resumen del negocio…
+      </div>
+    );
   }
 
   const maxIngresoDia =

@@ -8,13 +8,16 @@ import {
   deleteRole,
   deleteTurnoEmpleado,
   deleteUsuario,
+  downloadCertificadoLaboral,
   fetchAuditoria,
+  fetchAuthMe,
   fetchEmpleadoResumen,
   fetchEmpleadosComisiones,
   fetchEmpleadosMovimientos,
   fetchEmpleadosTurnos,
   fetchRoles,
   fetchUsuarios,
+  previewCertificadoLaboral,
   updateEmpleadoMovimientoEstado,
   updateRole,
   updateUsuario,
@@ -96,6 +99,8 @@ export function EmpleadosPage({ onChanged }: Props) {
     notas: "",
   });
 
+  const [puedeCertificado, setPuedeCertificado] = useState(false);
+
   const [newRol, setNewRol] = useState({
     slug: "",
     nombre: "",
@@ -119,6 +124,12 @@ export function EmpleadosPage({ onChanged }: Props) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    void fetchAuthMe()
+      .then((m) => setPuedeCertificado(!!m.user.permisos?.includes("*")))
+      .catch(() => setPuedeCertificado(false));
+  }, []);
 
   const defaultRol = useMemo(
     () => (roles.some((x) => x.slug === "empleado") ? "empleado" : roles[0]?.slug ?? "empleado"),
@@ -478,6 +489,34 @@ export function EmpleadosPage({ onChanged }: Props) {
                         <button type="button" className="link" onClick={() => openEdit(u)}>
                           Editar
                         </button>
+                        {puedeCertificado ? (
+                          <>
+                            <button
+                              type="button"
+                              className="link"
+                              title="Vista previa del PDF"
+                              onClick={() =>
+                                void previewCertificadoLaboral(u.id).catch((err) =>
+                                  toast(err instanceof Error ? err.message : "No se pudo generar el PDF", "error")
+                                )
+                              }
+                            >
+                              Certificado
+                            </button>
+                            <button
+                              type="button"
+                              className="link"
+                              title="Descargar PDF"
+                              onClick={() =>
+                                void downloadCertificadoLaboral(u.id).catch((err) =>
+                                  toast(err instanceof Error ? err.message : "Error al descargar", "error")
+                                )
+                              }
+                            >
+                              Descargar PDF
+                            </button>
+                          </>
+                        ) : null}
                         <button type="button" className="link" onClick={() => void toggleActivo(u)}>
                           {u.activo === 1 ? "Desactivar" : "Activar"}
                         </button>

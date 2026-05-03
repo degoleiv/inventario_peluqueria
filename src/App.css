@@ -196,6 +196,10 @@ textarea {
 
 .table-wrap {
   overflow-x: auto;
+  overflow-y: auto;
+  max-height: min(52vh, 560px);
+  border-radius: 10px;
+  border: 1px solid #ebe3dc;
 }
 
 .table {
@@ -562,7 +566,10 @@ select {
 .app-root {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  overflow: hidden;
   background: #f6f0eb;
   color: #1a1614;
 }
@@ -571,6 +578,7 @@ select {
   display: flex;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
 }
 
 .topbar {
@@ -706,7 +714,8 @@ select {
   padding: 0.5rem 0.35rem 1rem;
   border-right: 1px solid #1a1512;
   transition: width 0.2s ease;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .app-root--collapsed .sidebar-pro {
@@ -768,18 +777,21 @@ select {
 .main-pro {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background: #f6f0eb;
 }
 
 .main-pro-header {
-  padding: 0.5rem 1.25rem 0;
+  flex-shrink: 0;
+  padding: 0.35rem 1.25rem 0;
 }
 
 .main-pro-title {
   margin: 0;
-  font-size: 1.35rem;
+  font-size: 1.25rem;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: #2c2420;
@@ -787,10 +799,43 @@ select {
 
 .main-pro-content {
   flex: 1;
-  padding: 0.75rem 1.25rem 2rem;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0.5rem 1.15rem 0.85rem;
   max-width: 1280px;
   width: 100%;
   margin: 0 auto;
+}
+
+/* Una sola raíz (ej. .page-clientes) llena el área y hace scroll interno */
+.main-pro-content > *:only-child:not(.drawer-root) {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+/* Patrón SubNav + contenido (fragment sin wrapper) */
+.main-pro-content > .subnav-wrap {
+  flex-shrink: 0;
+}
+
+.main-pro-content > .subnav-wrap + *:not(.drawer-root) {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.drawer-root {
+  flex: none !important;
+  align-self: stretch;
 }
 
 /* Sub-navegación horizontal (módulos complejos) */
@@ -800,9 +845,13 @@ select {
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.75rem 1rem;
-  margin: -0.25rem 0 1rem;
-  padding-bottom: 0.65rem;
+  margin: -0.25rem 0 0.65rem;
+  padding: 0.35rem 0 0.55rem;
   border-bottom: 1px solid #e8ddd4;
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  background: #f6f0eb;
 }
 
 .subnav {
@@ -1579,9 +1628,49 @@ select {
 
 .page-pos {
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
   /* Base ligeramente mayor solo en ventas (mejor lectura en mostrador / táctil) */
   font-size: 1.0625rem;
   -webkit-font-smoothing: antialiased;
+}
+
+.page-pos .pos-shell {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.page-pos .pos-split {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  align-items: stretch;
+}
+
+.page-pos .pos-cart-column {
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.page-pos .pos-products {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.page-pos .product-grid {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  align-content: start;
 }
 
 /* POS — tipografía y controles más grandes para uso en venta */
@@ -1705,7 +1794,10 @@ select {
 }
 
 .page-pos .cart-lines--main {
-  max-height: min(48vh, 400px);
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
 }
 
 .page-pos .sale-list-item {
@@ -1734,7 +1826,7 @@ select {
 
 /* Título y área principal más amplios cuando la vista es Ventas */
 .main-pro-content:has(.page-pos) {
-  padding: 0.85rem 1.35rem 2.25rem;
+  padding: 0.45rem 1.1rem 0.5rem;
   max-width: 1440px;
 }
 
@@ -2429,11 +2521,16 @@ select {
   background: #12110f;
 }
 
+[data-theme="dark"] .table-wrap {
+  border-color: #3a3530;
+}
+
 [data-theme="dark"] .main-pro-title {
   color: #faf6f1;
 }
 
 [data-theme="dark"] .subnav-wrap {
+  background: #12110f;
   border-bottom-color: #3a3530;
 }
 

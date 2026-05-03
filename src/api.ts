@@ -30,6 +30,8 @@ export type Cliente = {
   email: string | null;
   notas: string | null;
   puntos?: number;
+  tipo_cliente?: "registrado" | "temporal";
+  activo?: number;
   created_at: string;
   updated_at: string;
 };
@@ -388,6 +390,89 @@ export async function updateCliente(id: number, body: Partial<Cliente>): Promise
 
 export async function deleteCliente(id: number): Promise<void> {
   await requestJson(`/api/clientes/${id}`, { method: "DELETE" });
+}
+
+/** Certificado laboral PDF (requiere admin). Vista previa en nueva pestaña. */
+export async function previewCertificadoLaboral(empleadoId: number): Promise<void> {
+  const token = getAccessToken();
+  if (!token) throw new Error("Sesión requerida");
+  const res = await fetch(`${API_BASE}/api/admin/certificados/${empleadoId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    let msg = res.statusText;
+    try {
+      const j = (await res.json()) as { error?: string };
+      if (j.error) msg = j.error;
+    } catch {
+      const t = await res.text();
+      if (t) msg = t;
+    }
+    throw new Error(msg);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const w = window.open(url, "_blank", "noopener,noreferrer");
+  if (!w) {
+    URL.revokeObjectURL(url);
+    throw new Error("El navegador bloqueó la ventana emergente");
+  }
+  setTimeout(() => URL.revokeObjectURL(url), 120_000);
+}
+
+export async function downloadCertificadoLaboral(empleadoId: number): Promise<void> {
+  const token = getAccessToken();
+  if (!token) throw new Error("Sesión requerida");
+  const res = await fetch(`${API_BASE}/api/admin/certificados/${empleadoId}?descargar=1`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    let msg = res.statusText;
+    try {
+      const j = (await res.json()) as { error?: string };
+      if (j.error) msg = j.error;
+    } catch {
+      const t = await res.text();
+      if (t) msg = t;
+    }
+    throw new Error(msg);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `certificado-laboral-${empleadoId}.pdf`;
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30_000);
+}
+
+/** Walk-in / guest: crea fila temporal o reutiliza cliente existente si el teléfono coincide. */
+export async function createClienteTemporal(body?: {
+  nombre?: string;
+  telefono?: string | null;
+}): Promise<{ cliente: Cliente; reutilizado: boolean }> {
+  return requestJson("/api/clientes/temporal", {
+    method: "POST",
+    body: JSON.stringify(body ?? {}),
+  });
+}
+
+export async function convertirClienteRegistrado(
+  id: number,
+  body: {
+    nombre: string;
+    telefono?: string | null;
+    email?: string | null;
+    notas?: string | null;
+  }
+): Promise<Cliente> {
+  return requestJson(`/api/clientes/${id}/convertir-registrado`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
 }
 
 /* Citas */

@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useParams } from "react-router-dom";
-import { createCliente, deleteCliente, fetchClientes, updateCliente, type Cliente } from "../api";
+import {
+  convertirClienteRegistrado,
+  createCliente,
+  deleteCliente,
+  fetchClientes,
+  updateCliente,
+  type Cliente,
+} from "../api";
 import { Drawer } from "../components/Drawer";
 import { SkeletonCard } from "../components/Skeleton";
 import { useToast } from "../context/ToastContext";
@@ -142,6 +149,32 @@ export function ClientesPage() {
     );
   }, [rows]);
 
+  const editingTemporal =
+    editingId != null &&
+    rows.find((r) => r.id === editingId)?.tipo_cliente === "temporal";
+
+  async function onConvertirRegistrado(e: React.MouseEvent) {
+    e.preventDefault();
+    if (editingId == null) return;
+    if (!nombre.trim()) {
+      toast("Completá el nombre para registrar al cliente.", "warning");
+      return;
+    }
+    try {
+      await convertirClienteRegistrado(editingId, {
+        nombre: nombre.trim(),
+        telefono: telefono.trim() || null,
+        email: email.trim() || null,
+        notas: notas.trim() || null,
+      });
+      toast("Cliente registrado. Ventas y citas previas siguen vinculadas.", "success");
+      closeDrawer();
+      void load(busqueda.trim() || undefined);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Error", "error");
+    }
+  }
+
   async function onDelete(id: number) {
     if (!window.confirm("¿Eliminar cliente y sus citas?")) return;
     try {
@@ -256,6 +289,11 @@ export function ClientesPage() {
                     </td>
                     <td>
                       <span className="cell-main">{c.nombre}</span>
+                      {c.tipo_cliente === "temporal" ? (
+                        <span className="badge-ok" style={{ marginLeft: "0.35rem", fontSize: "0.7rem" }}>
+                          ocasional
+                        </span>
+                      ) : null}
                     </td>
                     <td>
                       <span className="mono">{c.telefono?.trim() ? c.telefono : "—"}</span>
@@ -313,6 +351,11 @@ export function ClientesPage() {
                     >
                       <td>
                         <span className="cell-main">{c.nombre}</span>
+                        {c.tipo_cliente === "temporal" ? (
+                          <span className="badge-ok" style={{ marginLeft: "0.35rem", fontSize: "0.7rem" }}>
+                            ocasional
+                          </span>
+                        ) : null}
                       </td>
                       <td>
                         <span className="mono">{c.telefono?.trim() ? c.telefono : "—"}</span>
@@ -347,10 +390,22 @@ export function ClientesPage() {
       <Drawer
         open={drawerOpen}
         onClose={closeDrawer}
-        title={editingId ? "Editar cliente" : "Nuevo cliente"}
+        title={
+          editingId
+            ? editingTemporal
+              ? "Cliente ocasional"
+              : "Editar cliente"
+            : "Nuevo cliente"
+        }
         wide
       >
         <form className="form drawer-form" onSubmit={onSubmit}>
+          {editingTemporal ? (
+            <p className="hint">
+              Contacto rápido sin registro completo. Cuando quieras, completá datos y pulsá{" "}
+              <strong>Registrar formalmente</strong> para fidelizar sin duplicar en el listado.
+            </p>
+          ) : null}
           <label className="field">
             <span>Nombre *</span>
             <input value={nombre} onChange={(e) => setNombre(e.target.value)} required />
@@ -370,8 +425,13 @@ export function ClientesPage() {
             <textarea value={notas} onChange={(e) => setNotas(e.target.value)} rows={3} />
           </label>
           <div className="drawer-actions">
+            {editingTemporal ? (
+              <button type="button" className="btn primary btn-lg" onClick={onConvertirRegistrado}>
+                Registrar formalmente
+              </button>
+            ) : null}
             <button type="submit" className="btn primary btn-lg">
-              Guardar
+              {editingTemporal ? "Guardar cambios (sigue ocasional)" : "Guardar"}
             </button>
             {editingId != null ? (
               <button

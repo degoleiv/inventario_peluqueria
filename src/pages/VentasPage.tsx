@@ -30,6 +30,7 @@ import {
 import { posBeepErr, posBeepOk } from "../lib/posSounds";
 import { SubNav } from "../components/SubNav";
 import { readLastTab, VENTAS_TABS, type VentasTab } from "../lib/moduleRoutes";
+import { publishPosClienteDisplay } from "../lib/posClientDisplay";
 
 type CartLine = {
   producto_id: number;
@@ -329,6 +330,27 @@ export function VentasPage() {
     [cart]
   );
 
+  useEffect(() => {
+    publishPosClienteDisplay({
+      lines: cart.map((l) => ({
+        nombre: l.nombre,
+        cantidad: l.cantidad,
+        importe: l.precio_unitario * l.cantidad,
+      })),
+      subtotal: total,
+    });
+  }, [cart, total]);
+
+  const abrirPantallaCliente = useCallback(() => {
+    try {
+      const u = new URL(window.location.href);
+      u.hash = "#/ventas/pantalla-cliente";
+      window.open(u.toString(), "peluqueria_pos_cliente", "noopener,noreferrer");
+    } catch {
+      window.open("#/ventas/pantalla-cliente", "peluqueria_pos_cliente", "noopener,noreferrer");
+    }
+  }, []);
+
   async function onBarcodeEnter() {
     const raw = search.trim();
     if (!raw) return;
@@ -447,9 +469,14 @@ export function VentasPage() {
         ]}
         quickActions={
           tab === "pos" ? (
-            <button type="button" className="btn ghost small" onClick={() => void load()}>
-              Sincronizar datos
-            </button>
+            <>
+              <button type="button" className="btn ghost small" onClick={abrirPantallaCliente}>
+                Pantalla cliente
+              </button>
+              <button type="button" className="btn ghost small" onClick={() => void load()}>
+                Sincronizar datos
+              </button>
+            </>
           ) : null
         }
       />

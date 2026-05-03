@@ -8,7 +8,7 @@ export const MODULO_KEYS = [
   "citas",
   "clientes",
   "inventario",
-  "compras",
+  "pedidos_proveedores",
   "finanzas",
   "facturas",
   "reportes",
@@ -19,7 +19,14 @@ export type ModuloKey = (typeof MODULO_KEYS)[number];
 const RESERVED_ADMIN_SLUG = "admin";
 
 function validatePermisos(arr: string[]): string[] {
-  const out = [...new Set(arr.map((s) => s.trim()).filter(Boolean))];
+  const out = [
+    ...new Set(
+      arr
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((p) => (p === "compras" ? "pedidos_proveedores" : p))
+    ),
+  ];
   for (const p of out) {
     if (p === "*") continue;
     if (!(MODULO_KEYS as readonly string[]).includes(p)) {

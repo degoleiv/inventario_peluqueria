@@ -17,7 +17,8 @@ export function FinanzasPage() {
   const [flujo, setFlujo] = useState<{
     ingresos_ventas: number;
     egresos_gastos: number;
-    egresos_compras: number;
+    egresos_pedidos_proveedor?: number;
+    egresos_compras?: number;
     egresos_total: number;
     resultado_neto: number;
   } | null>(null);
@@ -148,10 +149,10 @@ export function FinanzasPage() {
       ) : null}
 
       <section className="card">
-        <h2 className="card-title">Flujo de caja (ventas vs gastos + compras)</h2>
+        <h2 className="card-title">Flujo de caja (ventas vs gastos + pedidos proveedores)</h2>
         <p className="muted">
-          Ingresos: suma de ventas en el período. Egresos: gastos operativos registrados + total de
-          compras.
+          Ingresos: suma de ventas en el período. Egresos: gastos operativos + total de pedidos a
+          proveedores (valor de líneas / stock).
         </p>
         <div className="filtros-row">
           <label className="field inline">
@@ -172,7 +173,10 @@ export function FinanzasPage() {
               Ingresos (ventas): <strong>{flujo.ingresos_ventas.toFixed(2)}</strong>
             </li>
             <li>Egresos gastos: {flujo.egresos_gastos.toFixed(2)}</li>
-            <li>Egresos compras: {flujo.egresos_compras.toFixed(2)}</li>
+            <li>
+              Egresos pedidos proveedores:{" "}
+              {(flujo.egresos_pedidos_proveedor ?? flujo.egresos_compras ?? 0).toFixed(2)}
+            </li>
             <li>
               Resultado neto: <strong>{flujo.resultado_neto.toFixed(2)}</strong>
             </li>

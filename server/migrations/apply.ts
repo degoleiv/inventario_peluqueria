@@ -1,5 +1,78 @@
 import type Database from "better-sqlite3";
 
+function tableExists(db: Database.Database, name: string): boolean {
+  const r = db
+    .prepare(`SELECT 1 AS o FROM sqlite_master WHERE type = 'table' AND name = ?`)
+    .get(name) as { o: number } | undefined;
+  return !!r;
+}
+
+/** Antes `compras` / `compra_lineas`; ahora `pedidos_proveedor` / `pedido_proveedor_lineas`. */
+function migrateComprasAPedidosProveedor(db: Database.Database) {
+  if (!tableExists(db, "compras") || tableExists(db, "pedidos_proveedor")) return;
+
+  db.pragma("foreign_keys = OFF");
+  try {
+    db.exec(`ALTER TABLE compras RENAME TO pedidos_proveedor`);
+    if (tableExists(db, "compra_lineas")) {
+      db.exec(`ALTER TABLE compra_lineas RENAME TO pedido_proveedor_lineas`);
+      db.exec(`ALTER TABLE pedido_proveedor_lineas RENAME COLUMN compra_id TO pedido_proveedor_id`);
+    }
+    const movCols = db.prepare(`PRAGMA table_info(movimientos_inventario)`).all() as { name: string }[];
+    const mn = new Set(movCols.map((c) => c.name));
+    if (mn.has("compra_id") && !mn.has("pedido_proveedor_id")) {
+      db.exec(`ALTER TABLE movimientos_inventario RENAME COLUMN compra_id TO pedido_proveedor_id`);
+    }
+  } finally {
+    db.pragma("foreign_keys = ON");
+  }
+
+  const now = new Date().toISOString();
+  const placeholderNombre = "(Histórico) Sin proveedor";
+  const existing = db.prepare(`SELECT id FROM proveedores WHERE nombre = ?`).get(placeholderNombre) as
+    | { id: number }
+    | undefined;
+  let phId = existing?.id;
+  if (!phId) {
+    const ins = db
+      .prepare(
+        `INSERT INTO proveedores (nombre, telefono, email, notas, created_at) VALUES (?,?,?,?,?)`
+      )
+      .run(placeholderNombre, null, null, "Migración: pedidos sin proveedor enlazado", now);
+    phId = Number(ins.lastInsertRowid);
+  }
+  db.prepare(`UPDATE pedidos_proveedor SET proveedor_id = ? WHERE proveedor_id IS NULL`).run(phId);
+}
+
+function migrateRolesPermisoComprasAPedidos(db: Database.Database) {
+  const rows = db.prepare(`SELECT slug, permisos FROM roles_app`).all() as {
+    slug: string;
+    permisos: string;
+  }[];
+  for (const row of rows) {
+    try {
+      const arr = JSON.parse(row.permisos) as unknown;
+      if (!Array.isArray(arr)) continue;
+      let changed = false;
+      const next = arr.map((x) => {
+        if (x === "compras") {
+          changed = true;
+          return "pedidos_proveedores";
+        }
+        return x;
+      });
+      if (changed) {
+        db.prepare(`UPDATE roles_app SET permisos = ? WHERE slug = ?`).run(
+          JSON.stringify(next),
+          row.slug
+        );
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
 export function applyMigrations(db: Database.Database) {
   const productCols = db.prepare(`PRAGMA table_info(productos)`).all() as { name: string }[];
   const pNames = new Set(productCols.map((c) => c.name));
@@ -65,6 +138,8 @@ export function applyMigrations(db: Database.Database) {
     /* Duplicados históricos */
   }
 
+  migrateComprasAPedidosProveedor(db);
+
   db.exec(`
     CREATE TABLE IF NOT EXISTS proveedores (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -75,28 +150,33 @@ export function applyMigrations(db: Database.Database) {
       created_at TEXT NOT NULL
     );
 
-    CREATE TABLE IF NOT EXISTS compras (
+    CREATE TABLE IF NOT EXISTS pedidos_proveedor (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      proveedor_id INTEGER,
+      proveedor_id INTEGER NOT NULL,
       proveedor_nombre TEXT,
       fecha TEXT NOT NULL,
+      fecha_pago_con_descuento TEXT,
+      fecha_pago_maxima TEXT,
+      valor_pago_con_descuento REAL,
+      valor_pago_sin_descuento REAL,
       total REAL NOT NULL,
       notas TEXT,
       referencia TEXT,
+      estado TEXT NOT NULL DEFAULT 'pendiente',
       created_at TEXT NOT NULL,
-      FOREIGN KEY (proveedor_id) REFERENCES proveedores(id) ON DELETE SET NULL
+      FOREIGN KEY (proveedor_id) REFERENCES proveedores(id) ON DELETE RESTRICT
     );
 
-    CREATE INDEX IF NOT EXISTS idx_compras_fecha ON compras(fecha);
+    CREATE INDEX IF NOT EXISTS idx_pedidos_prov_fecha ON pedidos_proveedor(fecha);
 
-    CREATE TABLE IF NOT EXISTS compra_lineas (
+    CREATE TABLE IF NOT EXISTS pedido_proveedor_lineas (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      compra_id INTEGER NOT NULL,
+      pedido_proveedor_id INTEGER NOT NULL,
       producto_id INTEGER NOT NULL,
       cantidad INTEGER NOT NULL,
       costo_unitario REAL NOT NULL,
       subtotal REAL NOT NULL,
-      FOREIGN KEY (compra_id) REFERENCES compras(id) ON DELETE CASCADE,
+      FOREIGN KEY (pedido_proveedor_id) REFERENCES pedidos_proveedor(id) ON DELETE CASCADE,
       FOREIGN KEY (producto_id) REFERENCES productos(id)
     );
 
@@ -138,10 +218,30 @@ export function applyMigrations(db: Database.Database) {
 
   const movCols = db.prepare(`PRAGMA table_info(movimientos_inventario)`).all() as { name: string }[];
   const movNames = new Set(movCols.map((c) => c.name));
-  if (!movNames.has("compra_id")) {
+  if (!movNames.has("pedido_proveedor_id")) {
     db.exec(
-      `ALTER TABLE movimientos_inventario ADD COLUMN compra_id INTEGER REFERENCES compras(id) ON DELETE SET NULL`
+      `ALTER TABLE movimientos_inventario ADD COLUMN pedido_proveedor_id INTEGER REFERENCES pedidos_proveedor(id) ON DELETE SET NULL`
     );
+  }
+
+  const pedCols = db.prepare(`PRAGMA table_info(pedidos_proveedor)`).all() as { name: string }[];
+  const pedNames = new Set(pedCols.map((c) => c.name));
+  if (tableExists(db, "pedidos_proveedor")) {
+    if (!pedNames.has("fecha_pago_con_descuento")) {
+      db.exec(`ALTER TABLE pedidos_proveedor ADD COLUMN fecha_pago_con_descuento TEXT`);
+    }
+    if (!pedNames.has("fecha_pago_maxima")) {
+      db.exec(`ALTER TABLE pedidos_proveedor ADD COLUMN fecha_pago_maxima TEXT`);
+    }
+    if (!pedNames.has("valor_pago_con_descuento")) {
+      db.exec(`ALTER TABLE pedidos_proveedor ADD COLUMN valor_pago_con_descuento REAL`);
+    }
+    if (!pedNames.has("valor_pago_sin_descuento")) {
+      db.exec(`ALTER TABLE pedidos_proveedor ADD COLUMN valor_pago_sin_descuento REAL`);
+    }
+    if (!pedNames.has("estado")) {
+      db.exec(`ALTER TABLE pedidos_proveedor ADD COLUMN estado TEXT NOT NULL DEFAULT 'pendiente'`);
+    }
   }
 
   db.exec(`
@@ -258,7 +358,7 @@ export function applyMigrations(db: Database.Database) {
         "citas",
         "clientes",
         "inventario",
-        "compras",
+        "pedidos_proveedores",
         "facturas",
         "reportes",
       ]),
@@ -381,4 +481,6 @@ export function applyMigrations(db: Database.Database) {
     );
     CREATE INDEX IF NOT EXISTS idx_emp_mov_empleado ON empleado_movimientos(empleado_id);
   `);
+
+  migrateRolesPermisoComprasAPedidos(db);
 }

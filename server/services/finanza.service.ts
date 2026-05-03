@@ -43,7 +43,7 @@ export const finanzaService = {
     return db.prepare(`SELECT * FROM gastos_operativos WHERE id = ?`).get(info.lastInsertRowid);
   },
 
-  /** Ingresos por ventas, egresos por gastos operativos + total compras en el período. */
+  /** Ingresos por ventas, egresos por gastos operativos + total pedidos a proveedores en el período. */
   flujoCaja(desde: string, hasta: string) {
     const ingresos = db
       .prepare(`SELECT COALESCE(SUM(total), 0) AS s FROM ventas WHERE fecha >= ? AND fecha <= ?`)
@@ -53,15 +53,20 @@ export const finanzaService = {
         `SELECT COALESCE(SUM(monto), 0) AS s FROM gastos_operativos WHERE fecha >= ? AND fecha <= ?`
       )
       .get(desde.slice(0, 10), hasta.slice(0, 10)) as { s: number };
-    const egresosCompras = db
-      .prepare(`SELECT COALESCE(SUM(total), 0) AS s FROM compras WHERE fecha >= ? AND fecha <= ?`)
+    const egresosPedidos = db
+      .prepare(
+        `SELECT COALESCE(SUM(total), 0) AS s FROM pedidos_proveedor WHERE fecha >= ? AND fecha <= ?`
+      )
       .get(desde.slice(0, 10), hasta.slice(0, 10)) as { s: number };
-    const egresos = egresosGastos.s + egresosCompras.s;
+    const egresos = egresosGastos.s + egresosPedidos.s;
     return {
       periodo: { desde, hasta },
       ingresos_ventas: ingresos.s,
       egresos_gastos: egresosGastos.s,
-      egresos_compras: egresosCompras.s,
+      /** Total facturado en pedidos (líneas de stock), mismo concepto que antes con compras. */
+      egresos_pedidos_proveedor: egresosPedidos.s,
+      /** @deprecated usar egresos_pedidos_proveedor */
+      egresos_compras: egresosPedidos.s,
       egresos_total: egresos,
       resultado_neto: ingresos.s - egresos,
     };

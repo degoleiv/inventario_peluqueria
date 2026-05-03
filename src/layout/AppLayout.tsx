@@ -114,7 +114,7 @@ const ICONS: Partial<Record<NavKey, React.ReactElement>> = {
   citas: <IconCalendar />,
   clientes: <IconUsers />,
   inventario: <IconBox />,
-  compras: <IconTruck />,
+  pedidos_proveedores: <IconTruck />,
   finanzas: <IconWallet />,
   facturas: <IconFile />,
   reportes: <IconChart />,
@@ -144,6 +144,8 @@ type Props = {
   /** Texto de marca (configuración / branding). */
   brandTitle?: string;
   brandLogoSrc?: string | null;
+  /** Pantalla secundaria al cliente: sin menú ni barra de app. */
+  fullscreenContent?: boolean;
   children: ReactNode;
 };
 
@@ -164,10 +166,15 @@ export function AppLayout({
   permisos,
   brandTitle,
   brandLogoSrc,
+  fullscreenContent,
   children,
 }: Props) {
   const pageTitle = NAV_LABEL[nav];
   const displayBrand = brandTitle?.trim() || "Peluquería";
+
+  if (fullscreenContent) {
+    return <div className="app-root app-root--customer-display">{children}</div>;
+  }
 
   const sidebarGroups = NAV_GROUPS.map((g) => ({
     ...g,

@@ -211,31 +211,67 @@ export function ClientesPage() {
           </button>
         </div>
       ) : (
-        <div className="cards-grid">
-          {displayRows.map((c) => (
-            <div key={c.id} className="cliente-card-wrap">
-              <button type="button" className="cliente-card" onClick={() => openEdit(c)}>
-                <span className="cliente-card-name">{c.nombre}</span>
-                <span className="cliente-card-meta">{c.telefono ?? "Sin teléfono"}</span>
-                {c.puntos != null && c.puntos > 0 ? (
-                  <span className="cliente-card-badge">{c.puntos} pts</span>
-                ) : null}
-              </button>
-              <button
-                type="button"
-                className={`cliente-fav ${isClientePinned(c.id) ? "cliente-fav--on" : ""}`}
-                title={isClientePinned(c.id) ? "Quitar favorito" : "Cliente frecuente"}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  togglePinCliente(c.id);
-                  setPinTick((t) => t + 1);
-                }}
-              >
-                ★
-              </button>
-            </div>
-          ))}
-        </div>
+        <section className="card-pro clientes-tabla-wrap">
+          <div className="table-wrap">
+            <table className="table clientes-table">
+              <thead>
+                <tr>
+                  <th className="clientes-table-col-fav" scope="col" aria-label="Favorito" />
+                  <th scope="col">Nombre</th>
+                  <th scope="col">Teléfono</th>
+                  <th scope="col">Email</th>
+                  <th scope="col" className="clientes-table-col-narrow">
+                    Puntos
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {displayRows.map((c) => (
+                  <tr
+                    key={c.id}
+                    className="table-row-click"
+                    onClick={() => openEdit(c)}
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        openEdit(c);
+                      }
+                    }}
+                  >
+                    <td className="clientes-table-col-fav">
+                      <button
+                        type="button"
+                        className={`cliente-fav-inline ${isClientePinned(c.id) ? "cliente-fav-inline--on" : ""}`}
+                        title={isClientePinned(c.id) ? "Quitar favorito" : "Cliente frecuente"}
+                        aria-pressed={isClientePinned(c.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          togglePinCliente(c.id);
+                          setPinTick((t) => t + 1);
+                        }}
+                      >
+                        ★
+                      </button>
+                    </td>
+                    <td>
+                      <span className="cell-main">{c.nombre}</span>
+                    </td>
+                    <td>
+                      <span className="mono">{c.telefono?.trim() ? c.telefono : "—"}</span>
+                    </td>
+                    <td>
+                      <span className="cell-sub">{c.email?.trim() ? c.email : "—"}</span>
+                    </td>
+                    <td className="clientes-table-col-narrow mono">
+                      {c.puntos != null && c.puntos > 0 ? `${c.puntos}` : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
       )}
         </>
       ) : null}
@@ -252,18 +288,44 @@ export function ClientesPage() {
           ) : displayRowsHistorial.length === 0 ? (
             <p className="muted">Sin clientes.</p>
           ) : (
-            <div className="cards-grid">
-              {displayRowsHistorial.map((c) => (
-                <div key={c.id} className="cliente-card-wrap">
-                  <button type="button" className="cliente-card" onClick={() => openEdit(c)}>
-                    <span className="cliente-card-name">{c.nombre}</span>
-                    <span className="cliente-card-meta">{c.telefono ?? "Sin teléfono"}</span>
-                    <span className="muted small">
-                      Actualizado: {new Date(c.updated_at).toLocaleString()}
-                    </span>
-                  </button>
-                </div>
-              ))}
+            <div className="table-wrap">
+              <table className="table clientes-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Nombre</th>
+                    <th scope="col">Teléfono</th>
+                    <th scope="col">Última actividad</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {displayRowsHistorial.map((c) => (
+                    <tr
+                      key={c.id}
+                      className="table-row-click"
+                      tabIndex={0}
+                      onClick={() => openEdit(c)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          openEdit(c);
+                        }
+                      }}
+                    >
+                      <td>
+                        <span className="cell-main">{c.nombre}</span>
+                      </td>
+                      <td>
+                        <span className="mono">{c.telefono?.trim() ? c.telefono : "—"}</span>
+                      </td>
+                      <td>
+                        <span className="muted small">
+                          {new Date(c.updated_at).toLocaleString()}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </section>

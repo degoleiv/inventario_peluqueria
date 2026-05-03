@@ -72,8 +72,8 @@ export function getModuleEntryPath(key: NavKey): string {
       return `/inventario/${readLastTab("inventario", "productos")}`;
     case "clientes":
       return `/clientes/${readLastTab("clientes", "lista")}`;
-    case "compras":
-      return "/compras";
+    case "pedidos_proveedores":
+      return "/pedidos-proveedores";
     case "finanzas":
       return "/finanzas";
     case "facturas":
@@ -93,13 +93,15 @@ export function getModuleEntryPath(key: NavKey): string {
 export function pathToNavKey(pathname: string): NavKey {
   let seg = pathname.replace(/^\//, "").split("/")[0] || "inicio";
   if (seg === "usuarios") seg = "empleados";
+  if (seg === "pedidos-proveedores") seg = "pedidos_proveedores";
+  if (seg === "compras") seg = "pedidos_proveedores";
   const keys: NavKey[] = [
     "inicio",
     "ventas",
     "citas",
     "clientes",
     "inventario",
-    "compras",
+    "pedidos_proveedores",
     "finanzas",
     "facturas",
     "reportes",

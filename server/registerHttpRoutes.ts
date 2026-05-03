@@ -11,7 +11,7 @@ import { productoService } from "./services/producto.service.js";
 import { clienteService } from "./services/cliente.service.js";
 import { citaService } from "./services/cita.service.js";
 import { ventaService } from "./services/venta.service.js";
-import { compraService } from "./services/compra.service.js";
+import { pedidoProveedorService } from "./services/pedidoProveedor.service.js";
 import { proveedorService } from "./services/proveedor.service.js";
 import { facturaElectronicaService } from "./services/facturaElectronica.service.js";
 import { configuracionService } from "./services/configuracion.service.js";
@@ -341,28 +341,34 @@ export function registerHttpRoutes(app: Express) {
     }
   });
 
-  api.get("/proveedores", requirePermiso("compras"), (_req, res) =>
+  api.get("/proveedores", requirePermiso("pedidos_proveedores"), (_req, res) =>
     res.json(proveedorService.list())
   );
 
-  api.post("/proveedores", requirePermiso("compras"), (req, res) => {
+  api.post("/proveedores", requirePermiso("pedidos_proveedores"), (req, res) => {
     res.status(201).json(proveedorService.create(req.body as Record<string, unknown>));
   });
 
-  api.get("/compras", requirePermiso("compras"), (req, res) => {
+  api.get("/pedidos-proveedores", requirePermiso("pedidos_proveedores"), (req, res) => {
     const desde = typeof req.query.desde === "string" ? req.query.desde : undefined;
     const hasta = typeof req.query.hasta === "string" ? req.query.hasta : undefined;
-    res.json(compraService.list(desde, hasta));
+    res.json(pedidoProveedorService.list(desde, hasta));
   });
 
-  api.get("/compras/:id", requirePermiso("compras"), (req, res) => {
+  api.get("/pedidos-proveedores/:id", requirePermiso("pedidos_proveedores"), (req, res) => {
     const id = parseId(req, res);
     if (id == null) return;
-    res.json(compraService.getById(id));
+    res.json(pedidoProveedorService.getById(id));
   });
 
-  api.post("/compras", requirePermiso("compras"), (req, res) => {
-    res.status(201).json(compraService.create(req.body as Record<string, unknown>));
+  api.post("/pedidos-proveedores", requirePermiso("pedidos_proveedores"), (req, res) => {
+    res.status(201).json(pedidoProveedorService.create(req.body as Record<string, unknown>));
+  });
+
+  api.patch("/pedidos-proveedores/:id", requirePermiso("pedidos_proveedores"), (req, res) => {
+    const id = parseId(req, res);
+    if (id == null) return;
+    res.json(pedidoProveedorService.updateMeta(id, req.body as Record<string, unknown>));
   });
 
   api.get("/facturas-electronicas", requirePermiso("facturas"), (req, res) => {

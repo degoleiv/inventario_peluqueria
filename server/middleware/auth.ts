@@ -7,7 +7,10 @@ import { rolesService } from "../services/roles.service.js";
 export function hasPermiso(permisos: string[] | undefined, modulo: string): boolean {
   if (!permisos?.length) return false;
   if (permisos.includes("*")) return true;
-  return permisos.includes(modulo);
+  if (permisos.includes(modulo)) return true;
+  /* Compat: rol antiguo con permiso "compras" → módulo pedidos_proveedores */
+  if (modulo === "pedidos_proveedores" && permisos.includes("compras")) return true;
+  return false;
 }
 
 export function requireAuth(req: Request, _res: Response, next: NextFunction) {

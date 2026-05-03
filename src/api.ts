@@ -469,20 +469,54 @@ export async function createProveedor(body: Partial<Proveedor>): Promise<Proveed
   return requestJson("/api/proveedores", { method: "POST", body: JSON.stringify(body) });
 }
 
-export async function fetchCompras(desde?: string, hasta?: string): Promise<unknown[]> {
+export type PedidoProveedor = {
+  id: number;
+  proveedor_id: number;
+  proveedor_nombre: string | null;
+  proveedor_nombre_ref?: string | null;
+  fecha: string;
+  fecha_pago_con_descuento: string | null;
+  fecha_pago_maxima: string | null;
+  valor_pago_con_descuento: number | null;
+  valor_pago_sin_descuento: number | null;
+  total: number;
+  notas: string | null;
+  referencia: string | null;
+  estado: string;
+  created_at: string;
+  indicador_pago?: string;
+  lineas?: unknown[];
+};
+
+export async function fetchPedidosProveedores(
+  desde?: string,
+  hasta?: string
+): Promise<PedidoProveedor[]> {
   const q = new URLSearchParams();
   if (desde) q.set("desde", desde);
   if (hasta) q.set("hasta", hasta);
   const suffix = q.toString() ? `?${q}` : "";
-  return requestJson(`/api/compras${suffix}`);
+  return requestJson(`/api/pedidos-proveedores${suffix}`);
 }
 
-export async function fetchCompra(id: number): Promise<unknown> {
-  return requestJson(`/api/compras/${id}`);
+export async function fetchPedidoProveedor(id: number): Promise<PedidoProveedor> {
+  return requestJson(`/api/pedidos-proveedores/${id}`);
 }
 
-export async function createCompra(body: Record<string, unknown>): Promise<unknown> {
-  return requestJson("/api/compras", { method: "POST", body: JSON.stringify(body) });
+export async function createPedidoProveedor(
+  body: Record<string, unknown>
+): Promise<PedidoProveedor> {
+  return requestJson("/api/pedidos-proveedores", { method: "POST", body: JSON.stringify(body) });
+}
+
+export async function updatePedidoProveedorMeta(
+  id: number,
+  body: Record<string, unknown>
+): Promise<PedidoProveedor> {
+  return requestJson(`/api/pedidos-proveedores/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
 }
 
 export type FacturaElectronica = {

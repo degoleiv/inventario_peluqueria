@@ -6,7 +6,7 @@ export type NavKey =
   | "citas"
   | "clientes"
   | "inventario"
-  | "compras"
+  | "pedidos_proveedores"
   | "finanzas"
   | "facturas"
   | "reportes"
@@ -22,7 +22,7 @@ export const PERMISO_MODULOS: PermisoModulo[] = [
   "citas",
   "clientes",
   "inventario",
-  "compras",
+  "pedidos_proveedores",
   "finanzas",
   "facturas",
   "reportes",
@@ -34,7 +34,7 @@ export const NAV_LABEL: Record<NavKey, string> = {
   citas: "Agenda",
   clientes: "Clientes",
   inventario: "Inventario",
-  compras: "Compras",
+  pedidos_proveedores: "Pedidos proveedores",
   finanzas: "Finanzas",
   facturas: "Facturas",
   reportes: "Reportes",
@@ -45,7 +45,7 @@ export const NAV_LABEL: Record<NavKey, string> = {
 export const NAV_GROUPS: { label: string; items: NavKey[] }[] = [
   { label: "Principal", items: ["inicio"] },
   { label: "Operación", items: ["ventas", "citas"] },
-  { label: "Gestión", items: ["clientes", "inventario", "compras"] },
+  { label: "Gestión", items: ["clientes", "inventario", "pedidos_proveedores"] },
   { label: "Finanzas", items: ["finanzas", "facturas", "reportes"] },
   { label: "Administración", items: ["configuracion", "empleados"] },
 ];
@@ -54,7 +54,10 @@ export function puedeVerModulo(permisos: string[] | undefined, key: NavKey): boo
   if (!permisos?.length) return false;
   if (permisos.includes("*")) return true;
   if (key === "configuracion" || key === "empleados") return false;
-  return permisos.includes(key);
+  if (permisos.includes(key)) return true;
+  /* Compat: permiso legado "compras" en JWT/rol */
+  if (key === "pedidos_proveedores" && permisos.includes("compras")) return true;
+  return false;
 }
 
 export function puedeVerUsuariosAdmin(permisos: string[] | undefined): boolean {

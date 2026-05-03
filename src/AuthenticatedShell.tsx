@@ -13,7 +13,8 @@ import { InventarioPage } from "./pages/InventarioPage";
 import { ClientesPage } from "./pages/ClientesPage";
 import { CitasPage } from "./pages/CitasPage";
 import { VentasPage } from "./pages/VentasPage";
-import { ComprasPage } from "./pages/ComprasPage";
+import { VentaClienteDisplayPage } from "./pages/VentaClienteDisplayPage";
+import { PedidosProveedoresPage } from "./pages/PedidosProveedoresPage";
 import { FacturasPage } from "./pages/FacturasPage";
 import { FinanzasPage } from "./pages/FinanzasPage";
 import { ReportesPage } from "./pages/ReportesPage";
@@ -46,6 +47,7 @@ export function AuthenticatedShell() {
   const navigate = useNavigate();
   const location = useLocation();
   const nav = pathToNavKey(location.pathname);
+  const customerDisplay = location.pathname === "/ventas/pantalla-cliente";
 
   const [authTick, setAuthTick] = useState(0);
   const [theme, setTheme] = useState<"light" | "dark">(() => {
@@ -176,7 +178,7 @@ export function AuthenticatedShell() {
       "citas",
       "clientes",
       "inventario",
-      "compras",
+      "pedidos_proveedores",
       "finanzas",
       "facturas",
       "reportes",
@@ -284,6 +286,7 @@ export function AuthenticatedShell() {
         permisos={permisos}
         brandTitle={brandTitle}
         brandLogoSrc={brandLogo}
+        fullscreenContent={customerDisplay}
         online={online}
         onLogout={() => {
           clearAccessToken();
@@ -318,6 +321,7 @@ export function AuthenticatedRoutes() {
         <Route path="inicio" element={<DashboardPage />} />
         <Route path="citas" element={<Navigate to={`/citas/${readCitasTab()}`} replace />} />
         <Route path="citas/:tab" element={<CitasPage />} />
+        <Route path="ventas/pantalla-cliente" element={<VentaClienteDisplayPage />} />
         <Route
           path="ventas"
           element={<Navigate to={`/ventas/${readLastTab("ventas", "pos")}`} replace />}
@@ -335,7 +339,8 @@ export function AuthenticatedRoutes() {
           element={<Navigate to={`/clientes/${readLastTab("clientes", "lista")}`} replace />}
         />
         <Route path="clientes/:tab" element={<ClientesPage />} />
-        <Route path="compras" element={<ComprasPage />} />
+        <Route path="compras" element={<Navigate to="/pedidos-proveedores" replace />} />
+        <Route path="pedidos-proveedores" element={<PedidosProveedoresPage />} />
         <Route path="finanzas" element={<FinanzasPage />} />
         <Route path="facturas" element={<FacturasPage />} />
         <Route path="reportes" element={<ReportesPage />} />

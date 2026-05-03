@@ -2,6 +2,7 @@ import { createHmac, randomUUID } from "node:crypto";
 import { db, recordSyncEvent } from "../db.js";
 import { getJwtSecret } from "../config.js";
 import { AppError } from "../lib/AppError.js";
+import { smtpService } from "./smtp.service.js";
 
 function signingSecret() {
   return process.env.FACTURA_SIGNING_SECRET?.trim() || getJwtSecret();
@@ -190,5 +191,77 @@ export const facturaElectronicaService = {
     if (!f) throw new AppError("Factura no encontrada", 404);
     if (formato === "xml") return { contentType: "application/xml", body: f.xml_documento };
     return { contentType: "application/json", body: f.json_documento };
+  },
+
+  /** Envía XML y JSON por correo (SMTP). Destinatario: override o email del cliente de la venta. */
+  async enviarPorEmail(facturaId: number, destinatarioOverride?: string) {
+    const row = db
+      .prepare(
+        `SELECT fe.id, fe.punto_venta, fe.numero, fe.cliente_nombre, fe.xml_documento, fe.json_documento,
+                c.email AS cliente_email
+         FROM facturas_electronicas fe
+         JOIN ventas v ON v.id = fe.venta_id
+         LEFT JOIN clientes c ON c.id = v.cliente_id
+         WHERE fe.id = ?`
+      )
+      .get(facturaId) as
+      | {
+          id: number;
+          punto_venta: number;
+          numero: number;
+          cliente_nombre: string | null;
+          xml_documento: string;
+          json_documento: string;
+          cliente_email: string | null;
+        }
+      | undefined;
+
+    if (!row) throw new AppError("Factura no encontrada", 404);
+
+    const rawTo =
+      (destinatarioOverride ?? "").trim() || (row.cliente_email ?? "").trim();
+    if (!rawTo) {
+      throw new AppError(
+        "No hay email de destino: indicá uno en el envío o cargá email en el cliente de la venta.",
+        400
+      );
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawTo)) {
+      throw new AppError("Email de destino inválido", 400);
+    }
+
+    const label = `${row.punto_venta}-${row.numero}`;
+    const subject = `Factura electrónica ${label}`;
+    const nombre = row.cliente_nombre ?? "Cliente";
+
+    await smtpService.sendMail({
+      to: rawTo,
+      subject,
+      text: `Hola,\n\nAdjuntamos el comprobante electrónico ${label} (${nombre}).\n\nSaludos.`,
+      html: `<p>Adjuntamos el comprobante electrónico <strong>${escapeXml(
+        label
+      )}</strong> (${escapeXml(nombre)}).</p><p>Saludos.</p>`,
+      attachments: [
+        {
+          filename: `factura-${label}.xml`,
+          content: row.xml_documento,
+          contentType: "application/xml",
+        },
+        {
+          filename: `factura-${label}.json`,
+          content: row.json_documento,
+          contentType: "application/json",
+        },
+      ],
+    });
+
+    const now = new Date().toISOString();
+    db.prepare(`UPDATE facturas_electronicas SET email_enviado_at = ? WHERE id = ?`).run(
+      now,
+      facturaId
+    );
+
+    recordSyncEvent("factura_electronica", "email_enviado", { id: facturaId, to: rawTo });
+    return { ok: true as const, to: rawTo, enviado_en: now };
   },
 };

@@ -1,0 +1,108 @@
+import { db } from "../db.js";
+import { AppError } from "../lib/AppError.js";
+
+const TIPOS = new Set(["adelanto", "descuento"]);
+const ESTADOS = new Set(["pendiente", "pagado"]);
+
+export const empleadoMovimientoService = {
+  list(empleadoId?: number) {
+    let sql = `SELECT m.*, u.nombre AS empleado_nombre FROM empleado_movimientos m
+               JOIN usuarios u ON u.id = m.empleado_id`;
+    const params: number[] = [];
+    if (empleadoId != null) {
+      sql += ` WHERE m.empleado_id = ?`;
+      params.push(empleadoId);
+    }
+    sql += ` ORDER BY m.created_at DESC`;
+    return db.prepare(sql).all(...params);
+  },
+
+  create(body: Record<string, unknown>) {
+    const empleado_id = Number(body.empleado_id);
+    if (!Number.isFinite(empleado_id)) throw new AppError("empleado_id requerido");
+    const ok = db.prepare(`SELECT id FROM usuarios WHERE id = ?`).get(empleado_id) as
+      | { id: number }
+      | undefined;
+    if (!ok) throw new AppError("Empleado no encontrado");
+
+    const monto = Number(body.monto);
+    if (!Number.isFinite(monto) || monto <= 0) throw new AppError("monto inválido");
+
+    let tipo = typeof body.tipo === "string" ? body.tipo.trim().toLowerCase() : "adelanto";
+    if (!TIPOS.has(tipo)) throw new AppError("tipo debe ser adelanto o descuento");
+
+    let estado = typeof body.estado === "string" ? body.estado.trim().toLowerCase() : "pendiente";
+    if (!ESTADOS.has(estado)) estado = "pendiente";
+
+    const notas = typeof body.notas === "string" ? body.notas || null : null;
+    const now = new Date().toISOString();
+
+    const info = db
+      .prepare(
+        `INSERT INTO empleado_movimientos (empleado_id, monto, tipo, estado, notas, created_at)
+         VALUES (?,?,?,?,?,?)`
+      )
+      .run(empleado_id, monto, tipo, estado, notas, now);
+
+    return db
+      .prepare(
+        `SELECT m.*, u.nombre AS empleado_nombre FROM empleado_movimientos m
+         JOIN usuarios u ON u.id = m.empleado_id WHERE m.id = ?`
+      )
+      .get(info.lastInsertRowid);
+  },
+
+  updateEstado(id: number, estado: string) {
+    const e = estado.trim().toLowerCase();
+    if (!ESTADOS.has(e)) throw new AppError("estado debe ser pendiente o pagado");
+    const info = db.prepare(`UPDATE empleado_movimientos SET estado = ? WHERE id = ?`).run(e, id);
+    if (info.changes === 0) throw new AppError("no encontrado", 404);
+    return db
+      .prepare(
+        `SELECT m.*, u.nombre AS empleado_nombre FROM empleado_movimientos m
+         JOIN usuarios u ON u.id = m.empleado_id WHERE m.id = ?`
+      )
+      .get(id);
+  },
+
+  resumen(empleadoId: number, desde?: string, hasta?: string) {
+    const ok = db.prepare(`SELECT id, nombre FROM usuarios WHERE id = ?`).get(empleadoId) as
+      | { id: number; nombre: string | null }
+      | undefined;
+    if (!ok) throw new AppError("Empleado no encontrado", 404);
+
+    let sqlC = `SELECT COALESCE(SUM(monto), 0) AS t FROM comisiones WHERE empleado_id = ?`;
+    const paramsC: (number | string)[] = [empleadoId];
+    if (desde) {
+      sqlC += ` AND fecha >= ?`;
+      paramsC.push(desde);
+    }
+    if (hasta) {
+      sqlC += ` AND fecha <= ?`;
+      paramsC.push(hasta);
+    }
+    const totalComisiones = (
+      db.prepare(sqlC).get(...paramsC) as { t: number }
+    ).t;
+
+    const pend = db
+      .prepare(
+        `SELECT COALESCE(SUM(monto), 0) AS t FROM empleado_movimientos
+         WHERE empleado_id = ? AND estado = 'pendiente'`
+      )
+      .get(empleadoId) as { t: number };
+
+    const totalAdelantosPendiente = pend.t;
+    const saldoFinal = Math.round((totalComisiones - totalAdelantosPendiente) * 100) / 100;
+
+    return {
+      empleado_id: empleadoId,
+      empleado_nombre: ok.nombre,
+      total_comisiones_periodo: totalComisiones,
+      adelantos_y_descuentos_pendiente: totalAdelantosPendiente,
+      saldo_final: saldoFinal,
+      desde: desde ?? null,
+      hasta: hasta ?? null,
+    };
+  },
+};

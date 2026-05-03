@@ -227,6 +227,45 @@ export function applyMigrations(db: Database.Database) {
     INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('puntos_valor_redencion', '0');
   `);
 
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS roles_app (
+      slug TEXT PRIMARY KEY,
+      nombre TEXT NOT NULL,
+      permisos TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+  `);
+
+  const rolesCount = db.prepare(`SELECT COUNT(*) AS n FROM roles_app`).get() as { n: number };
+  if (rolesCount.n === 0) {
+    const now = new Date().toISOString();
+    const ins = db.prepare(
+      `INSERT INTO roles_app (slug, nombre, permisos, created_at) VALUES (?, ?, ?, ?)`
+    );
+    ins.run("admin", "Administrador", JSON.stringify(["*"]), now);
+    ins.run(
+      "vendedor",
+      "Vendedor",
+      JSON.stringify(["inicio", "ventas", "citas", "clientes"]),
+      now
+    );
+    ins.run(
+      "empleado",
+      "Empleado",
+      JSON.stringify([
+        "inicio",
+        "ventas",
+        "citas",
+        "clientes",
+        "inventario",
+        "compras",
+        "facturas",
+        "reportes",
+      ]),
+      now
+    );
+  }
+
   const ventaCols = db.prepare(`PRAGMA table_info(ventas)`).all() as { name: string }[];
   const ventaNames = new Set(ventaCols.map((c) => c.name));
   if (!ventaNames.has("descuento_puntos")) {
@@ -235,4 +274,111 @@ export function applyMigrations(db: Database.Database) {
   if (!ventaNames.has("puntos_canjeados")) {
     db.exec(`ALTER TABLE ventas ADD COLUMN puntos_canjeados INTEGER NOT NULL DEFAULT 0`);
   }
+
+  const factCols = db.prepare(`PRAGMA table_info(facturas_electronicas)`).all() as { name: string }[];
+  const factNames = new Set(factCols.map((c) => c.name));
+  if (!factNames.has("email_enviado_at")) {
+    db.exec(`ALTER TABLE facturas_electronicas ADD COLUMN email_enviado_at TEXT`);
+  }
+
+  const usrCols = db.prepare(`PRAGMA table_info(usuarios)`).all() as { name: string }[];
+  const usrNames = new Set(usrCols.map((c) => c.name));
+  if (!usrNames.has("telefono")) {
+    db.exec(`ALTER TABLE usuarios ADD COLUMN telefono TEXT`);
+  }
+  if (!usrNames.has("color_agenda")) {
+    db.exec(`ALTER TABLE usuarios ADD COLUMN color_agenda TEXT`);
+  }
+  if (!usrNames.has("foto_url")) {
+    db.exec(`ALTER TABLE usuarios ADD COLUMN foto_url TEXT`);
+  }
+
+  const ventaCols2 = db.prepare(`PRAGMA table_info(ventas)`).all() as { name: string }[];
+  const ventaNames2 = new Set(ventaCols2.map((c) => c.name));
+  if (!ventaNames2.has("usuario_id")) {
+    db.exec(
+      `ALTER TABLE ventas ADD COLUMN usuario_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL`
+    );
+  }
+
+  const citaCols = db.prepare(`PRAGMA table_info(citas)`).all() as { name: string }[];
+  const citaNames = new Set(citaCols.map((c) => c.name));
+  if (!citaNames.has("usuario_id")) {
+    db.exec(
+      `ALTER TABLE citas ADD COLUMN usuario_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL`
+    );
+  }
+
+  const usrCols2 = db.prepare(`PRAGMA table_info(usuarios)`).all() as { name: string }[];
+  const usrNames2 = new Set(usrCols2.map((c) => c.name));
+  if (!usrNames2.has("tipo_comision")) {
+    db.exec(
+      `ALTER TABLE usuarios ADD COLUMN tipo_comision TEXT NOT NULL DEFAULT 'porcentaje'`
+    );
+  }
+  if (!usrNames2.has("valor_comision")) {
+    db.exec(`ALTER TABLE usuarios ADD COLUMN valor_comision REAL NOT NULL DEFAULT 0`);
+  }
+
+  const ventaCols3 = db.prepare(`PRAGMA table_info(ventas)`).all() as { name: string }[];
+  const ventaNames3 = new Set(ventaCols3.map((c) => c.name));
+  if (!ventaNames3.has("estado")) {
+    db.exec(`ALTER TABLE ventas ADD COLUMN estado TEXT NOT NULL DEFAULT 'confirmada'`);
+  }
+  if (!ventaNames3.has("cancelado_por")) {
+    db.exec(`ALTER TABLE ventas ADD COLUMN cancelado_por TEXT`);
+  }
+  if (!ventaNames3.has("cancelado_motivo")) {
+    db.exec(`ALTER TABLE ventas ADD COLUMN cancelado_motivo TEXT`);
+  }
+  if (!ventaNames3.has("cancelado_at")) {
+    db.exec(`ALTER TABLE ventas ADD COLUMN cancelado_at TEXT`);
+  }
+
+  const citaCols2 = db.prepare(`PRAGMA table_info(citas)`).all() as { name: string }[];
+  const citaNames2 = new Set(citaCols2.map((c) => c.name));
+  if (!citaNames2.has("cancelado_por")) {
+    db.exec(`ALTER TABLE citas ADD COLUMN cancelado_por TEXT`);
+  }
+  if (!citaNames2.has("cancelado_motivo")) {
+    db.exec(`ALTER TABLE citas ADD COLUMN cancelado_motivo TEXT`);
+  }
+  if (!citaNames2.has("cancelado_at")) {
+    db.exec(`ALTER TABLE citas ADD COLUMN cancelado_at TEXT`);
+  }
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS comisiones (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      empleado_id INTEGER NOT NULL REFERENCES usuarios(id),
+      venta_id INTEGER NOT NULL UNIQUE REFERENCES ventas(id) ON DELETE CASCADE,
+      monto REAL NOT NULL,
+      fecha TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_comisiones_empleado ON comisiones(empleado_id);
+    CREATE INDEX IF NOT EXISTS idx_comisiones_fecha ON comisiones(fecha);
+
+    CREATE TABLE IF NOT EXISTS turnos_empleado (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      empleado_id INTEGER NOT NULL REFERENCES usuarios(id),
+      fecha TEXT NOT NULL,
+      hora_inicio TEXT NOT NULL,
+      hora_fin TEXT NOT NULL,
+      estado TEXT NOT NULL DEFAULT 'activo',
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_turnos_emp_fecha ON turnos_empleado(empleado_id, fecha);
+
+    CREATE TABLE IF NOT EXISTS empleado_movimientos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      empleado_id INTEGER NOT NULL REFERENCES usuarios(id),
+      monto REAL NOT NULL,
+      tipo TEXT NOT NULL,
+      estado TEXT NOT NULL DEFAULT 'pendiente',
+      notas TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_emp_mov_empleado ON empleado_movimientos(empleado_id);
+  `);
 }

@@ -3,7 +3,7 @@ import type { Express } from "express";
 import { db } from "./db.js";
 import { recordSyncEvent } from "./db.js";
 import { lookupBarcode } from "./barcode.js";
-import { requireAdmin, requireAuth } from "./middleware/auth.js";
+import { requireAdmin, requireAlguno, requireAuth, requirePermiso } from "./middleware/auth.js";
 import { asyncHandler } from "./utils/asyncHandler.js";
 import { bootstrapFirstAdmin, login } from "./services/auth.service.js";
 import { usuariosRepo } from "./repositories/usuarios.js";
@@ -15,15 +15,20 @@ import { compraService } from "./services/compra.service.js";
 import { proveedorService } from "./services/proveedor.service.js";
 import { facturaElectronicaService } from "./services/facturaElectronica.service.js";
 import { configuracionService } from "./services/configuracion.service.js";
+import { smtpService } from "./services/smtp.service.js";
 import { reporteService } from "./services/reporte.service.js";
 import { notificacionService } from "./services/notificacion.service.js";
 import { usuarioService } from "./services/usuario.service.js";
+import { rolesService } from "./services/roles.service.js";
 import { enviarRecordatorioCita } from "./services/whatsapp.service.js";
 import { auditService } from "./services/audit.service.js";
 import { finanzaService } from "./services/finanza.service.js";
 import { cobranzaService } from "./services/cobranza.service.js";
 import { inventarioAjusteService } from "./services/inventarioAjuste.service.js";
 import { promocionesService } from "./services/promociones.service.js";
+import { commissionService } from "./services/commission.service.js";
+import { turnoService } from "./services/turno.service.js";
+import { empleadoMovimientoService } from "./services/empleadoMovimiento.service.js";
 
 function parseId(req: Request, res: Response): number | null {
   const id = Number(req.params.id);
@@ -67,7 +72,17 @@ export function registerHttpRoutes(app: Express) {
   api.use(requireAuth);
 
   api.get("/auth/me", (req, res) => {
-    res.json({ user: req.user });
+    const u = req.user!;
+    const dbUser = usuariosRepo.findById(u.sub);
+    res.json({
+      user: {
+        id: u.sub,
+        email: u.email,
+        nombre: dbUser?.nombre ?? null,
+        rol: u.rol,
+        permisos: u.permisos,
+      },
+    });
   });
 
   api.get("/configuracion/puntos", (_req, res) => {
@@ -78,91 +93,209 @@ export function registerHttpRoutes(app: Express) {
     res.json(configuracionService.updatePuntosConfig(req.body as Record<string, unknown>));
   });
 
-  api.get("/productos", (_req, res) => res.json(productoService.list()));
+  api.get("/configuracion/branding", (_req, res) => {
+    res.json(configuracionService.getBranding());
+  });
 
-  api.post("/productos", (req, res) => {
+  api.patch("/configuracion/branding", requireAdmin, (req, res) => {
+    res.json(configuracionService.updateBranding(req.body as Record<string, unknown>));
+  });
+
+  api.get("/configuracion/tienda", (_req, res) => {
+    res.json(configuracionService.getTienda());
+  });
+
+  api.patch("/configuracion/tienda", requireAdmin, (req, res) => {
+    res.json(configuracionService.updateTienda(req.body as Record<string, unknown>));
+  });
+
+  api.get("/configuracion/sistema", (_req, res) => {
+    res.json(configuracionService.getSistemaPrefs());
+  });
+
+  api.patch("/configuracion/sistema", requireAdmin, (req, res) => {
+    res.json(configuracionService.updateSistemaPrefs(req.body as Record<string, unknown>));
+  });
+
+  api.get("/equipo", requireAuth, (_req, res) => {
+    const rows = usuariosRepo.listActivos();
+    res.json(
+      rows.map((r) => ({
+        id: r.id,
+        nombre: r.nombre,
+        email: r.email,
+        telefono: r.telefono,
+        rol: r.rol,
+        color_agenda: r.color_agenda,
+        foto_url: r.foto_url,
+      }))
+    );
+  });
+
+  api.get("/configuracion/smtp", requireAdmin, (_req, res) => {
+    res.json(smtpService.getPublicConfig());
+  });
+
+  api.patch("/configuracion/smtp", requireAdmin, (req, res) => {
+    res.json(smtpService.updateStoredConfig(req.body as Record<string, unknown>));
+  });
+
+  api.post(
+    "/configuracion/smtp/probar",
+    requireAdmin,
+    asyncHandler(async (req, res) => {
+      const body = req.body as Record<string, unknown>;
+      const to = typeof body.email === "string" ? body.email.trim() : "";
+      await smtpService.sendTestEmail(to);
+      res.json({ ok: true });
+    })
+  );
+
+  api.get("/productos", requireAlguno("ventas", "inventario"), (_req, res) =>
+    res.json(productoService.list())
+  );
+
+  api.post("/productos", requirePermiso("inventario"), (req, res) => {
     const row = productoService.create(req.body as Record<string, unknown>);
     res.status(201).json(row);
   });
 
-  api.put("/productos/:id", (req, res) => {
+  api.put("/productos/:id", requirePermiso("inventario"), (req, res) => {
     const id = parseId(req, res);
     if (id == null) return;
-    res.json(productoService.update(id, req.body as Record<string, unknown>));
+    const row = productoService.update(id, req.body as Record<string, unknown>);
+    auditService.log(req.user?.sub, "editar", "producto", id, {
+      nombre: (row as { nombre?: string }).nombre,
+    });
+    res.json(row);
   });
 
-  api.delete("/productos/:id", (req, res) => {
+  api.delete("/productos/:id", requirePermiso("inventario"), (req, res) => {
     const id = parseId(req, res);
     if (id == null) return;
     productoService.delete(id);
     res.status(204).send();
   });
 
-  api.get("/clientes", (req, res) => {
+  api.get("/clientes", requirePermiso("clientes"), (req, res) => {
     const q = typeof req.query.q === "string" ? req.query.q : undefined;
     res.json(clienteService.list(q));
   });
 
-  api.post("/clientes", (req, res) => {
+  api.post("/clientes", requirePermiso("clientes"), (req, res) => {
     res.status(201).json(clienteService.create(req.body as Record<string, unknown>));
   });
 
-  api.put("/clientes/:id", (req, res) => {
+  api.put("/clientes/:id", requirePermiso("clientes"), (req, res) => {
     const id = parseId(req, res);
     if (id == null) return;
     res.json(clienteService.update(id, req.body as Record<string, unknown>));
   });
 
-  api.delete("/clientes/:id", (req, res) => {
+  api.delete("/clientes/:id", requirePermiso("clientes"), (req, res) => {
     const id = parseId(req, res);
     if (id == null) return;
     clienteService.delete(id);
     res.status(204).send();
   });
 
-  api.get("/citas", (_req, res) => res.json(citaService.list()));
+  api.get("/citas", requirePermiso("citas"), (_req, res) => res.json(citaService.list()));
 
-  api.post("/citas", (req, res) => {
-    res.status(201).json(citaService.create(req.body as Record<string, unknown>));
+  api.post("/citas", requirePermiso("citas"), (req, res) => {
+    const row = citaService.create(req.body as Record<string, unknown>) as { id: number };
+    auditService.log(req.user?.sub, "crear", "cita", row.id, {
+      cliente_id: (row as { cliente_id?: number }).cliente_id,
+    });
+    res.status(201).json(row);
   });
 
-  api.put("/citas/:id", (req, res) => {
+  api.put("/citas/:id", requirePermiso("citas"), (req, res) => {
     const id = parseId(req, res);
     if (id == null) return;
     res.json(citaService.update(id, req.body as Record<string, unknown>));
   });
 
-  api.delete("/citas/:id", (req, res) => {
+  api.patch("/citas/:id/cancelar", requirePermiso("citas"), (req, res) => {
     const id = parseId(req, res);
     if (id == null) return;
+    const b = req.body as Record<string, unknown>;
+    const motivo = typeof b.motivo === "string" ? b.motivo : "";
+    const cancelado_por = b.cancelado_por as string;
+    const row = citaService.cancelar(id, {
+      motivo,
+      cancelado_por:
+        cancelado_por === "cliente" || cancelado_por === "empleado" || cancelado_por === "admin"
+          ? cancelado_por
+          : "empleado",
+    });
+    auditService.log(req.user?.sub, "cancelar", "cita", id, {
+      motivo,
+      cancelado_por,
+    });
+    res.json(row);
+  });
+
+  api.delete("/citas/:id", requirePermiso("citas"), (req, res) => {
+    const id = parseId(req, res);
+    if (id == null) return;
+    auditService.log(req.user?.sub, "eliminar", "cita", id, {});
     citaService.delete(id);
     res.status(204).send();
   });
 
-  api.get("/citas/sugerencias-horario", (req, res) => {
+  api.get("/citas/sugerencias-horario", requirePermiso("citas"), (req, res) => {
     const fecha = typeof req.query.fecha === "string" ? req.query.fecha : "";
     const dur = Number(req.query.duracion_min ?? 60);
-    res.json(citaService.sugerirHorarios(fecha, dur));
+    const uidq = req.query.usuario_id;
+    let staff: number | null = null;
+    if (uidq != null && String(uidq).trim() !== "") {
+      const n = Number(uidq);
+      if (Number.isFinite(n)) staff = Math.floor(n);
+    }
+    res.json(citaService.sugerirHorarios(fecha, dur, staff));
   });
 
-  api.post("/citas/serie-recurrente", (req, res) => {
+  api.post("/citas/serie-recurrente", requirePermiso("citas"), (req, res) => {
     res.status(201).json(citaService.crearSerieRecurrente(req.body as Record<string, unknown>));
   });
 
-  api.get("/ventas", (req, res) => {
+  api.get("/ventas", requirePermiso("ventas"), (req, res) => {
     const desde = typeof req.query.desde === "string" ? req.query.desde : undefined;
     const hasta = typeof req.query.hasta === "string" ? req.query.hasta : undefined;
     res.json(ventaService.list(desde, hasta));
   });
 
-  api.get("/ventas/:id", (req, res) => {
+  api.get("/ventas/:id", requirePermiso("ventas"), (req, res) => {
     const id = parseId(req, res);
     if (id == null) return;
     res.json(ventaService.getById(id));
   });
 
-  api.post("/ventas", (req, res) => {
+  api.patch("/ventas/:id/cancelar", requirePermiso("ventas"), (req, res) => {
+    const id = parseId(req, res);
+    if (id == null) return;
+    const b = req.body as Record<string, unknown>;
+    const motivo = typeof b.motivo === "string" ? b.motivo : "";
+    const cancelado_por = b.cancelado_por as string;
+    const data = ventaService.cancelar(id, {
+      motivo,
+      cancelado_por:
+        cancelado_por === "cliente" || cancelado_por === "empleado" || cancelado_por === "admin"
+          ? cancelado_por
+          : "empleado",
+    });
+    auditService.log(req.user?.sub, "cancelar", "venta", id, {
+      motivo,
+      cancelado_por,
+    });
+    res.json(data);
+  });
+
+  api.post("/ventas", requirePermiso("ventas"), (req, res) => {
     const raw = { ...(req.body as Record<string, unknown>) };
+    if (raw.usuario_id == null && req.user?.sub != null) {
+      raw.usuario_id = req.user.sub;
+    }
     const emitir = raw.emitir_factura !== false;
     const condicion_iva =
       typeof raw.condicion_iva_cliente === "string" ? raw.condicion_iva_cliente : undefined;
@@ -190,7 +323,7 @@ export function registerHttpRoutes(app: Express) {
     res.status(201).json({ ...data, factura_electronica, factura_error });
   });
 
-  api.post("/ventas/:id/factura-electronica", (req, res) => {
+  api.post("/ventas/:id/factura-electronica", requirePermiso("ventas"), (req, res) => {
     const id = parseId(req, res);
     if (id == null) return;
     const b = req.body as Record<string, unknown>;
@@ -208,35 +341,37 @@ export function registerHttpRoutes(app: Express) {
     }
   });
 
-  api.get("/proveedores", (_req, res) => res.json(proveedorService.list()));
+  api.get("/proveedores", requirePermiso("compras"), (_req, res) =>
+    res.json(proveedorService.list())
+  );
 
-  api.post("/proveedores", (req, res) => {
+  api.post("/proveedores", requirePermiso("compras"), (req, res) => {
     res.status(201).json(proveedorService.create(req.body as Record<string, unknown>));
   });
 
-  api.get("/compras", (req, res) => {
+  api.get("/compras", requirePermiso("compras"), (req, res) => {
     const desde = typeof req.query.desde === "string" ? req.query.desde : undefined;
     const hasta = typeof req.query.hasta === "string" ? req.query.hasta : undefined;
     res.json(compraService.list(desde, hasta));
   });
 
-  api.get("/compras/:id", (req, res) => {
+  api.get("/compras/:id", requirePermiso("compras"), (req, res) => {
     const id = parseId(req, res);
     if (id == null) return;
     res.json(compraService.getById(id));
   });
 
-  api.post("/compras", (req, res) => {
+  api.post("/compras", requirePermiso("compras"), (req, res) => {
     res.status(201).json(compraService.create(req.body as Record<string, unknown>));
   });
 
-  api.get("/facturas-electronicas", (req, res) => {
+  api.get("/facturas-electronicas", requirePermiso("facturas"), (req, res) => {
     const desde = typeof req.query.desde === "string" ? req.query.desde : undefined;
     const hasta = typeof req.query.hasta === "string" ? req.query.hasta : undefined;
     res.json(facturaElectronicaService.list(desde, hasta));
   });
 
-  api.get("/facturas-electronicas/:id/documento", (req, res) => {
+  api.get("/facturas-electronicas/:id/documento", requirePermiso("facturas"), (req, res) => {
     const id = parseId(req, res);
     if (id == null) return;
     const formato = req.query.formato === "xml" ? "xml" : "json";
@@ -249,21 +384,39 @@ export function registerHttpRoutes(app: Express) {
     }
   });
 
-  api.get("/facturas-electronicas/:id", (req, res) => {
+  api.get("/facturas-electronicas/:id", requirePermiso("facturas"), (req, res) => {
     const id = parseId(req, res);
     if (id == null) return;
     res.json(facturaElectronicaService.getById(id));
   });
 
-  api.get("/reportes/dashboard", (_req, res) => res.json(reporteService.dashboard()));
+  api.post(
+    "/facturas-electronicas/:id/enviar-email",
+    requirePermiso("facturas"),
+    asyncHandler(async (req, res) => {
+      const id = parseId(req, res);
+      if (id == null) return;
+      const body = req.body as Record<string, unknown>;
+      const email = typeof body.email === "string" ? body.email.trim() : undefined;
+      const out = await facturaElectronicaService.enviarPorEmail(
+        id,
+        email && email.length > 0 ? email : undefined
+      );
+      res.json(out);
+    })
+  );
 
-  api.get("/reportes/ventas", (req, res) => {
+  api.get("/reportes/dashboard", requirePermiso("inicio"), (_req, res) =>
+    res.json(reporteService.dashboard())
+  );
+
+  api.get("/reportes/ventas", requirePermiso("reportes"), (req, res) => {
     const desde = typeof req.query.desde === "string" ? req.query.desde : undefined;
     const hasta = typeof req.query.hasta === "string" ? req.query.hasta : undefined;
     res.json(reporteService.ventasFiltradas(desde, hasta));
   });
 
-  api.get("/reportes/productos-mas-vendidos", (req, res) => {
+  api.get("/reportes/productos-mas-vendidos", requirePermiso("reportes"), (req, res) => {
     const desde = typeof req.query.desde === "string" ? req.query.desde : "";
     const hasta = typeof req.query.hasta === "string" ? req.query.hasta : "";
     if (!desde || !hasta) {
@@ -273,7 +426,7 @@ export function registerHttpRoutes(app: Express) {
     res.json(reporteService.productosMasVendidos(desde, hasta));
   });
 
-  api.get("/reportes/ingresos-diarios", (req, res) => {
+  api.get("/reportes/ingresos-diarios", requirePermiso("reportes"), (req, res) => {
     const desde = typeof req.query.desde === "string" ? req.query.desde : "";
     const hasta = typeof req.query.hasta === "string" ? req.query.hasta : "";
     if (!desde || !hasta) {
@@ -283,7 +436,7 @@ export function registerHttpRoutes(app: Express) {
     res.json(reporteService.ingresosDiarios(desde, hasta));
   });
 
-  api.get("/reportes/bi/rentabilidad", (req, res) => {
+  api.get("/reportes/bi/rentabilidad", requirePermiso("reportes"), (req, res) => {
     const desde = typeof req.query.desde === "string" ? req.query.desde : "";
     const hasta = typeof req.query.hasta === "string" ? req.query.hasta : "";
     if (!desde || !hasta) {
@@ -293,18 +446,18 @@ export function registerHttpRoutes(app: Express) {
     res.json(reporteService.productosRentabilidad(desde, hasta));
   });
 
-  api.get("/reportes/bi/sin-rotacion", (req, res) => {
+  api.get("/reportes/bi/sin-rotacion", requirePermiso("reportes"), (req, res) => {
     const dias = Number(req.query.dias ?? 90);
     res.json(reporteService.productosSinRotacion(dias));
   });
 
-  api.get("/reportes/bi/sugerencias-compra", (req, res) => {
+  api.get("/reportes/bi/sugerencias-compra", requirePermiso("reportes"), (req, res) => {
     const dh = Number(req.query.dias_historial ?? 30);
     const dc = Number(req.query.dias_cobertura ?? 14);
     res.json(reporteService.sugerenciasReabastecimiento(dh, dc));
   });
 
-  api.get("/reportes/kpis", (req, res) => {
+  api.get("/reportes/kpis", requirePermiso("reportes"), (req, res) => {
     const desde = typeof req.query.desde === "string" ? req.query.desde : "";
     const hasta = typeof req.query.hasta === "string" ? req.query.hasta : "";
     if (!desde || !hasta) {
@@ -314,7 +467,7 @@ export function registerHttpRoutes(app: Express) {
     res.json(reporteService.kpisNegocio(desde, hasta));
   });
 
-  api.get("/reportes/bi/ventas-semana", (req, res) => {
+  api.get("/reportes/bi/ventas-semana", requirePermiso("reportes"), (req, res) => {
     const desde = typeof req.query.desde === "string" ? req.query.desde : "";
     const hasta = typeof req.query.hasta === "string" ? req.query.hasta : "";
     if (!desde || !hasta) {
@@ -324,7 +477,7 @@ export function registerHttpRoutes(app: Express) {
     res.json(reporteService.ventasPorSemana(desde, hasta));
   });
 
-  api.get("/finanzas/flujo-caja", (req, res) => {
+  api.get("/finanzas/flujo-caja", requirePermiso("finanzas"), (req, res) => {
     const desde = typeof req.query.desde === "string" ? req.query.desde : "";
     const hasta = typeof req.query.hasta === "string" ? req.query.hasta : "";
     if (!desde || !hasta) {
@@ -334,7 +487,7 @@ export function registerHttpRoutes(app: Express) {
     res.json(finanzaService.flujoCaja(desde, hasta));
   });
 
-  api.get("/gastos", (req, res) => {
+  api.get("/gastos", requirePermiso("finanzas"), (req, res) => {
     const desde = typeof req.query.desde === "string" ? req.query.desde : undefined;
     const hasta = typeof req.query.hasta === "string" ? req.query.hasta : undefined;
     res.json(finanzaService.listGastos(desde, hasta));
@@ -348,12 +501,12 @@ export function registerHttpRoutes(app: Express) {
     res.status(201).json(row);
   });
 
-  api.get("/cobranzas", (req, res) => {
+  api.get("/cobranzas", requirePermiso("finanzas"), (req, res) => {
     const estado = typeof req.query.estado === "string" ? req.query.estado : undefined;
     res.json(cobranzaService.list(estado));
   });
 
-  api.post("/cobranzas", (req, res) => {
+  api.post("/cobranzas", requirePermiso("finanzas"), (req, res) => {
     const row = cobranzaService.create(req.body as Record<string, unknown>);
     auditService.log(req.user?.sub, "crear", "cobranza", row.id as number, {
       cliente_id: (row as { cliente_id?: number }).cliente_id,
@@ -361,7 +514,7 @@ export function registerHttpRoutes(app: Express) {
     res.status(201).json(row);
   });
 
-  api.patch("/cobranzas/:id/pago", (req, res) => {
+  api.patch("/cobranzas/:id/pago", requirePermiso("finanzas"), (req, res) => {
     const id = parseId(req, res);
     if (id == null) return;
     res.json(cobranzaService.registrarPago(id, req.body as Record<string, unknown>));
@@ -372,18 +525,92 @@ export function registerHttpRoutes(app: Express) {
     res.json(auditService.list(lim));
   });
 
-  api.post("/inventario/ajuste-stock", (req, res) => {
+  api.get("/empleados/comisiones", requireAdmin, (req, res) => {
+    const desde = typeof req.query.desde === "string" ? req.query.desde : undefined;
+    const hasta = typeof req.query.hasta === "string" ? req.query.hasta : undefined;
+    const uid = req.query.usuario_id;
+    let empleadoId: number | undefined;
+    if (uid != null && String(uid).trim() !== "") {
+      const n = Number(uid);
+      if (Number.isFinite(n)) empleadoId = Math.floor(n);
+    }
+    res.json(commissionService.list(desde, hasta, empleadoId));
+  });
+
+  api.get("/empleados/turnos", requireAdmin, (req, res) => {
+    const desde = typeof req.query.desde === "string" ? req.query.desde : undefined;
+    const hasta = typeof req.query.hasta === "string" ? req.query.hasta : undefined;
+    const uid = req.query.usuario_id;
+    let empleadoId: number | undefined;
+    if (uid != null && String(uid).trim() !== "") {
+      const n = Number(uid);
+      if (Number.isFinite(n)) empleadoId = Math.floor(n);
+    }
+    res.json(turnoService.list(desde, hasta, empleadoId));
+  });
+
+  api.post("/empleados/turnos", requireAdmin, (req, res) => {
+    res.status(201).json(turnoService.create(req.body as Record<string, unknown>));
+  });
+
+  api.patch("/empleados/turnos/:id", requireAdmin, (req, res) => {
+    const id = parseId(req, res);
+    if (id == null) return;
+    res.json(turnoService.update(id, req.body as Record<string, unknown>));
+  });
+
+  api.delete("/empleados/turnos/:id", requireAdmin, (req, res) => {
+    const id = parseId(req, res);
+    if (id == null) return;
+    turnoService.delete(id);
+    res.status(204).send();
+  });
+
+  api.get("/empleados/movimientos", requireAdmin, (req, res) => {
+    const uid = req.query.usuario_id;
+    let empleadoId: number | undefined;
+    if (uid != null && String(uid).trim() !== "") {
+      const n = Number(uid);
+      if (Number.isFinite(n)) empleadoId = Math.floor(n);
+    }
+    res.json(empleadoMovimientoService.list(empleadoId));
+  });
+
+  api.post("/empleados/movimientos", requireAdmin, (req, res) => {
+    res.status(201).json(empleadoMovimientoService.create(req.body as Record<string, unknown>));
+  });
+
+  api.patch("/empleados/movimientos/:id", requireAdmin, (req, res) => {
+    const id = parseId(req, res);
+    if (id == null) return;
+    const b = req.body as Record<string, unknown>;
+    const estado = typeof b.estado === "string" ? b.estado : "";
+    res.json(empleadoMovimientoService.updateEstado(id, estado));
+  });
+
+  api.get("/empleados/resumen/:id", requireAdmin, (req, res) => {
+    const id = parseId(req, res);
+    if (id == null) return;
+    const desde = typeof req.query.desde === "string" ? req.query.desde : undefined;
+    const hasta = typeof req.query.hasta === "string" ? req.query.hasta : undefined;
+    res.json(empleadoMovimientoService.resumen(id, desde, hasta));
+  });
+
+  api.post("/inventario/ajuste-stock", requirePermiso("inventario"), (req, res) => {
     const out = inventarioAjusteService.registrarAjuste(req.body as Record<string, unknown>, req.user?.sub);
     auditService.log(req.user?.sub, "ajuste_stock", "producto", out.producto_id, out as Record<string, unknown>);
     res.status(201).json(out);
   });
 
-  api.get("/promociones", (_req, res) => res.json(promocionesService.list()));
+  api.get("/promociones", requireAlguno("ventas", "inventario"), (_req, res) =>
+    res.json(promocionesService.list())
+  );
 
   api.get("/notificaciones", (_req, res) => res.json(notificacionService.listar()));
 
   api.post(
     "/whatsapp/recordatorio/:citaId",
+    requirePermiso("citas"),
     asyncHandler(async (req, res) => {
       const id = Number(req.params.citaId);
       if (!Number.isFinite(id)) {
@@ -431,12 +658,46 @@ export function registerHttpRoutes(app: Express) {
 
   api.get(
     "/barcode/:codigo",
+    requireAlguno("ventas", "inventario"),
     asyncHandler(async (req, res) => {
       const codigo = req.params.codigo || "";
       const result = await lookupBarcode(codigo);
       res.json(result);
     })
   );
+
+  api.get("/roles", requireAdmin, (_req, res) => {
+    const rows = rolesService.list().map((r) => ({
+      slug: r.slug,
+      nombre: r.nombre,
+      permisos: JSON.parse(r.permisos) as string[],
+      created_at: r.created_at,
+    }));
+    res.json(rows);
+  });
+
+  api.post("/roles", requireAdmin, (req, res) => {
+    const row = rolesService.create(req.body as Record<string, unknown>);
+    res.status(201).json({
+      ...row,
+      permisos: JSON.parse(row!.permisos) as string[],
+    });
+  });
+
+  api.patch("/roles/:slug", requireAdmin, (req, res) => {
+    const slug = req.params.slug || "";
+    const row = rolesService.update(slug, req.body as Record<string, unknown>);
+    res.json({
+      ...row,
+      permisos: JSON.parse(row!.permisos) as string[],
+    });
+  });
+
+  api.delete("/roles/:slug", requireAdmin, (req, res) => {
+    const slug = req.params.slug || "";
+    rolesService.delete(slug);
+    res.status(204).send();
+  });
 
   api.get("/usuarios", requireAdmin, (_req, res) => res.json(usuarioService.list()));
 
@@ -450,8 +711,63 @@ export function registerHttpRoutes(app: Express) {
         password: String(b.password ?? ""),
         nombre: typeof b.nombre === "string" ? b.nombre : undefined,
         rol: typeof b.rol === "string" ? b.rol : undefined,
+        telefono: typeof b.telefono === "string" ? b.telefono : undefined,
+        color_agenda: typeof b.color_agenda === "string" ? b.color_agenda : undefined,
+        foto_url: typeof b.foto_url === "string" ? b.foto_url : undefined,
+        tipo_comision:
+          typeof b.tipo_comision === "string" ? b.tipo_comision : undefined,
+        valor_comision:
+          b.valor_comision != null && Number.isFinite(Number(b.valor_comision))
+            ? Number(b.valor_comision)
+            : undefined,
       });
       res.status(201).json(row);
+    })
+  );
+
+  api.patch(
+    "/usuarios/:id",
+    requireAdmin,
+    asyncHandler(async (req, res) => {
+      const id = parseId(req, res);
+      if (id == null) return;
+      const b = req.body as Record<string, unknown>;
+      const row = await usuarioService.update(id, {
+        rol: typeof b.rol === "string" ? b.rol : undefined,
+        password: typeof b.password === "string" ? b.password : undefined,
+        nombre:
+          b.nombre === null
+            ? null
+            : typeof b.nombre === "string"
+              ? b.nombre
+              : undefined,
+        telefono:
+          b.telefono === null
+            ? null
+            : typeof b.telefono === "string"
+              ? b.telefono
+              : undefined,
+        color_agenda:
+          b.color_agenda === null
+            ? null
+            : typeof b.color_agenda === "string"
+              ? b.color_agenda
+              : undefined,
+        foto_url:
+          b.foto_url === null
+            ? null
+            : typeof b.foto_url === "string"
+              ? b.foto_url
+              : undefined,
+        activo: typeof b.activo === "boolean" ? b.activo : undefined,
+        tipo_comision:
+          typeof b.tipo_comision === "string" ? b.tipo_comision : undefined,
+        valor_comision:
+          b.valor_comision != null && Number.isFinite(Number(b.valor_comision))
+            ? Number(b.valor_comision)
+            : undefined,
+      });
+      res.json(row);
     })
   );
 

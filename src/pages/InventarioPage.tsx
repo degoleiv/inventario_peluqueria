@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Navigate, useParams } from "react-router-dom";
 import {
   createProducto,
   deleteProducto,
@@ -13,6 +14,9 @@ import {
 import { ContextMenu, type ContextMenuItem } from "../components/ContextMenu";
 import { Drawer } from "../components/Drawer";
 import { useToast } from "../context/ToastContext";
+import { filterIntegerTyping } from "../lib/decimalInput";
+import { SubNav } from "../components/SubNav";
+import { INVENTARIO_TABS, readLastTab, type InventarioTab } from "../lib/moduleRoutes";
 
 function labelFuenteLookup(fuente: string) {
   if (fuente === "inventario") return "Datos desde tu inventario local";
@@ -24,6 +28,7 @@ function labelFuenteLookup(fuente: string) {
 }
 
 export function InventarioPage() {
+  const { tab: tabParam } = useParams<{ tab: string }>();
   const toast = useToast();
   const [productos, setProductos] = useState<Producto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,7 +40,7 @@ export function InventarioPage() {
   const [categoria, setCategoria] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [imagenUrl, setImagenUrl] = useState("");
-  const [stock, setStock] = useState(0);
+  const [stock, setStock] = useState<number | "">(0);
   const [precioCompra, setPrecioCompra] = useState<number | "">("");
   const [precioVenta, setPrecioVenta] = useState<number | "">("");
   const [stockMinimo, setStockMinimo] = useState<number | "">("");
@@ -185,7 +190,7 @@ export function InventarioPage() {
       categoria: categoria.trim() || null,
       descripcion: descripcion.trim() || null,
       imagen_url: imagenUrl.trim() || null,
-      stock,
+      stock: stock === "" ? 0 : Number(stock),
       precio_compra: precioCompra === "" ? null : Number(precioCompra),
       precio_venta: precioVenta === "" ? null : Number(precioVenta),
       stock_minimo: stockMinimo === "" ? undefined : Number(stockMinimo),
@@ -360,6 +365,20 @@ export function InventarioPage() {
     ];
   }
 
+  const alertasProductos = useMemo(() => {
+    return productos.filter((p) => {
+      if (p.stock === 0) return true;
+      if (p.stock_minimo != null && p.stock <= p.stock_minimo) return true;
+      return false;
+    });
+  }, [productos]);
+
+  const tabOk = tabParam != null && INVENTARIO_TABS.includes(tabParam as InventarioTab);
+  if (!tabOk) {
+    return <Navigate to={`/inventario/${readLastTab("inventario", "productos")}`} replace />;
+  }
+  const tab = tabParam as InventarioTab;
+
   return (
     <>
       {error ? (
@@ -367,6 +386,20 @@ export function InventarioPage() {
           {error}
         </div>
       ) : null}
+
+      <SubNav
+        moduleId="inventario"
+        items={[
+          { id: "productos", label: "Productos", to: "/inventario/productos" },
+          { id: "movimientos", label: "Movimientos", to: "/inventario/movimientos" },
+          { id: "alertas", label: "Alertas", to: "/inventario/alertas" },
+        ]}
+        quickActions={
+          <button type="button" className="btn ghost small" onClick={() => void load()}>
+            Actualizar
+          </button>
+        }
+      />
 
       <Drawer
         open={drawerOpen}
@@ -474,8 +507,11 @@ export function InventarioPage() {
               <input
                 type="number"
                 min={0}
-                value={stock}
-                onChange={(e) => setStock(Number(e.target.value))}
+                value={stock === "" ? "" : stock}
+                onChange={(e) => {
+                  const raw = filterIntegerTyping(e.target.value);
+                  setStock(raw === "" ? "" : Number(raw));
+                }}
               />
             </label>
             <label className="field">
@@ -515,6 +551,7 @@ export function InventarioPage() {
         </form>
       </Drawer>
 
+      {tab === "movimientos" ? (
       <section className="card">
         <h2 className="card-title">Ajuste de stock (conteo físico)</h2>
         <p className="muted">
@@ -560,7 +597,9 @@ export function InventarioPage() {
           </button>
         </form>
       </section>
+      ) : null}
 
+      {tab === "productos" ? (
       <section className="card">
         <div className="card-head">
           <h2 className="card-title">Inventario</h2>
@@ -701,6 +740,56 @@ export function InventarioPage() {
           </div>
         )}
       </section>
+      ) : null}
+
+      {tab === "alertas" ? (
+        <section className="card">
+          <div className="card-head">
+            <h2 className="card-title">Alertas de stock</h2>
+            <span className="muted">{alertasProductos.length} productos</span>
+          </div>
+          {alertasProductos.length === 0 ? (
+            <p className="muted">No hay alertas: todo por encima del mínimo.</p>
+          ) : (
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Producto</th>
+                    <th>Stock</th>
+                    <th>Mínimo</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {alertasProductos.map((p) => (
+                    <tr key={p.id}>
+                      <td>{p.nombre}</td>
+                      <td>
+                        <span
+                          className={
+                            p.stock === 0
+                              ? "stock-badge stock-badge--out"
+                              : "stock-badge stock-badge--low"
+                          }
+                        >
+                          {p.stock}
+                        </span>
+                      </td>
+                      <td>{p.stock_minimo ?? "—"}</td>
+                      <td className="row-actions">
+                        <button type="button" className="link" onClick={() => onEditar(p)}>
+                          Editar
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      ) : null}
 
       <ContextMenu
         open={ctxMenu != null}

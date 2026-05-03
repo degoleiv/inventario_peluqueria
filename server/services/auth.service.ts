@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import { BCRYPT_ROUNDS, getJwtSecret, JWT_EXPIRY_SEC } from "../config.js";
 import { AppError } from "../lib/AppError.js";
 import { usuariosRepo } from "../repositories/usuarios.js";
+import { rolesService } from "./roles.service.js";
 
 export type JwtUser = { sub: number; email: string; rol: string };
 
@@ -16,6 +17,7 @@ export async function login(email: string, password: string) {
     getJwtSecret(),
     { expiresIn: JWT_EXPIRY_SEC }
   );
+  const permisos = rolesService.permisosParaRol(u.rol);
   return {
     accessToken: token,
     expiresIn: JWT_EXPIRY_SEC,
@@ -24,6 +26,7 @@ export async function login(email: string, password: string) {
       email: u.email,
       nombre: u.nombre,
       rol: u.rol,
+      permisos,
     },
   };
 }
@@ -47,10 +50,11 @@ export async function bootstrapFirstAdmin(email: string, password: string, nombr
     getJwtSecret(),
     { expiresIn: JWT_EXPIRY_SEC }
   );
+  const permisos = rolesService.permisosParaRol(u.rol);
   return {
     accessToken: token,
     expiresIn: JWT_EXPIRY_SEC,
-    user: { id: u.id, email: u.email, nombre: u.nombre, rol: u.rol },
+    user: { id: u.id, email: u.email, nombre: u.nombre, rol: u.rol, permisos },
   };
 }
 

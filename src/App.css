@@ -599,6 +599,14 @@ select {
   font-size: 1.05rem;
   color: #2c2420;
   letter-spacing: -0.02em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.topbar-brand-logo {
+  border-radius: 6px;
+  object-fit: cover;
 }
 
 .btn-icon {
@@ -783,6 +791,94 @@ select {
   max-width: 1280px;
   width: 100%;
   margin: 0 auto;
+}
+
+/* Sub-navegación horizontal (módulos complejos) */
+.subnav-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin: -0.25rem 0 1rem;
+  padding-bottom: 0.65rem;
+  border-bottom: 1px solid #e8ddd4;
+}
+
+.subnav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.subnav--tabs {
+  gap: 0;
+  border-radius: 12px;
+  padding: 3px;
+  background: rgba(196, 168, 130, 0.14);
+  border: 1px solid #e4d8cc;
+}
+
+.subnav--tabs .subnav-link {
+  border-radius: 9px;
+  padding: 0.45rem 0.85rem;
+}
+
+.subnav--tabs .subnav-link--active {
+  background: #fffdf9;
+  box-shadow: 0 1px 4px rgba(44, 36, 32, 0.08);
+}
+
+.subnav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: #5a524d;
+  border: 1px solid transparent;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.subnav-link:hover {
+  color: #2c2420;
+  background: rgba(255, 253, 249, 0.65);
+}
+
+.subnav-link--active {
+  color: #3d2910;
+  border-color: #c4a882;
+  background: rgba(255, 253, 249, 0.9);
+}
+
+.subnav-label {
+  white-space: nowrap;
+}
+
+.subnav-kbd {
+  font-size: 0.68rem;
+  padding: 0.08rem 0.28rem;
+  border-radius: 4px;
+  border: 1px solid #d5c9bf;
+  background: rgba(255, 255, 255, 0.75);
+  color: #7a6f68;
+  font-family: inherit;
+  opacity: 0.85;
+}
+
+.subnav-link--active .subnav-kbd {
+  border-color: #b8956a;
+  color: #5a4630;
+}
+
+.subnav-quick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  margin-left: auto;
 }
 
 .toolbar-inline {
@@ -1119,10 +1215,125 @@ select {
   align-items: start;
 }
 
+.pos-split--keyboard {
+  grid-template-columns: minmax(300px, 1fr) minmax(220px, 380px);
+}
+
 @media (max-width: 900px) {
   .pos-split {
     grid-template-columns: 1fr;
   }
+  .pos-split--keyboard {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pos-shell--keyboard .pos-scan-label {
+  font-size: 0.72rem;
+}
+
+.pos-shortcuts-hint {
+  margin: 0 0 0.85rem;
+  font-size: 0.76rem;
+  line-height: 1.55;
+  color: #6b5f58;
+}
+
+.pos-shortcuts-hint .kbd-mini {
+  margin: 0 0.06rem;
+}
+
+.pos-cart-column {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.cart-lines--main {
+  min-height: 120px;
+  max-height: min(42vh, 320px);
+  overflow: auto;
+}
+
+.cart-line--selected {
+  outline: 2px solid #c4a882;
+  outline-offset: -2px;
+  border-radius: 10px;
+  background: rgba(196, 168, 130, 0.12);
+}
+
+.cart-total-block--hero {
+  padding-top: 0.65rem;
+  margin-top: 0.25rem;
+}
+
+.cart-total-block--hero .cart-total-value {
+  font-size: 2rem;
+}
+
+.pos-pay-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.pos-pay-chip {
+  flex: 1;
+  min-width: 6.5rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 10px;
+  border: 1px solid #d5c9bf;
+  background: #faf7f3;
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: #3a322e;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.pos-pay-chip:hover {
+  background: #efe6dc;
+}
+
+.pos-pay-chip--on {
+  border-color: #6d5010;
+  background: #efe6dc;
+  box-shadow: inset 0 0 0 1px rgba(109, 80, 16, 0.25);
+}
+
+.btn-pay-keys {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  opacity: 0.85;
+  margin-top: 0.2rem;
+}
+
+.pos-options--panel {
+  margin-top: 0.35rem;
+  padding-top: 0.65rem;
+  border-top: 1px dashed #e0d5cb;
+}
+
+[data-theme="dark"] .pos-shortcuts-hint {
+  color: #9a918a;
+}
+
+[data-theme="dark"] .cart-line--selected {
+  background: rgba(196, 168, 130, 0.18);
+  outline-color: #b8956a;
+}
+
+[data-theme="dark"] .pos-pay-chip {
+  background: #242220;
+  border-color: #4a4440;
+  color: #f2ebe6;
+}
+
+[data-theme="dark"] .pos-pay-chip--on {
+  border-color: #d4b896;
+  background: #2e2b28;
 }
 
 .pos-panel-title {
@@ -1368,6 +1579,167 @@ select {
 
 .page-pos {
   width: 100%;
+  /* Base ligeramente mayor solo en ventas (mejor lectura en mostrador / táctil) */
+  font-size: 1.0625rem;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* POS — tipografía y controles más grandes para uso en venta */
+.page-pos .card-pro {
+  padding: 1.35rem 1.45rem;
+}
+
+.page-pos .card-pro-title {
+  font-size: 1.2rem;
+}
+
+.page-pos .pos-scan-label {
+  font-size: 0.9rem;
+}
+
+.page-pos .input-xl,
+.page-pos .pos-scan-input {
+  font-size: 1.35rem;
+  padding: 0.85rem 1rem;
+  min-height: 3rem;
+}
+
+.page-pos .pos-shell--keyboard .pos-scan-label {
+  font-size: 0.85rem;
+}
+
+.page-pos .pos-shortcuts-hint {
+  font-size: 0.88rem;
+  line-height: 1.65;
+}
+
+.page-pos .pos-panel-title {
+  font-size: 1.15rem;
+}
+
+.page-pos .cart-line-name {
+  font-size: 1rem;
+}
+
+.page-pos .cart-line-sub {
+  font-size: 0.9rem;
+}
+
+.page-pos .qty-btn {
+  min-width: 2.75rem;
+  height: 2.75rem;
+  font-size: 1.15rem;
+}
+
+.page-pos .cart-qty {
+  font-size: 1.05rem;
+  min-width: 2rem;
+}
+
+.page-pos .cart-total-label {
+  font-size: 0.95rem;
+}
+
+.page-pos .cart-total-value {
+  font-size: 2rem;
+}
+
+.page-pos .cart-total-block--hero .cart-total-value {
+  font-size: 2.5rem;
+}
+
+.page-pos .pos-pay-chip {
+  font-size: 0.95rem;
+  padding: 0.72rem 0.85rem;
+  min-height: 3rem;
+}
+
+.page-pos .btn-pay-keys {
+  font-size: 0.82rem;
+}
+
+.page-pos .btn-xl {
+  padding: 1rem 1.15rem;
+  font-size: 1.2rem;
+  min-height: 3.35rem;
+}
+
+.page-pos .field-inline > span {
+  font-size: 0.88rem;
+}
+
+.page-pos .field-inline select,
+.page-pos .field-inline input:not(.input-compact) {
+  font-size: 1.05rem;
+  padding: 0.55rem 0.65rem;
+  min-height: 2.85rem;
+}
+
+.page-pos .input-compact {
+  font-size: 1rem;
+  padding: 0.5rem 0.55rem;
+  min-height: 2.75rem;
+}
+
+.page-pos .check-inline {
+  font-size: 1rem;
+}
+
+.page-pos .product-grid {
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 0.65rem;
+}
+
+.page-pos .product-tile {
+  padding: 0.78rem 0.82rem;
+  min-height: 4.75rem;
+}
+
+.page-pos .product-tile-name {
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.page-pos .product-tile-meta {
+  font-size: 0.88rem;
+}
+
+.page-pos .cart-lines--main {
+  max-height: min(48vh, 400px);
+}
+
+.page-pos .sale-list-item {
+  font-size: 1rem;
+  padding: 0.55rem 0.4rem;
+}
+
+.page-pos .empty-state {
+  font-size: 1.05rem;
+}
+
+.page-pos .empty-state--compact {
+  padding: 1.5rem 1rem;
+}
+
+.page-pos .btn.small {
+  font-size: 0.95rem;
+  padding: 0.45rem 0.75rem;
+}
+
+.page-pos .product-tile-fav {
+  width: 2.15rem;
+  height: 2.15rem;
+  font-size: 1rem;
+}
+
+/* Título y área principal más amplios cuando la vista es Ventas */
+.main-pro-content:has(.page-pos) {
+  padding: 0.85rem 1.35rem 2.25rem;
+  max-width: 1440px;
+}
+
+.main-pro-content:has(.page-pos) .main-pro-title {
+  font-size: clamp(1.45rem, 2.5vw, 1.9rem);
 }
 
 /* Dashboard charts */
@@ -1584,6 +1956,269 @@ select {
   margin-right: 0.35rem;
 }
 
+/* Calendario mensual */
+.month-cal {
+  width: 100%;
+}
+
+.month-cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.month-cal-title {
+  margin: 0;
+  flex: 1;
+  text-align: center;
+  font-size: 1.15rem;
+  font-weight: 700;
+  text-transform: capitalize;
+  color: #2c2420;
+}
+
+.month-cal-nav {
+  font-size: 1.35rem;
+  line-height: 1;
+  min-width: 2.25rem;
+}
+
+.month-cal-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.25rem;
+  margin-bottom: 0.35rem;
+}
+
+.month-cal-weekday {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #7a6f68;
+  text-align: center;
+}
+
+.month-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.35rem;
+}
+
+.month-cal-cell--pad {
+  visibility: hidden;
+  min-height: 2.85rem;
+}
+
+.month-cal-day {
+  min-height: 2.85rem;
+  border: 1px solid #e4d8cc;
+  border-radius: 10px;
+  background: #fffdf9;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.12rem;
+  padding: 0.25rem;
+  font: inherit;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.month-cal-day:hover {
+  border-color: #c4a882;
+  background: rgba(255, 253, 249, 0.95);
+}
+
+.month-cal-day--today {
+  box-shadow: 0 0 0 2px #b8956a;
+}
+
+.month-cal-day--selected {
+  background: rgba(196, 168, 130, 0.22);
+  border-color: #b8956a;
+}
+
+.month-cal-day-num {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #2c2420;
+}
+
+.month-cal-day-badge {
+  font-size: 0.62rem;
+  font-weight: 700;
+  background: #b8956a;
+  color: #fff;
+  border-radius: 999px;
+  padding: 0.06rem 0.38rem;
+  min-width: 1.15rem;
+  text-align: center;
+}
+
+.month-cal-hint {
+  font-size: 0.82rem;
+  margin: 0.85rem 0 0;
+}
+
+.agenda-track--interactive {
+  cursor: crosshair;
+}
+
+.agenda-filtros-estado {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.agenda-proximas {
+  margin-bottom: 1rem;
+}
+
+.agenda-proximas-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.agenda-proximas-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.85rem;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid #e4d8cc;
+  border-radius: 10px;
+  background: #fffdf9;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.agenda-proximas-item:hover {
+  border-color: #c4a882;
+}
+
+.agenda-proximas-name {
+  font-weight: 600;
+}
+
+.agenda-cliente-pick {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  max-height: 200px;
+  overflow: auto;
+  border: 1px solid #e4d8cc;
+  border-radius: 8px;
+  background: #faf7f3;
+}
+
+.agenda-cliente-pick li {
+  margin: 0;
+  border-bottom: 1px solid #ebe3dc;
+}
+
+.agenda-cliente-pick li:last-child {
+  border-bottom: none;
+}
+
+.agenda-cliente-pick-btn {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.45rem 0.65rem;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.agenda-cliente-pick-btn:hover {
+  background: rgba(196, 168, 130, 0.18);
+}
+
+[data-theme="dark"] .month-cal-title {
+  color: #faf6f1;
+}
+
+[data-theme="dark"] .month-cal-day {
+  background: #242220;
+  border-color: #4a4440;
+}
+
+[data-theme="dark"] .month-cal-day:hover {
+  border-color: #b8956a;
+}
+
+[data-theme="dark"] .month-cal-day-num {
+  color: #faf6f1;
+}
+
+[data-theme="dark"] .month-cal-weekday {
+  color: #a89f96;
+}
+
+[data-theme="dark"] .agenda-cliente-pick {
+  background: #1c1a18;
+  border-color: #4a4440;
+}
+
+[data-theme="dark"] .agenda-cliente-pick li {
+  border-bottom-color: #3a3530;
+}
+
+[data-theme="dark"] .agenda-proximas-item {
+  background: #242220;
+  border-color: #4a4440;
+}
+
+.config-brand-preview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.empleado-avatar {
+  border-radius: 999px;
+  object-fit: cover;
+  vertical-align: middle;
+}
+
+.empleado-avatar--ph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: rgba(196, 168, 130, 0.35);
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.badge-ok {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(34, 139, 58, 0.18);
+  color: #145a1f;
+}
+
+.agenda-block--staff {
+  border-width: 2px;
+  border-style: solid;
+}
+
 /* Dark theme: shell */
 [data-theme="dark"] .app-root {
   background: #12110f;
@@ -1630,6 +2265,40 @@ select {
 
 [data-theme="dark"] .main-pro-title {
   color: #faf6f1;
+}
+
+[data-theme="dark"] .subnav-wrap {
+  border-bottom-color: #3a3530;
+}
+
+[data-theme="dark"] .subnav--tabs {
+  background: rgba(196, 168, 130, 0.12);
+  border-color: #4a4440;
+}
+
+[data-theme="dark"] .subnav--tabs .subnav-link--active {
+  background: #242220;
+}
+
+[data-theme="dark"] .subnav-link {
+  color: #c8bfb6;
+}
+
+[data-theme="dark"] .subnav-link:hover {
+  color: #faf6f1;
+  background: #2e2b28;
+}
+
+[data-theme="dark"] .subnav-link--active {
+  color: #f2ebe6;
+  border-color: #b8956a;
+  background: #2e2b28;
+}
+
+[data-theme="dark"] .subnav-kbd {
+  background: #1c1a18;
+  border-color: #4a4440;
+  color: #a89f96;
 }
 
 [data-theme="dark"] .drawer-panel {

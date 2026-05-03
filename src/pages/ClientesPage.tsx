@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Navigate, useParams } from "react-router-dom";
 import { createCliente, deleteCliente, fetchClientes, updateCliente, type Cliente } from "../api";
 import { Drawer } from "../components/Drawer";
 import { SkeletonCard } from "../components/Skeleton";
@@ -10,8 +11,11 @@ import {
   recordRecentCliente,
   togglePinCliente,
 } from "../lib/recentPins";
+import { SubNav } from "../components/SubNav";
+import { CLIENTES_TABS, readLastTab, type ClientesTab } from "../lib/moduleRoutes";
 
 export function ClientesPage() {
+  const { tab: tabParam } = useParams<{ tab: string }>();
   const toast = useToast();
   const [rows, setRows] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
@@ -131,6 +135,13 @@ export function ClientesPage() {
     return [...rows].sort((a, b) => score(b) - score(a));
   }, [rows, pinTick]);
 
+  const displayRowsHistorial = useMemo(() => {
+    return [...rows].sort(
+      (a, b) =>
+        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+    );
+  }, [rows]);
+
   async function onDelete(id: number) {
     if (!window.confirm("¿Eliminar cliente y sus citas?")) return;
     try {
@@ -143,8 +154,31 @@ export function ClientesPage() {
     }
   }
 
+  useEffect(() => {
+    if (tabParam === "nuevo") {
+      openNew();
+    }
+  }, [tabParam]);
+
+  const tabOk = tabParam != null && CLIENTES_TABS.includes(tabParam as ClientesTab);
+  if (!tabOk) {
+    return <Navigate to={`/clientes/${readLastTab("clientes", "lista")}`} replace />;
+  }
+  const tab = tabParam as ClientesTab;
+
   return (
     <div className="page-clientes">
+      <SubNav
+        moduleId="clientes"
+        items={[
+          { id: "lista", label: "Lista", to: "/clientes/lista" },
+          { id: "nuevo", label: "Nuevo cliente", to: "/clientes/nuevo" },
+          { id: "historial", label: "Historial", to: "/clientes/historial" },
+        ]}
+      />
+
+      {tab === "lista" ? (
+        <>
       <div className="toolbar-pro">
         <label className="search-hero">
           <span className="search-hero-icon" aria-hidden>
@@ -203,6 +237,50 @@ export function ClientesPage() {
           ))}
         </div>
       )}
+        </>
+      ) : null}
+
+      {tab === "historial" ? (
+        <section className="card-pro" style={{ marginBottom: "1rem" }}>
+          <h2 className="card-pro-title">Historial (última actividad)</h2>
+          <p className="muted">Orden por fecha de actualización en el sistema.</p>
+          {loading ? (
+            <div className="cards-grid">
+              <SkeletonCard />
+              <SkeletonCard />
+            </div>
+          ) : displayRowsHistorial.length === 0 ? (
+            <p className="muted">Sin clientes.</p>
+          ) : (
+            <div className="cards-grid">
+              {displayRowsHistorial.map((c) => (
+                <div key={c.id} className="cliente-card-wrap">
+                  <button type="button" className="cliente-card" onClick={() => openEdit(c)}>
+                    <span className="cliente-card-name">{c.nombre}</span>
+                    <span className="cliente-card-meta">{c.telefono ?? "Sin teléfono"}</span>
+                    <span className="muted small">
+                      Actualizado: {new Date(c.updated_at).toLocaleString()}
+                    </span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      ) : null}
+
+      {tab === "nuevo" ? (
+        <section className="card-pro">
+          <h2 className="card-pro-title">Nuevo cliente</h2>
+          <p className="muted">
+            Se abrió el panel lateral con el formulario. Completá los datos y guardá; podés cerrar
+            este mensaje y seguir en otra pestaña cuando termines.
+          </p>
+          <button type="button" className="btn primary" onClick={openNew}>
+            Abrir de nuevo el formulario
+          </button>
+        </section>
+      ) : null}
 
       <Drawer
         open={drawerOpen}

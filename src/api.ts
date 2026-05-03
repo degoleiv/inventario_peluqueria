@@ -37,6 +37,7 @@ export type Cliente = {
 export type Cita = {
   id: number;
   cliente_id: number;
+  usuario_id: number | null;
   inicio: string;
   duracion_min: number;
   servicio: string | null;
@@ -45,17 +46,21 @@ export type Cita = {
   created_at: string;
   updated_at: string;
   cliente_nombre: string;
+  empleado_nombre?: string | null;
+  empleado_color?: string | null;
 };
 
 export type Venta = {
   id: number;
   cliente_id: number | null;
+  usuario_id?: number | null;
   fecha: string;
   total: number;
   metodo_pago: string;
   notas: string | null;
   created_at: string;
   cliente_nombre: string | null;
+  vendedor_nombre?: string | null;
 };
 
 export type VentaDetalle = Venta & {
@@ -143,11 +148,19 @@ export async function fetchBootstrapNeeded(): Promise<{ needed: boolean }> {
   return requestJson("/api/auth/bootstrap-needed", undefined, false);
 }
 
+export type AuthUser = {
+  id: number;
+  email: string;
+  rol: string;
+  nombre?: string | null;
+  permisos: string[];
+};
+
 export async function bootstrapAdmin(body: {
   email: string;
   password: string;
   nombre?: string;
-}): Promise<{ accessToken: string; user: { id: number; email: string; rol: string } }> {
+}): Promise<{ accessToken: string; user: AuthUser }> {
   return requestJson("/api/auth/bootstrap", {
     method: "POST",
     body: JSON.stringify(body),
@@ -157,15 +170,170 @@ export async function bootstrapAdmin(body: {
 export async function loginApi(body: {
   email: string;
   password: string;
-}): Promise<{ accessToken: string; user: { id: number; email: string; rol: string } }> {
+}): Promise<{ accessToken: string; user: AuthUser }> {
   return requestJson("/api/auth/login", {
     method: "POST",
     body: JSON.stringify(body),
   }, false);
 }
 
-export async function fetchAuthMe(): Promise<{ user: { id: number; email: string; rol: string } }> {
+export async function fetchAuthMe(): Promise<{ user: AuthUser }> {
   return requestJson("/api/auth/me");
+}
+
+export type RolDefinicion = {
+  slug: string;
+  nombre: string;
+  permisos: string[];
+  created_at: string;
+};
+
+export async function fetchRoles(): Promise<RolDefinicion[]> {
+  return requestJson("/api/roles");
+}
+
+export async function createRole(body: {
+  slug: string;
+  nombre: string;
+  permisos: string[];
+}): Promise<RolDefinicion> {
+  return requestJson("/api/roles", { method: "POST", body: JSON.stringify(body) });
+}
+
+export async function updateRole(
+  slug: string,
+  body: Partial<{ nombre: string; permisos: string[] }>
+): Promise<RolDefinicion> {
+  return requestJson(`/api/roles/${encodeURIComponent(slug)}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deleteRole(slug: string): Promise<void> {
+  await requestJson(`/api/roles/${encodeURIComponent(slug)}`, { method: "DELETE" });
+}
+
+export type UsuarioListado = {
+  id: number;
+  email: string;
+  nombre: string | null;
+  rol: string;
+  activo: number;
+  telefono?: string | null;
+  color_agenda?: string | null;
+  foto_url?: string | null;
+  tipo_comision?: string;
+  valor_comision?: number;
+  created_at: string;
+};
+
+export type EquipoMiembro = {
+  id: number;
+  nombre: string | null;
+  email: string;
+  telefono: string | null;
+  rol: string;
+  color_agenda: string | null;
+  foto_url: string | null;
+};
+
+export type BrandingConfig = {
+  nombre_negocio: string;
+  logo_data_url: string | null;
+  color_primario: string;
+  color_secundario: string;
+  theme_mode: "light" | "dark" | "auto";
+};
+
+export type TiendaConfig = {
+  nombre_comercial: string;
+  direccion: string;
+  telefono: string;
+  moneda: string;
+  impuesto_pct: number | null;
+};
+
+export type SistemaPrefs = {
+  modo_offline: boolean;
+  notificaciones: boolean;
+  backup_auto: boolean;
+};
+
+export async function fetchUsuarios(): Promise<UsuarioListado[]> {
+  return requestJson("/api/usuarios");
+}
+
+export async function createUsuario(body: {
+  email: string;
+  password: string;
+  nombre?: string;
+  rol?: string;
+  telefono?: string | null;
+  color_agenda?: string | null;
+  foto_url?: string | null;
+  tipo_comision?: string;
+  valor_comision?: number;
+}): Promise<UsuarioListado> {
+  return requestJson("/api/usuarios", { method: "POST", body: JSON.stringify(body) });
+}
+
+export async function updateUsuario(
+  id: number,
+  body: Partial<{
+    rol: string;
+    password: string;
+    nombre: string | null;
+    telefono: string | null;
+    color_agenda: string | null;
+    foto_url: string | null;
+    activo: boolean;
+    tipo_comision: string;
+    valor_comision: number;
+  }>
+): Promise<UsuarioListado> {
+  return requestJson(`/api/usuarios/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+}
+
+export async function fetchEquipo(): Promise<EquipoMiembro[]> {
+  return requestJson("/api/equipo");
+}
+
+export async function fetchBranding(): Promise<BrandingConfig> {
+  return requestJson("/api/configuracion/branding");
+}
+
+export async function updateBranding(body: Partial<BrandingConfig>): Promise<BrandingConfig> {
+  return requestJson("/api/configuracion/branding", {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function fetchTienda(): Promise<TiendaConfig> {
+  return requestJson("/api/configuracion/tienda");
+}
+
+export async function updateTienda(body: Partial<TiendaConfig>): Promise<TiendaConfig> {
+  return requestJson("/api/configuracion/tienda", {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function fetchSistemaPrefs(): Promise<SistemaPrefs> {
+  return requestJson("/api/configuracion/sistema");
+}
+
+export async function updateSistemaPrefs(body: Partial<SistemaPrefs>): Promise<SistemaPrefs> {
+  return requestJson("/api/configuracion/sistema", {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deleteUsuario(id: number): Promise<void> {
+  await requestJson(`/api/usuarios/${id}`, { method: "DELETE" });
 }
 
 export async function fetchSyncEstado(): Promise<{ pendientes: number }> {
@@ -254,6 +422,7 @@ export async function fetchVenta(id: number): Promise<VentaDetalle> {
 
 export async function createVenta(body: {
   cliente_id?: number | null;
+  usuario_id?: number;
   fecha?: string;
   metodo_pago?: string;
   notas?: string | null;
@@ -329,6 +498,8 @@ export type FacturaElectronica = {
   iva_monto: number;
   estado: string;
   cliente_nombre: string | null;
+  /** ISO si ya se envió por correo al menos una vez */
+  email_enviado_at?: string | null;
 };
 
 export async function fetchFacturasElectronicas(desde?: string, hasta?: string): Promise<FacturaElectronica[]> {
@@ -357,6 +528,50 @@ export async function downloadFacturaDocumento(id: number, formato: "xml" | "jso
   a.download = `factura-${id}.${formato === "xml" ? "xml" : "json"}`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+export async function enviarFacturaPorEmail(
+  id: number,
+  email?: string
+): Promise<{ ok: true; to: string; enviado_en: string }> {
+  return requestJson(`/api/facturas-electronicas/${id}/enviar-email`, {
+    method: "POST",
+    body: JSON.stringify(email ? { email } : {}),
+  });
+}
+
+export type SmtpPublicConfig = {
+  configured: boolean;
+  host: string;
+  port: number;
+  secure: boolean;
+  user: string;
+  from: string;
+  password_set_via_env: boolean;
+};
+
+export async function fetchSmtpConfig(): Promise<SmtpPublicConfig> {
+  return requestJson("/api/configuracion/smtp");
+}
+
+export async function updateSmtpConfig(body: Partial<{
+  host: string;
+  port: number;
+  secure: boolean;
+  user: string;
+  from: string;
+}>): Promise<SmtpPublicConfig> {
+  return requestJson("/api/configuracion/smtp", {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function probarSmtpEmail(email: string): Promise<{ ok: boolean }> {
+  return requestJson("/api/configuracion/smtp/probar", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
 }
 
 /* Reportes */
@@ -476,8 +691,160 @@ export async function registrarPagoCobranza(id: number, monto: number): Promise<
   });
 }
 
-export async function fetchAuditoria(limit = 100): Promise<unknown[]> {
+export type AuditoriaRow = {
+  id: number;
+  usuario_id: number | null;
+  accion: string;
+  entidad: string;
+  entidad_id: number | null;
+  detalle_json: string | null;
+  created_at: string;
+  usuario_email?: string | null;
+};
+
+export async function fetchAuditoria(limit = 100): Promise<AuditoriaRow[]> {
   return requestJson(`/api/auditoria?limit=${limit}`);
+}
+
+export type ComisionRow = {
+  id: number;
+  empleado_id: number;
+  venta_id: number;
+  monto: number;
+  fecha: string;
+  created_at: string;
+  empleado_nombre?: string | null;
+  venta_total?: number | null;
+};
+
+export async function fetchEmpleadosComisiones(params?: {
+  desde?: string;
+  hasta?: string;
+  usuario_id?: number;
+}): Promise<ComisionRow[]> {
+  const q = new URLSearchParams();
+  if (params?.desde) q.set("desde", params.desde);
+  if (params?.hasta) q.set("hasta", params.hasta);
+  if (params?.usuario_id != null) q.set("usuario_id", String(params.usuario_id));
+  const suffix = q.toString() ? `?${q}` : "";
+  return requestJson(`/api/empleados/comisiones${suffix}`);
+}
+
+export type TurnoEmpleado = {
+  id: number;
+  empleado_id: number;
+  fecha: string;
+  hora_inicio: string;
+  hora_fin: string;
+  estado: string;
+  created_at: string;
+  empleado_nombre?: string | null;
+};
+
+export async function fetchEmpleadosTurnos(params?: {
+  desde?: string;
+  hasta?: string;
+  usuario_id?: number;
+}): Promise<TurnoEmpleado[]> {
+  const q = new URLSearchParams();
+  if (params?.desde) q.set("desde", params.desde);
+  if (params?.hasta) q.set("hasta", params.hasta);
+  if (params?.usuario_id != null) q.set("usuario_id", String(params.usuario_id));
+  const suffix = q.toString() ? `?${q}` : "";
+  return requestJson(`/api/empleados/turnos${suffix}`);
+}
+
+export async function createTurnoEmpleado(body: {
+  empleado_id: number;
+  fecha: string;
+  hora_inicio: string;
+  hora_fin: string;
+  estado?: string;
+}): Promise<TurnoEmpleado> {
+  return requestJson("/api/empleados/turnos", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function updateTurnoEmpleado(
+  id: number,
+  body: Partial<{
+    empleado_id: number;
+    fecha: string;
+    hora_inicio: string;
+    hora_fin: string;
+    estado: string;
+  }>
+): Promise<TurnoEmpleado> {
+  return requestJson(`/api/empleados/turnos/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deleteTurnoEmpleado(id: number): Promise<void> {
+  await requestJson(`/api/empleados/turnos/${id}`, { method: "DELETE" });
+}
+
+export type EmpleadoMovimiento = {
+  id: number;
+  empleado_id: number;
+  monto: number;
+  tipo: string;
+  estado: string;
+  notas: string | null;
+  created_at: string;
+  empleado_nombre?: string | null;
+};
+
+export async function fetchEmpleadosMovimientos(usuario_id?: number): Promise<EmpleadoMovimiento[]> {
+  const q = usuario_id != null ? `?usuario_id=${usuario_id}` : "";
+  return requestJson(`/api/empleados/movimientos${q}`);
+}
+
+export async function createEmpleadoMovimiento(body: {
+  empleado_id: number;
+  monto: number;
+  tipo: "adelanto" | "descuento";
+  estado?: "pendiente" | "pagado";
+  notas?: string | null;
+}): Promise<EmpleadoMovimiento> {
+  return requestJson("/api/empleados/movimientos", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function updateEmpleadoMovimientoEstado(
+  id: number,
+  estado: "pendiente" | "pagado"
+): Promise<EmpleadoMovimiento> {
+  return requestJson(`/api/empleados/movimientos/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ estado }),
+  });
+}
+
+export type EmpleadoResumen = {
+  empleado_id: number;
+  empleado_nombre: string | null;
+  total_comisiones_periodo: number;
+  adelantos_y_descuentos_pendiente: number;
+  saldo_final: number;
+  desde: string | null;
+  hasta: string | null;
+};
+
+export async function fetchEmpleadoResumen(
+  id: number,
+  params?: { desde?: string; hasta?: string }
+): Promise<EmpleadoResumen> {
+  const q = new URLSearchParams();
+  if (params?.desde) q.set("desde", params.desde);
+  if (params?.hasta) q.set("hasta", params.hasta);
+  const suffix = q.toString() ? `?${q}` : "";
+  return requestJson(`/api/empleados/resumen/${id}${suffix}`);
 }
 
 export async function registrarAjusteStock(body: {
@@ -495,8 +862,15 @@ export async function fetchPromociones(): Promise<unknown[]> {
   return requestJson("/api/promociones");
 }
 
-export async function fetchCitasSugerenciasHorario(fecha: string, duracionMin = 60) {
+export async function fetchCitasSugerenciasHorario(
+  fecha: string,
+  duracionMin = 60,
+  usuarioId?: number
+) {
   const q = new URLSearchParams({ fecha, duracion_min: String(duracionMin) });
+  if (usuarioId != null && Number.isFinite(usuarioId)) {
+    q.set("usuario_id", String(usuarioId));
+  }
   return requestJson<{ fecha: string; duracion_min: number; slots: string[] }>(
     `/api/citas/sugerencias-horario?${q}`
   );

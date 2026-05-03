@@ -1,6 +1,7 @@
 import { db, recordSyncEvent } from "../db.js";
 import { AppError } from "../lib/AppError.js";
 import { configuracionService } from "./configuracion.service.js";
+import { commissionService } from "./commission.service.js";
 
 function todayISODate() {
   return new Date().toISOString().slice(0, 10);
@@ -8,9 +9,10 @@ function todayISODate() {
 
 export const ventaService = {
   list(desde?: string, hasta?: string) {
-    let sql = `SELECT v.*, c.nombre AS cliente_nombre
+    let sql = `SELECT v.*, c.nombre AS cliente_nombre, u.nombre AS vendedor_nombre
                FROM ventas v
-               LEFT JOIN clientes c ON c.id = v.cliente_id`;
+               LEFT JOIN clientes c ON c.id = v.cliente_id
+               LEFT JOIN usuarios u ON u.id = v.usuario_id`;
     const params: string[] = [];
     if (desde) {
       sql += ` WHERE v.fecha >= ?`;
@@ -30,9 +32,10 @@ export const ventaService = {
   getById(id: number) {
     const venta = db
       .prepare(
-        `SELECT v.*, c.nombre AS cliente_nombre
+        `SELECT v.*, c.nombre AS cliente_nombre, u.nombre AS vendedor_nombre
          FROM ventas v
          LEFT JOIN clientes c ON c.id = v.cliente_id
+         LEFT JOIN usuarios u ON u.id = v.usuario_id
          WHERE v.id = ?`
       )
       .get(id);
@@ -57,9 +60,22 @@ export const ventaService = {
     const fechaVenta =
       typeof body.fecha === "string" && body.fecha.trim() ? body.fecha.trim() : now;
 
+    const uidRaw = body.usuario_id;
+    const usuario_id =
+      uidRaw != null && Number.isFinite(Number(uidRaw))
+        ? Math.floor(Number(uidRaw))
+        : null;
+    if (usuario_id == null) {
+      throw new AppError("usuario_id (vendedor) requerido");
+    }
+    const vu = db.prepare(`SELECT id FROM usuarios WHERE id = ? AND activo = 1`).get(usuario_id) as
+      | { id: number }
+      | undefined;
+    if (!vu) throw new AppError("Vendedor no encontrado o inactivo");
+
     const insVenta = db.prepare(
-      `INSERT INTO ventas (cliente_id, fecha, total, metodo_pago, notas, created_at, descuento_puntos, puntos_canjeados)
-       VALUES (?,?,?,?,?,?,?,?)`
+      `INSERT INTO ventas (cliente_id, fecha, total, metodo_pago, notas, created_at, descuento_puntos, puntos_canjeados, usuario_id)
+       VALUES (?,?,?,?,?,?,?,?,?)`
     );
     const insMov = db.prepare(
       `INSERT INTO movimientos_inventario (producto_id, tipo, cantidad, venta_id, referencia, created_at)
@@ -163,7 +179,8 @@ export const ventaService = {
         typeof body.notas === "string" ? body.notas || null : null,
         now,
         descuentoPuntos,
-        puntosCanjeadosEfectivos
+        puntosCanjeadosEfectivos,
+        usuario_id
       );
       const vid = Number(info.lastInsertRowid);
 
@@ -203,6 +220,8 @@ export const ventaService = {
         }
       }
 
+      commissionService.insertForVenta(vid, usuario_id, totalFinal, fechaVenta);
+
       recordSyncEvent("venta", "creada", {
         venta_id: vid,
         total: totalFinal,
@@ -217,5 +236,82 @@ export const ventaService = {
 
     const detalle = ventaService.getById(ventaId);
     return { ...detalle, puntos_otorgados: puntosOtorgados };
+  },
+
+  cancelar(
+    id: number,
+    body: {
+      motivo: string;
+      cancelado_por: "cliente" | "empleado" | "admin";
+    }
+  ) {
+    const motivo =
+      typeof body.motivo === "string" ? body.motivo.trim() : "";
+    if (!motivo) throw new AppError("motivo requerido");
+    const por = body.cancelado_por;
+    if (por !== "cliente" && por !== "empleado" && por !== "admin") {
+      throw new AppError("cancelado_por debe ser cliente, empleado o admin");
+    }
+
+    const venta = db.prepare(`SELECT * FROM ventas WHERE id = ?`).get(id) as
+      | Record<string, unknown>
+      | undefined;
+    if (!venta) throw new AppError("no encontrado", 404);
+
+    const estadoActual = String(venta.estado ?? "confirmada");
+    if (estadoActual === "cancelada") {
+      throw new AppError("La venta ya está cancelada");
+    }
+
+    const lineas = db
+      .prepare(`SELECT producto_id, cantidad FROM venta_lineas WHERE venta_id = ?`)
+      .all(id) as { producto_id: number; cantidad: number }[];
+
+    const now = new Date().toISOString();
+
+    db.transaction(() => {
+      commissionService.deleteByVentaId(id);
+
+      const insEntrada = db.prepare(
+        `INSERT INTO movimientos_inventario (producto_id, tipo, cantidad, venta_id, referencia, created_at)
+         VALUES (?, 'ENTRADA', ?, ?, ?, ?)`
+      );
+      const updStock = db.prepare(
+        `UPDATE productos SET stock = stock + ?, updated_at = ? WHERE id = ?`
+      );
+
+      for (const ln of lineas) {
+        updStock.run(ln.cantidad, now, ln.producto_id);
+        insEntrada.run(
+          ln.producto_id,
+          ln.cantidad,
+          id,
+          `anulacion_venta:${id}`,
+          now
+        );
+      }
+
+      db.prepare(
+        `UPDATE ventas SET estado = 'cancelada', cancelado_por = ?, cancelado_motivo = ?, cancelado_at = ? WHERE id = ?`
+      ).run(por, motivo, now, id);
+
+      const clienteId =
+        venta.cliente_id != null ? Number(venta.cliente_id) : null;
+      const totalFinal = Number(venta.total);
+      const puntosCfg = configuracionService.getPuntosConfig();
+      if (puntosCfg.activo && clienteId != null && totalFinal > 0) {
+        const quitar = Math.floor(totalFinal * puntosCfg.puntos_por_unidad_moneda);
+        if (quitar > 0) {
+          db.prepare(`UPDATE clientes SET puntos = MAX(0, COALESCE(puntos, 0) - ?), updated_at = ? WHERE id = ?`).run(
+            quitar,
+            now,
+            clienteId
+          );
+        }
+      }
+    })();
+
+    recordSyncEvent("venta", "cancelada", { venta_id: id, cancelado_por: por });
+    return ventaService.getById(id);
   },
 };

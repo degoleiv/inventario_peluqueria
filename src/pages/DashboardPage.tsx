@@ -6,12 +6,21 @@ import {
   type DashboardStats,
   type PuntosConfig,
 } from "../api";
+import {
+  filterDecimalTyping,
+  formatDecimalForInput,
+  parseDecimalLoose,
+} from "../lib/decimalInput";
 
 export function DashboardPage() {
   const [data, setData] = useState<DashboardStats | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [puntosCfg, setPuntosCfg] = useState<PuntosConfig | null>(null);
-  const [puntosDraft, setPuntosDraft] = useState({ activo: false, ratio: 1, valorRed: 0 });
+  const [puntosDraft, setPuntosDraft] = useState({
+    activo: false,
+    ratioStr: "1",
+    valorRedStr: "0",
+  });
   const [puntosMsg, setPuntosMsg] = useState<string | null>(null);
   const [puntosErr, setPuntosErr] = useState<string | null>(null);
   const [puntosSaving, setPuntosSaving] = useState(false);
@@ -40,8 +49,8 @@ export function DashboardPage() {
           setPuntosCfg(p);
           setPuntosDraft({
             activo: p.activo,
-            ratio: p.puntos_por_unidad_moneda,
-            valorRed: p.valor_redencion_moneda ?? 0,
+            ratioStr: formatDecimalForInput(p.puntos_por_unidad_moneda),
+            valorRedStr: formatDecimalForInput(p.valor_redencion_moneda ?? 0),
           });
         }
       } catch {
@@ -61,8 +70,8 @@ export function DashboardPage() {
     try {
       const p = await updatePuntosConfig({
         activo: puntosDraft.activo,
-        puntos_por_unidad_moneda: puntosDraft.ratio,
-        valor_redencion_moneda: puntosDraft.valorRed,
+        puntos_por_unidad_moneda: parseDecimalLoose(puntosDraft.ratioStr),
+        valor_redencion_moneda: parseDecimalLoose(puntosDraft.valorRedStr),
       });
       setPuntosCfg(p);
       setPuntosMsg("Configuración guardada.");
@@ -209,24 +218,30 @@ export function DashboardPage() {
             <label className="field">
               <span>Puntos por unidad de moneda del total</span>
               <input
-                type="number"
-                min={0}
-                step={0.01}
-                value={puntosDraft.ratio}
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                value={puntosDraft.ratioStr}
                 onChange={(e) =>
-                  setPuntosDraft((d) => ({ ...d, ratio: Number(e.target.value) || 0 }))
+                  setPuntosDraft((d) => ({
+                    ...d,
+                    ratioStr: filterDecimalTyping(e.target.value),
+                  }))
                 }
               />
             </label>
             <label className="field">
               <span>Valor de cada punto al canjear (descuento en moneda; 0 = no canje)</span>
               <input
-                type="number"
-                min={0}
-                step={0.01}
-                value={puntosDraft.valorRed}
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                value={puntosDraft.valorRedStr}
                 onChange={(e) =>
-                  setPuntosDraft((d) => ({ ...d, valorRed: Number(e.target.value) || 0 }))
+                  setPuntosDraft((d) => ({
+                    ...d,
+                    valorRedStr: filterDecimalTyping(e.target.value),
+                  }))
                 }
               />
             </label>

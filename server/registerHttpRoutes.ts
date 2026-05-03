@@ -29,6 +29,7 @@ import { promocionesService } from "./services/promociones.service.js";
 import { commissionService } from "./services/commission.service.js";
 import { turnoService } from "./services/turno.service.js";
 import { empleadoMovimientoService } from "./services/empleadoMovimiento.service.js";
+import { certificadoController } from "./controllers/certificado.controller.js";
 
 function parseId(req: Request, res: Response): number | null {
   const id = Number(req.params.id);
@@ -184,6 +185,21 @@ export function registerHttpRoutes(app: Express) {
 
   api.post("/clientes", requirePermiso("clientes"), (req, res) => {
     res.status(201).json(clienteService.create(req.body as Record<string, unknown>));
+  });
+
+  api.post("/clientes/temporal", requireAlguno("ventas", "citas", "clientes"), (req, res) => {
+    const out = clienteService.createTemporal(req.body as Record<string, unknown>);
+    res.status(out.reutilizado ? 200 : 201).json(out);
+  });
+
+  api.post("/clientes/:id/convertir-registrado", requirePermiso("clientes"), (req, res) => {
+    const id = parseId(req, res);
+    if (id == null) return;
+    const row = clienteService.convertirARegistrado(id, req.body as Record<string, unknown>);
+    auditService.log(req.user?.sub, "convertir", "cliente", id, {
+      nombre: (row as { nombre?: string }).nombre,
+    });
+    res.json(row);
   });
 
   api.put("/clientes/:id", requirePermiso("clientes"), (req, res) => {
@@ -524,6 +540,12 @@ export function registerHttpRoutes(app: Express) {
     const lim = Number(req.query.limit ?? 100);
     res.json(auditService.list(lim));
   });
+
+  api.get(
+    "/admin/certificados/:idEmpleado",
+    requireAdmin,
+    asyncHandler(certificadoController.generar)
+  );
 
   api.get("/empleados/comisiones", requireAdmin, (req, res) => {
     const desde = typeof req.query.desde === "string" ? req.query.desde : undefined;

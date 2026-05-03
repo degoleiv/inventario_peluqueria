@@ -8,6 +8,7 @@ import {
 import {
   crearCitasSerieRecurrente,
   createCita,
+  createClienteTemporal,
   deleteCita,
   fetchAuthMe,
   fetchCitas,
@@ -19,6 +20,7 @@ import {
   type Cliente,
   type EquipoMiembro,
 } from "../api";
+import { useToast } from "../context/ToastContext";
 import { Drawer } from "../components/Drawer";
 import { SubNav } from "../components/SubNav";
 import { DailyTimeline } from "../components/agenda/DailyTimeline";
@@ -74,6 +76,7 @@ function overlapConflict(
 export function CitasPage() {
   const { tab: tabParam } = useParams<{ tab: string }>();
   const navigate = useNavigate();
+  const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const fechaParam = searchParams.get("fecha");
@@ -165,6 +168,23 @@ export function CitasPage() {
       setLoading(false);
     }
   }, []);
+
+  const usarClienteOcasional = useCallback(async () => {
+    try {
+      const { cliente, reutilizado } = await createClienteTemporal();
+      setClienteId(cliente.id);
+      setClienteBusqueda(cliente.nombre);
+      await load();
+      toast(
+        reutilizado
+          ? "Ya había un cliente con ese teléfono; se usó ese contacto."
+          : "Cliente ocasional — completá fecha y profesional para guardar.",
+        reutilizado ? "info" : "success"
+      );
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Error", "error");
+    }
+  }, [load, toast]);
 
   useEffect(() => {
     void load();
@@ -440,8 +460,21 @@ export function CitasPage() {
         {clienteId !== "" ? (
           <p className="muted small">
             Seleccionado: {clientes.find((c) => c.id === clienteId)?.nombre ?? `#${clienteId}`}
+            {clientes.find((c) => c.id === clienteId)?.tipo_cliente === "temporal" ? (
+              <span className="badge-ok" style={{ marginLeft: "0.35rem" }}>
+                ocasional
+              </span>
+            ) : null}
           </p>
         ) : null}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginTop: "0.35rem" }}>
+          <button type="button" className="btn secondary small" onClick={() => void usarClienteOcasional()}>
+            Cliente ocasional
+          </button>
+          <span className="muted small" style={{ alignSelf: "center" }}>
+            Sin datos obligatorios — podés completar después.
+          </span>
+        </div>
         {clienteBusqueda.trim() && clienteId === "" ? (
           <ul className="agenda-cliente-pick" role="listbox">
             {clientesFiltrados.map((c) => (
@@ -699,20 +732,27 @@ export function CitasPage() {
             <form className="form" onSubmit={onSubmit}>
               <label className="field">
                 <span>Cliente *</span>
-                <select
-                  required
-                  value={clienteId === "" ? "" : String(clienteId)}
-                  onChange={(e) =>
-                    setClienteId(e.target.value === "" ? "" : Number(e.target.value))
-                  }
-                >
-                  <option value="">Seleccionar…</option>
-                  {clientes.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.nombre}
-                    </option>
-                  ))}
-                </select>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
+                  <select
+                    required
+                    style={{ flex: "1", minWidth: "12rem" }}
+                    value={clienteId === "" ? "" : String(clienteId)}
+                    onChange={(e) =>
+                      setClienteId(e.target.value === "" ? "" : Number(e.target.value))
+                    }
+                  >
+                    <option value="">Seleccionar…</option>
+                    {clientes.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nombre}
+                        {c.tipo_cliente === "temporal" ? " · ocasional" : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <button type="button" className="btn secondary small" onClick={() => void usarClienteOcasional()}>
+                    Cliente ocasional
+                  </button>
+                </div>
               </label>
               <label className="field">
                 <span>Profesional *</span>

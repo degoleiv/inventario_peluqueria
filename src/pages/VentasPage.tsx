@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useParams } from "react-router-dom";
 import {
+  createClienteTemporal,
   createVenta,
   fetchAuthMe,
   fetchClientes,
@@ -86,6 +87,23 @@ export function VentasPage() {
       setLoading(false);
     }
   }, [toast]);
+
+  const agregarClienteOcasional = useCallback(async () => {
+    try {
+      const { cliente, reutilizado } = await createClienteTemporal();
+      setClienteId(cliente.id);
+      recordRecentCliente(cliente.id);
+      await load();
+      toast(
+        reutilizado
+          ? "Ya existía un contacto con ese teléfono; se seleccionó ese cliente."
+          : "Cliente ocasional — podés cobrar sin registrar datos completos.",
+        reutilizado ? "info" : "success"
+      );
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Error", "error");
+    }
+  }, [load, toast]);
 
   useEffect(() => {
     void fetchAuthMe()
@@ -645,10 +663,19 @@ export function VentasPage() {
                   {clientesOrdenados.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.nombre}
+                      {c.tipo_cliente === "temporal" ? " · ocasional" : ""}
                     </option>
                   ))}
                 </select>
               </label>
+              <button
+                type="button"
+                className="btn secondary small"
+                title="Crea un contacto mínimo para la venta"
+                onClick={() => void agregarClienteOcasional()}
+              >
+                Cliente ocasional
+              </button>
               <label className="field-inline">
                 <span>Pago (detalle)</span>
                 <select value={metodoPago} onChange={(e) => setMetodoPago(e.target.value)}>

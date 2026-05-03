@@ -1,6 +1,9 @@
 import { db, recordSyncEvent } from "../db.js";
 import { AppError } from "../lib/AppError.js";
 
+const TIPO_REGISTRADO = "registrado";
+const TIPO_TEMPORAL = "temporal";
+
 export const clienteService = {
   list(q?: string) {
     if (q && q.trim()) {
@@ -29,8 +32,8 @@ export const clienteService = {
     const now = new Date().toISOString();
     const info = db
       .prepare(
-        `INSERT INTO clientes (nombre, telefono, email, notas, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?)`
+        `INSERT INTO clientes (nombre, telefono, email, notas, created_at, updated_at, tipo_cliente, activo)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 1)`
       )
       .run(
         nombre,
@@ -38,10 +41,80 @@ export const clienteService = {
         typeof body.email === "string" ? body.email || null : null,
         typeof body.notas === "string" ? body.notas || null : null,
         now,
-        now
+        now,
+        TIPO_REGISTRADO
       );
     const row = db.prepare(`SELECT * FROM clientes WHERE id = ?`).get(info.lastInsertRowid);
     recordSyncEvent("cliente", "creado", row);
+    return row;
+  },
+
+  /**
+   * Cliente ocasional (guest): datos mínimos. Si hay teléfono y ya existe un cliente con ese número, devuelve ese registro (evita duplicados).
+   */
+  createTemporal(body: Record<string, unknown>) {
+    const telRaw = typeof body.telefono === "string" ? body.telefono.trim() : "";
+    const telefono = telRaw || null;
+    if (telefono) {
+      const ex = db
+        .prepare(`SELECT * FROM clientes WHERE telefono = ? AND IFNULL(telefono,'') != ''`)
+        .get(telefono) as Record<string, unknown> | undefined;
+      if (ex) {
+        return { cliente: ex, reutilizado: true as const };
+      }
+    }
+    const nombreIn = typeof body.nombre === "string" ? body.nombre.trim() : "";
+    const nombre = nombreIn || "Cliente ocasional";
+    const now = new Date().toISOString();
+    const info = db
+      .prepare(
+        `INSERT INTO clientes (nombre, telefono, email, notas, created_at, updated_at, tipo_cliente, activo)
+         VALUES (?, ?, NULL, NULL, ?, ?, ?, 1)`
+      )
+      .run(nombre, telefono, now, now, TIPO_TEMPORAL);
+    const row = db.prepare(`SELECT * FROM clientes WHERE id = ?`).get(info.lastInsertRowid);
+    recordSyncEvent("cliente", "creado_temporal", row);
+    return { cliente: row, reutilizado: false as const };
+  },
+
+  convertirARegistrado(id: number, body: Record<string, unknown>) {
+    const existing = db.prepare(`SELECT * FROM clientes WHERE id = ?`).get(id) as Record<
+      string,
+      unknown
+    > | undefined;
+    if (!existing) throw new AppError("no encontrado", 404);
+    const tipo = String(existing.tipo_cliente ?? TIPO_REGISTRADO);
+    if (tipo !== TIPO_TEMPORAL) {
+      throw new AppError("Este cliente ya está registrado; editá los datos con «Actualizar»");
+    }
+    const nombre = typeof body.nombre === "string" ? body.nombre.trim() : "";
+    if (!nombre) throw new AppError("Nombre requerido para registrar el cliente");
+    const telefono =
+      typeof body.telefono === "string" ? body.telefono.trim() || null : null;
+    if (telefono) {
+      const dup = db
+        .prepare(`SELECT id FROM clientes WHERE telefono = ? AND id != ?`)
+        .get(telefono, id) as { id: number } | undefined;
+      if (dup) {
+        throw new AppError(
+          "Ya existe otro cliente con ese teléfono. Unificá desde ese contacto o usá otro número."
+        );
+      }
+    }
+    const now = new Date().toISOString();
+    db.prepare(
+      `UPDATE clientes SET tipo_cliente = ?, nombre = ?, telefono = ?, email = ?, notas = ?, updated_at = ? WHERE id = ?`
+    ).run(
+      TIPO_REGISTRADO,
+      nombre,
+      telefono,
+      typeof body.email === "string" ? body.email.trim() || null : null,
+      typeof body.notas === "string" ? body.notas.trim() || null : null,
+      now,
+      id
+    );
+    const row = db.prepare(`SELECT * FROM clientes WHERE id = ?`).get(id);
+    recordSyncEvent("cliente", "convertido_registrado", row);
     return row;
   },
 

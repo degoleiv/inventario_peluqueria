@@ -381,4 +381,13 @@ export function applyMigrations(db: Database.Database) {
     );
     CREATE INDEX IF NOT EXISTS idx_emp_mov_empleado ON empleado_movimientos(empleado_id);
   `);
+
+  const cliColsGuest = db.prepare(`PRAGMA table_info(clientes)`).all() as { name: string }[];
+  const cliGuestNames = new Set(cliColsGuest.map((c) => c.name));
+  if (!cliGuestNames.has("tipo_cliente")) {
+    db.exec(`ALTER TABLE clientes ADD COLUMN tipo_cliente TEXT NOT NULL DEFAULT 'registrado'`);
+  }
+  if (!cliGuestNames.has("activo")) {
+    db.exec(`ALTER TABLE clientes ADD COLUMN activo INTEGER NOT NULL DEFAULT 1`);
+  }
 }

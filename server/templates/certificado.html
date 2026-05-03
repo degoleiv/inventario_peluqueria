@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Certificado laboral — {{nombre}}</title>
+    <style>
+      @page {
+        size: A4;
+        margin: 22mm 24mm 26mm 24mm;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: "Georgia", "Times New Roman", serif;
+        font-size: 11.5pt;
+        line-height: 1.55;
+        color: #1a1a1a;
+        background: #fff;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      .sheet {
+        max-width: 210mm;
+        margin: 0 auto;
+        padding: 8mm 4mm 12mm;
+      }
+
+      .letterhead {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        padding-bottom: 14px;
+        margin-bottom: 20px;
+        border-bottom: 2px solid #2c3e50;
+      }
+
+      .brand-text {
+        flex: 1;
+      }
+
+      .empresa {
+        font-size: 17pt;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        color: #2c3e50;
+        margin: 0 0 4px;
+      }
+
+      .empresa-sub {
+        font-size: 9.5pt;
+        color: #5c6c7d;
+        margin: 0;
+        font-family: system-ui, sans-serif;
+      }
+
+      .logo-wrap {
+        width: 96px;
+        height: 96px;
+        flex-shrink: 0;
+        border: 1px solid #dfe6ee;
+        border-radius: 8px;
+        overflow: hidden;
+        background: #fafbfc;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .logo-wrap img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+      }
+
+      .logo-ph {
+        font-size: 8pt;
+        color: #9aa8b4;
+        text-align: center;
+        padding: 8px;
+        font-family: system-ui, sans-serif;
+      }
+
+      h1 {
+        font-size: 13pt;
+        text-align: center;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        margin: 28px 0 22px;
+        color: #2c3e50;
+      }
+
+      .cuerpo {
+        text-align: justify;
+        hyphens: auto;
+      }
+
+      .cuerpo p {
+        margin: 0 0 1em;
+      }
+
+      .dato {
+        font-weight: 600;
+      }
+
+      .muted {
+        color: #5c6c7d;
+      }
+
+      .firma-block {
+        margin-top: 42px;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 24px;
+        align-items: flex-end;
+      }
+
+      .firma-col {
+        flex: 1;
+        min-width: 200px;
+      }
+
+      .firma-linea {
+        border-top: 1px solid #2c3e50;
+        padding-top: 8px;
+        margin-top: 72px;
+        font-size: 10pt;
+        text-align: center;
+        font-family: system-ui, sans-serif;
+      }
+
+      .firma-img-wrap {
+        margin-top: 8px;
+        min-height: 64px;
+        text-align: center;
+      }
+
+      .firma-img-wrap img {
+        max-height: 56px;
+        max-width: 180px;
+      }
+
+      .pie-fecha {
+        margin-top: 24px;
+        font-size: 10pt;
+        font-family: system-ui, sans-serif;
+        color: #5c6c7d;
+      }
+
+      .sello {
+        margin-top: 12px;
+        font-size: 8.5pt;
+        color: #8a96a0;
+        font-family: system-ui, sans-serif;
+        border-top: 1px dashed #cfd8e3;
+        padding-top: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="sheet">
+      <header class="letterhead">
+        <div class="brand-text">
+          <p class="empresa">{{empresa}}</p>
+          <p class="empresa-sub">Certificado expedido para fines laborales</p>
+        </div>
+        <div class="logo-wrap">{{logoContenido}}</div>
+      </header>
+
+      <h1>Certificado laboral</h1>
+
+      <section class="cuerpo">
+        <p>
+          Quien suscribe, en representación de <span class="dato">{{empresa}}</span>, certifica que
+          <span class="dato">{{nombre}}</span>, identificado(a) con documento de ciudadanía N.º
+          <span class="dato">{{cedula}}</span>, desempeña el cargo de <span class="dato">{{cargo}}</span>,
+          {{salarioTexto}}habiendo ingresado en nuestra organización el día
+          <span class="dato">{{fechaIngreso}}</span>.
+        </p>
+        <p>
+          El presente certificado se expide a solicitud del interesado(a), en la ciudad de
+          <span class="dato">{{lugar}}</span>, a los <span class="dato">{{fechaCertificado}}</span>.
+        </p>
+      </section>
+
+      <div class="firma-block">
+        <div class="firma-col">
+          <div class="firma-img-wrap">{{firmaImagen}}</div>
+          <div class="firma-linea">Firma y sello — Recursos Humanos</div>
+        </div>
+      </div>
+
+      <p class="pie-fecha">
+        Documento generado electrónicamente · Ref. {{referencia}} · Válido sin enmiendas ni tachaduras.
+      </p>
+
+      <p class="sello">
+        Este documento no constituye compromiso contractual adicional. Para mayor información,
+        contactar administración.
+      </p>
+    </div>
+  </body>
+</html>

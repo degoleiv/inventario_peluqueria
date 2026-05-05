@@ -3,16 +3,14 @@ import { Navigate, useParams } from "react-router-dom";
 import {
   fetchBranding,
   fetchSistemaPrefs,
-  fetchTienda,
   updateBranding,
   updateSistemaPrefs,
-  updateTienda,
   type BrandingConfig,
   type SistemaPrefs,
-  type TiendaConfig,
 } from "../api";
 import { SubNav } from "../components/SubNav";
-import { CONFIG_TABS, readLastTab, type ConfigTab } from "../lib/moduleRoutes";
+import { applyBrandingToDocument } from "../lib/brandingDocument";
+import { CONFIG_TABS, readConfigTab, type ConfigTab } from "../lib/moduleRoutes";
 import { useToast } from "../context/ToastContext";
 import { useThemeUi } from "../context/ThemeUiContext";
 import { THEME_CATALOG } from "../lib/themeCatalog";
@@ -20,19 +18,9 @@ import { THEME_CATALOG } from "../lib/themeCatalog";
 export function ConfiguracionPage() {
   const { tab: tabParam } = useParams<{ tab: string }>();
   const toast = useToast();
-  const {
-    prefs: uiPrefs,
-    setPreset,
-    setDensity,
-    setRadius,
-    setClayStyle,
-    setCustomPrimary,
-    setCustomAccent,
-    resetUiCustom,
-  } = useThemeUi();
+  const { prefs: uiPrefs, setPreset, setDensity, setRadius, setClayStyle } = useThemeUi();
 
   const [branding, setBranding] = useState<BrandingConfig | null>(null);
-  const [tienda, setTienda] = useState<TiendaConfig | null>(null);
   const [sistema, setSistema] = useState<SistemaPrefs | null>(null);
   const [loading, setLoading] = useState(true);
   /** Con icono cargado: el input file solo se muestra tras «Modificar icono». */
@@ -44,16 +32,10 @@ export function ConfiguracionPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [b, t, s] = await Promise.all([
-        fetchBranding(),
-        fetchTienda(),
-        fetchSistemaPrefs(),
-      ]);
+      const [b, s] = await Promise.all([fetchBranding(), fetchSistemaPrefs()]);
       setBranding(b);
-      setTienda(t);
       setSistema(s);
-      document.documentElement.style.setProperty("--brand-primary", b.color_primario);
-      document.documentElement.style.setProperty("--brand-secondary", b.color_secundario);
+      applyBrandingToDocument(b);
     } catch (e) {
       toast(e instanceof Error ? e.message : "Error al cargar configuración", "error");
     } finally {
@@ -76,8 +58,7 @@ export function ConfiguracionPage() {
     try {
       const b = await updateBranding(partial);
       setBranding(b);
-      document.documentElement.style.setProperty("--brand-primary", b.color_primario);
-      document.documentElement.style.setProperty("--brand-secondary", b.color_secundario);
+      applyBrandingToDocument(b);
       toast(mensajeExito, "success");
     } catch (e) {
       toast(e instanceof Error ? e.message : "Error", "error");
@@ -98,16 +79,6 @@ export function ConfiguracionPage() {
       uiPrefsToastTimerRef.current = null;
       toast("Interfaz guardada en este navegador.", "success");
     }, 500);
-  }
-
-  async function guardarTienda(partial: Partial<TiendaConfig>) {
-    try {
-      const t = await updateTienda(partial);
-      setTienda(t);
-      toast("Datos del negocio guardados.", "success");
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "Error", "error");
-    }
   }
 
   async function guardarSistema(partial: Partial<SistemaPrefs>) {
@@ -175,13 +146,9 @@ export function ConfiguracionPage() {
 
   const tabOk = tabParam != null && CONFIG_TABS.includes(tabParam as ConfigTab);
   if (!tabOk) {
-    return <Navigate to={`/configuracion/${readLastTab("configuracion", "general")}`} replace />;
+    return <Navigate to={`/configuracion/${readConfigTab()}`} replace />;
   }
   const tab = tabParam as ConfigTab;
-
-  const uiPresetEntry = THEME_CATALOG.find((t) => t.id === uiPrefs.preset);
-  const uiPrimaryFallback = uiPresetEntry?.swatch[0] ?? "#4F46E5";
-  const uiAccentFallback = uiPresetEntry?.swatch[1] ?? "#10B981";
 
   if (loading && !branding) {
     return <p className="muted">Cargando configuración…</p>;
@@ -192,26 +159,25 @@ export function ConfiguracionPage() {
       <SubNav
         moduleId="configuracion"
         items={[
-          { id: "general", label: "General", to: "/configuracion/general" },
+          { id: "parametros", label: "Parámetros generales", to: "/configuracion/parametros" },
           { id: "apariencia", label: "Apariencia", to: "/configuracion/apariencia" },
-          { id: "negocio", label: "Negocio", to: "/configuracion/negocio" },
           { id: "sistema", label: "Sistema", to: "/configuracion/sistema" },
         ]}
       />
 
       <div className="config-page-body">
-      {tab === "general" ? (
+      {tab === "parametros" ? (
         <section className="card config-settings-card">
-          <h2 className="card-title">General</h2>
-          <p className="muted">
-            Personalizá la marca, los datos fiscales/comerciales y el comportamiento del sistema desde
-            las pestañas superiores. Los cambios de apariencia se reflejan en la barra superior y en las
-            variables CSS <code className="mono">--brand-primary</code> /{" "}
-            <code className="mono">--brand-secondary</code>.
+          <h2 className="card-title">Parámetros generales</h2>
+          <p className="muted small">
+            Volvé a cargar marca, sistema y demás preferencias desde el servidor si hubo cambios en otro
+            equipo o tras un error.
           </p>
-          <button type="button" className="btn secondary" onClick={() => void load()}>
-            Recargar valores
-          </button>
+          <div className="actions" style={{ marginTop: "0.75rem" }}>
+            <button type="button" className="btn secondary" onClick={() => void load()}>
+              Recargar valores
+            </button>
+          </div>
         </section>
       ) : null}
 
@@ -219,8 +185,8 @@ export function ConfiguracionPage() {
         <section className="card config-settings-card">
           <h2 className="card-title">Marca e interfaz</h2>
           <p className="muted small" style={{ marginBottom: "1rem" }}>
-            Nombre e icono para la barra y PDFs (se guardan en el servidor). Paleta, densidad y demás se
-            guardan en este navegador. Icono: PNG, JPG o SVG; máximo ~300 KB.
+            Aquí puedes darle tu toque a la aplicación. Cambia el nombre, el icono y ajusta los colores y
+            estilos visuales para que todo se vea como quieres.
           </p>
 
           <span className="config-section-label">Marca</span>
@@ -297,7 +263,7 @@ export function ConfiguracionPage() {
             Interfaz
           </span>
           <p className="muted small" style={{ marginBottom: "0.75rem" }}>
-            Se aplica al elegir cada opción. Paleta, densidad, bordes y colores opcionales del tema.
+            Se aplica al elegir cada opción: paleta, densidad, bordes y relieve clay.
           </p>
 
           <span className="config-section-label">Paleta</span>
@@ -308,36 +274,24 @@ export function ConfiguracionPage() {
                 <button
                   key={t.id}
                   type="button"
-                  className={`btn ${selected ? "primary" : "secondary"}`}
-                  style={{
-                    textAlign: "left",
-                    padding: "0.65rem 0.75rem",
-                    borderWidth: selected ? 2 : 1,
-                  }}
+                  className={`config-palette-tile${selected ? " config-palette-tile--selected" : ""}`}
                   onClick={() => {
                     setPreset(t.id);
                     scheduleToastInterfazLocal();
                   }}
                   title={t.hint}
                 >
-                  <div style={{ display: "flex", gap: 6, marginBottom: 4 }}>
+                  <div className="config-palette-swatches" aria-hidden>
                     {t.swatch.map((c) => (
                       <span
                         key={c}
-                        style={{
-                          width: 18,
-                          height: 18,
-                          borderRadius: 6,
-                          background: c,
-                          boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.12)",
-                        }}
+                        className="config-palette-swatch"
+                        style={{ background: c }}
                       />
                     ))}
                   </div>
-                  <strong style={{ fontSize: "0.9rem" }}>{t.label}</strong>
-                  <div className="muted small" style={{ marginTop: 2, lineHeight: 1.25 }}>
-                    {t.hint}
-                  </div>
+                  <strong className="config-palette-tile-title">{t.label}</strong>
+                  <div className="config-palette-tile-hint muted small">{t.hint}</div>
                 </button>
               );
             })}
@@ -385,116 +339,6 @@ export function ConfiguracionPage() {
               </select>
             </label>
           </div>
-
-          <p className="muted small" style={{ margin: "0.35rem 0 0.5rem" }}>
-            Colores UI opcionales (dejá vacío para usar los del preset elegido).
-          </p>
-          <div className="grid-2" style={{ marginBottom: "1rem" }}>
-            <label className="field">
-              <span>Color principal UI</span>
-              <input
-                type="color"
-                value={uiPrefs.customPrimary ?? uiPrimaryFallback}
-                onChange={(e) => {
-                  setCustomPrimary(e.target.value);
-                  scheduleToastInterfazLocal();
-                }}
-              />
-            </label>
-            <label className="field">
-              <span>Color acento UI</span>
-              <input
-                type="color"
-                value={uiPrefs.customAccent ?? uiAccentFallback}
-                onChange={(e) => {
-                  setCustomAccent(e.target.value);
-                  scheduleToastInterfazLocal();
-                }}
-              />
-            </label>
-          </div>
-          <div className="actions">
-            <button
-              type="button"
-              className="btn secondary"
-              onClick={() => {
-                resetUiCustom();
-                toast("Colores personalizados quitados.", "success");
-              }}
-            >
-              Quitar colores personalizados
-            </button>
-          </div>
-        </section>
-      ) : null}
-
-      {tab === "negocio" && tienda ? (
-        <section className="card">
-          <h2 className="card-title">Negocio</h2>
-          <form
-            className="form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void guardarTienda(tienda);
-            }}
-          >
-            <label className="field">
-              <span>Nombre comercial</span>
-              <input
-                value={tienda.nombre_comercial}
-                onChange={(e) => setTienda((t) => (t ? { ...t, nombre_comercial: e.target.value } : t))}
-              />
-            </label>
-            <label className="field">
-              <span>Dirección</span>
-              <textarea
-                rows={2}
-                value={tienda.direccion}
-                onChange={(e) => setTienda((t) => (t ? { ...t, direccion: e.target.value } : t))}
-              />
-            </label>
-            <div className="grid-2">
-              <label className="field">
-                <span>Teléfono</span>
-                <input
-                  value={tienda.telefono}
-                  onChange={(e) => setTienda((t) => (t ? { ...t, telefono: e.target.value } : t))}
-                />
-              </label>
-              <label className="field">
-                <span>Moneda</span>
-                <input
-                  value={tienda.moneda}
-                  onChange={(e) =>
-                    setTienda((t) => (t ? { ...t, moneda: e.target.value.toUpperCase() } : t))
-                  }
-                />
-              </label>
-              <label className="field">
-                <span>Impuesto (%)</span>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={tienda.impuesto_pct ?? ""}
-                  placeholder="Opcional"
-                  onChange={(e) => {
-                    const v = e.target.value.trim();
-                    setTienda((t) =>
-                      t
-                        ? {
-                            ...t,
-                            impuesto_pct: v === "" ? null : Number(v),
-                          }
-                        : t
-                    );
-                  }}
-                />
-              </label>
-            </div>
-            <button type="submit" className="btn primary">
-              Guardar negocio
-            </button>
-          </form>
         </section>
       ) : null}
 

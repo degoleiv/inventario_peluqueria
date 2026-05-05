@@ -8,8 +8,7 @@ export const MODULO_KEYS = [
   "citas",
   "clientes",
   "inventario",
-  "proveedores",
-  "pedidos_proveedores",
+  "pedidos",
   "finanzas",
   "facturas",
   "reportes",
@@ -25,7 +24,9 @@ function validatePermisos(arr: string[]): string[] {
       arr
         .map((s) => s.trim())
         .filter(Boolean)
-        .map((p) => (p === "compras" ? "pedidos_proveedores" : p))
+        .map((p) =>
+          p === "compras" || p === "pedidos_proveedores" || p === "proveedores" ? "pedidos" : p
+        )
     ),
   ];
   for (const p of out) {

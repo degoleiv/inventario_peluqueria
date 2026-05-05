@@ -11,6 +11,7 @@ export type ProveedorDto = {
   telefono: string | null;
   email: string | null;
   direccion: string | null;
+  icono_url: string | null;
   estado: "activo" | "inactivo";
   fecha_creacion: string;
   fecha_actualizacion: string;
@@ -25,6 +26,7 @@ function toDto(r: ProveedorRow): ProveedorDto {
     telefono: r.telefono,
     email: r.email,
     direccion: r.direccion,
+    icono_url: r.icono_url ?? null,
     estado: est,
     fecha_creacion: r.fecha_creacion,
     fecha_actualizacion: r.fecha_actualizacion,
@@ -64,6 +66,19 @@ function parseDireccion(body: Record<string, unknown>): string | null {
   if (typeof body.direccion !== "string") return null;
   const t = body.direccion.trim();
   return t || null;
+}
+
+function parseIconoUrl(value: unknown): string | null {
+  if (value == null || value === "") return null;
+  if (typeof value !== "string") throw new AppError("URL de icono inválida");
+  const t = value.trim();
+  if (!t) return null;
+  if (t.length > 4000) throw new AppError("URL de icono demasiado larga");
+  const low = t.toLowerCase();
+  if (!low.startsWith("http://") && !low.startsWith("https://") && !low.startsWith("data:image/")) {
+    throw new AppError("El icono debe ser una URL (http/https) o una imagen data:image/…");
+  }
+  return t;
 }
 
 function parseEstado(body: Record<string, unknown>, fallback: "activo" | "inactivo"): "activo" | "inactivo" {
@@ -119,6 +134,7 @@ export const proveedoresService = {
     const email = parseEmail(body);
     const telefono = parseTelefono(body);
     const direccion = parseDireccion(body);
+    const icono_url = parseIconoUrl(body.icono_url);
     const estado = parseEstado(body, "activo");
     const now = new Date().toISOString();
 
@@ -133,6 +149,7 @@ export const proveedoresService = {
         telefono,
         email,
         direccion,
+        icono_url,
         estado,
         fecha_creacion: now,
         fecha_actualizacion: now,
@@ -161,6 +178,8 @@ export const proveedoresService = {
     const email = body.email !== undefined ? parseEmail(body) : cur.email;
     const telefono = body.telefono !== undefined ? parseTelefono(body) : cur.telefono;
     const direccion = body.direccion !== undefined ? parseDireccion(body) : cur.direccion;
+    const icono_url =
+      body.icono_url !== undefined ? parseIconoUrl(body.icono_url) : (cur.icono_url ?? null);
     const estadoCur: "activo" | "inactivo" = cur.estado === "inactivo" ? "inactivo" : "activo";
     const estado =
       body.estado !== undefined ? parseEstado(body, estadoCur) : estadoCur;
@@ -176,6 +195,7 @@ export const proveedoresService = {
         telefono,
         email,
         direccion,
+        icono_url,
         estado,
         fecha_actualizacion: now,
       });

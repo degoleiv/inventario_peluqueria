@@ -15,7 +15,7 @@ function parseId(req: Request, res: Response): number | null {
 export const proveedoresController = {
   list(req: Request, res: Response): void {
     const incluirInactivos = req.query.incluir_inactivos === "1";
-    const puedeGestionar = hasPermiso(req.user?.permisos, "proveedores");
+    const puedeGestionar = hasPermiso(req.user?.permisos, "pedidos");
     if (incluirInactivos && !puedeGestionar) {
       throw new AppError("Sin permiso para incluir proveedores inactivos", 403);
     }

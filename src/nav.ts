@@ -1,13 +1,15 @@
 /** Navegación principal — usada por App y command palette. */
 
+/** En `false` se oculta Facturas (menú, permisos asignables y acceso por ruta). */
+export const MODULO_FACTURACION_ACTIVO = false;
+
 export type NavKey =
   | "inicio"
   | "ventas"
   | "citas"
   | "clientes"
   | "inventario"
-  | "proveedores"
-  | "pedidos_proveedores"
+  | "pedidos"
   | "finanzas"
   | "facturas"
   | "reportes"
@@ -23,10 +25,9 @@ export const PERMISO_MODULOS: PermisoModulo[] = [
   "citas",
   "clientes",
   "inventario",
-  "proveedores",
-  "pedidos_proveedores",
+  "pedidos",
   "finanzas",
-  "facturas",
+  ...(MODULO_FACTURACION_ACTIVO ? (["facturas"] as const) : []),
   "reportes",
 ];
 
@@ -36,8 +37,7 @@ export const NAV_LABEL: Record<NavKey, string> = {
   citas: "Agenda",
   clientes: "Clientes",
   inventario: "Inventario",
-  proveedores: "Proveedores",
-  pedidos_proveedores: "Pedidos proveedores",
+  pedidos: "Pedidos",
   finanzas: "Finanzas",
   facturas: "Facturas",
   reportes: "Reportes",
@@ -48,18 +48,29 @@ export const NAV_LABEL: Record<NavKey, string> = {
 export const NAV_GROUPS: { label: string; items: NavKey[] }[] = [
   { label: "Principal", items: ["inicio"] },
   { label: "Operación", items: ["ventas", "citas"] },
-  { label: "Gestión", items: ["clientes", "inventario", "proveedores", "pedidos_proveedores"] },
-  { label: "Finanzas", items: ["finanzas", "facturas", "reportes"] },
+  { label: "Gestión", items: ["clientes", "inventario", "pedidos"] },
+  {
+    label: "Finanzas",
+    items: MODULO_FACTURACION_ACTIVO ? ["finanzas", "facturas", "reportes"] : ["finanzas", "reportes"],
+  },
   { label: "Administración", items: ["configuracion", "empleados"] },
 ];
 
 export function puedeVerModulo(permisos: string[] | undefined, key: NavKey): boolean {
+  if (key === "facturas" && !MODULO_FACTURACION_ACTIVO) return false;
   if (!permisos?.length) return false;
   if (permisos.includes("*")) return true;
   if (key === "configuracion" || key === "empleados") return false;
   if (permisos.includes(key)) return true;
-  /* Compat: permiso legado "compras" en JWT/rol */
-  if (key === "pedidos_proveedores" && permisos.includes("compras")) return true;
+  if (key === "pedidos") {
+    if (
+      permisos.includes("proveedores") ||
+      permisos.includes("pedidos_proveedores") ||
+      permisos.includes("compras")
+    ) {
+      return true;
+    }
+  }
   return false;
 }
 

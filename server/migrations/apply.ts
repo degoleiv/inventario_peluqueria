@@ -44,8 +44,8 @@ function migrateComprasAPedidosProveedor(db: Database.Database) {
   db.prepare(`UPDATE pedidos_proveedor SET proveedor_id = ? WHERE proveedor_id IS NULL`).run(phId);
 }
 
-/** Añade permiso `proveedores` a roles que ya tenían gestión de pedidos a proveedores. */
-function migrateRolesAgregarProveedores(db: Database.Database) {
+/** Unifica permisos `compras` / `pedidos_proveedores` / `proveedores` → `pedidos`. */
+function migrateRolesModuloPedidosUnificado(db: Database.Database) {
   const rows = db.prepare(`SELECT slug, permisos FROM roles_app`).all() as {
     slug: string;
     permisos: string;
@@ -55,34 +55,12 @@ function migrateRolesAgregarProveedores(db: Database.Database) {
       const arr = JSON.parse(row.permisos) as unknown;
       if (!Array.isArray(arr)) continue;
       if (arr.includes("*")) continue;
-      if (!arr.includes("pedidos_proveedores") && !arr.includes("compras")) continue;
-      if (arr.includes("proveedores")) continue;
-      const next = [...arr, "proveedores"];
-      db.prepare(`UPDATE roles_app SET permisos = ? WHERE slug = ?`).run(JSON.stringify(next), row.slug);
-    } catch {
-      /* ignore */
-    }
-  }
-}
-
-function migrateRolesPermisoComprasAPedidos(db: Database.Database) {
-  const rows = db.prepare(`SELECT slug, permisos FROM roles_app`).all() as {
-    slug: string;
-    permisos: string;
-  }[];
-  for (const row of rows) {
-    try {
-      const arr = JSON.parse(row.permisos) as unknown;
-      if (!Array.isArray(arr)) continue;
-      let changed = false;
-      const next = arr.map((x) => {
-        if (x === "compras") {
-          changed = true;
-          return "pedidos_proveedores";
-        }
-        return x;
-      });
-      if (changed) {
+      const asStrings = arr.filter((x): x is string => typeof x === "string");
+      const mapped = asStrings.map((x) =>
+        x === "compras" || x === "pedidos_proveedores" || x === "proveedores" ? "pedidos" : x
+      );
+      const next = [...new Set(mapped)];
+      if (JSON.stringify(next) !== JSON.stringify(arr)) {
         db.prepare(`UPDATE roles_app SET permisos = ? WHERE slug = ?`).run(
           JSON.stringify(next),
           row.slug
@@ -272,6 +250,9 @@ export function applyMigrations(db: Database.Database) {
     );
     db.exec(`DROP INDEX IF EXISTS idx_proveedores_nit_unique`);
     db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_proveedores_nit_unique ON proveedores(nit)`);
+    if (!prNames.has("icono_url")) {
+      db.exec(`ALTER TABLE proveedores ADD COLUMN icono_url TEXT`);
+    }
   }
 
   const movCols = db.prepare(`PRAGMA table_info(movimientos_inventario)`).all() as { name: string }[];
@@ -416,8 +397,7 @@ export function applyMigrations(db: Database.Database) {
         "citas",
         "clientes",
         "inventario",
-        "proveedores",
-        "pedidos_proveedores",
+        "pedidos",
         "facturas",
         "reportes",
       ]),
@@ -549,6 +529,5 @@ export function applyMigrations(db: Database.Database) {
   if (!cliGuestNames.has("activo")) {
     db.exec(`ALTER TABLE clientes ADD COLUMN activo INTEGER NOT NULL DEFAULT 1`);
   }
-  migrateRolesPermisoComprasAPedidos(db);
-  migrateRolesAgregarProveedores(db);
+  migrateRolesModuloPedidosUnificado(db);
 }

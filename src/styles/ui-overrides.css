@@ -190,6 +190,97 @@ body.ui-density-compact .field {
   min-width: 0;
 }
 
+/* Tarjetas de paleta: selección legible (sin texto oscuro sobre primary pleno) */
+.config-palette-tile {
+  display: block;
+  width: 100%;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin: 0;
+  padding: 0.65rem 0.75rem;
+  border-radius: var(--radius-md, 12px);
+  border: 1px solid color-mix(in srgb, var(--border, #d5c9bf) 80%, transparent);
+  background: var(--surface, #fffdf9);
+  color: var(--text, #1a1614);
+  box-shadow: var(--clay-raise, 0 1px 3px rgba(0, 0, 0, 0.06));
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.config-palette-tile:hover {
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--border, #d5c9bf));
+  background: color-mix(in srgb, var(--surface, #fffdf9) 92%, var(--primary) 8%);
+}
+
+.config-palette-tile:focus-visible {
+  outline: 2px solid var(--primary, #6366f1);
+  outline-offset: 2px;
+}
+
+.config-palette-tile--selected {
+  border-width: 2px;
+  border-color: color-mix(in srgb, var(--primary) 70%, var(--border));
+  background: color-mix(in srgb, var(--primary) 16%, var(--surface, #fffdf9));
+  color: var(--text, #1a1614);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--primary) 28%, transparent),
+    var(--clay-raise, 0 1px 3px rgba(0, 0, 0, 0.06));
+}
+
+:root[data-theme="dark"] .config-palette-tile--selected {
+  background: color-mix(in srgb, var(--primary) 22%, var(--surface, #1e1c1a));
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
+}
+
+.config-palette-swatches {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.config-palette-swatch {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+  flex-shrink: 0;
+}
+
+.config-palette-tile--selected .config-palette-swatch {
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.15),
+    0 0 0 1px color-mix(in srgb, var(--text) 12%, transparent);
+}
+
+.config-palette-tile-title {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 700;
+  margin: 0;
+  color: inherit;
+}
+
+.config-palette-tile-hint {
+  display: block;
+  margin: 2px 0 0;
+  line-height: 1.25;
+  color: var(--text-muted, #6b5f58);
+}
+
+.config-palette-tile--selected .config-palette-tile-hint.muted {
+  color: color-mix(in srgb, var(--text-muted, #5a524d) 55%, var(--text, #1a1614) 45%);
+}
+
+:root[data-theme="dark"] .config-palette-tile--selected .config-palette-tile-hint.muted {
+  color: color-mix(in srgb, var(--text-muted) 75%, #f6f0eb 25%);
+}
+
 .config-section-label {
   display: block;
   font-size: 0.82rem;

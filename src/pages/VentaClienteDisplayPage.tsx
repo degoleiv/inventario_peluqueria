@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { fetchAuthMe, fetchBranding } from "../api";
+import { applyBrandingToDocument } from "../lib/brandingDocument";
 import { puedeVerModulo } from "../nav";
 import {
   readPosClienteDisplaySnapshot,
@@ -27,7 +28,9 @@ export function VentaClienteDisplayPage() {
       });
     void fetchBranding()
       .then((b) => {
-        if (!cancel) setBrand(b.nombre_negocio?.trim() || null);
+        if (cancel) return;
+        setBrand(b.nombre_negocio?.trim() || null);
+        applyBrandingToDocument(b);
       })
       .catch(() => {});
     return () => {

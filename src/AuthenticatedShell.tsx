@@ -14,9 +14,7 @@ import { ClientesPage } from "./pages/ClientesPage";
 import { CitasPage } from "./pages/CitasPage";
 import { VentasPage } from "./pages/VentasPage";
 import { VentaClienteDisplayPage } from "./pages/VentaClienteDisplayPage";
-import { PedidosProveedoresPage } from "./pages/PedidosProveedoresPage";
-import { ProveedoresPage } from "./pages/ProveedoresPage";
-import { FacturasPage } from "./pages/FacturasPage";
+import { PedidosModulePage } from "./pages/PedidosModulePage";
 import { FinanzasPage } from "./pages/FinanzasPage";
 import { ReportesPage } from "./pages/ReportesPage";
 import { ConfiguracionPage } from "./pages/ConfiguracionPage";
@@ -36,12 +34,15 @@ import {
   type Cliente,
 } from "./api";
 import { clearAccessToken } from "./auth/token";
+import { applyBrandingToDocument } from "./lib/brandingDocument";
 import {
   getModuleEntryPath,
   pathToNavKey,
   readCitasTab,
+  readConfigTab,
   readEmpleadosTab,
   readLastTab,
+  readPedidosTab,
 } from "./lib/moduleRoutes";
 export function AuthenticatedShell() {
   const navigate = useNavigate();
@@ -68,6 +69,7 @@ export function AuthenticatedShell() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [paletteClientes, setPaletteClientes] = useState<Cliente[]>([]);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userFotoUrl, setUserFotoUrl] = useState<string | null>(null);
   const [permisos, setPermisos] = useState<string[]>([]);
   const [online, setOnline] = useState(true);
   const [brandTitle, setBrandTitle] = useState<string | undefined>(undefined);
@@ -97,8 +99,7 @@ export function AuthenticatedShell() {
         if (cancel) return;
         setBrandTitle(b.nombre_negocio);
         setBrandLogo(b.logo_data_url);
-        document.documentElement.style.setProperty("--brand-primary", b.color_primario);
-        document.documentElement.style.setProperty("--brand-secondary", b.color_secundario);
+        applyBrandingToDocument(b);
       })
       .catch(() => {
         /* offline / sin permiso */
@@ -116,11 +117,14 @@ export function AuthenticatedShell() {
         if (!cancel) {
           setUserEmail(me.user.email);
           setPermisos(me.user.permisos ?? []);
+          const f = me.user.foto_url?.trim();
+          setUserFotoUrl(f && f.length > 0 ? f : null);
         }
       } catch {
         if (!cancel) {
           setUserEmail(null);
           setPermisos([]);
+          setUserFotoUrl(null);
         }
       }
       try {
@@ -178,10 +182,8 @@ export function AuthenticatedShell() {
       "citas",
       "clientes",
       "inventario",
-      "proveedores",
-      "pedidos_proveedores",
+      "pedidos",
       "finanzas",
-      "facturas",
       "reportes",
       "configuracion",
       "empleados",
@@ -284,6 +286,7 @@ export function AuthenticatedShell() {
         collapsed={collapsed}
         setCollapsed={setCollapsed}
         userEmail={userEmail}
+        userFotoUrl={userFotoUrl}
         permisos={permisos}
         brandTitle={brandTitle}
         brandLogoSrc={brandLogo}
@@ -340,16 +343,21 @@ export function AuthenticatedRoutes() {
           element={<Navigate to={`/clientes/${readLastTab("clientes", "lista")}`} replace />}
         />
         <Route path="clientes/:tab" element={<ClientesPage />} />
-        <Route path="compras" element={<Navigate to="/pedidos-proveedores" replace />} />
-        <Route path="proveedores" element={<ProveedoresPage />} />
-        <Route path="pedidos-proveedores" element={<PedidosProveedoresPage />} />
+        <Route path="compras" element={<Navigate to="/pedidos/pedidos-proveedores" replace />} />
+        <Route path="proveedores" element={<Navigate to="/pedidos/proveedores" replace />} />
+        <Route
+          path="pedidos-proveedores"
+          element={<Navigate to="/pedidos/pedidos-proveedores" replace />}
+        />
+        <Route path="pedidos" element={<Navigate to={`/pedidos/${readPedidosTab()}`} replace />} />
+        <Route path="pedidos/:tab" element={<PedidosModulePage />} />
         <Route path="finanzas" element={<FinanzasPage />} />
-        <Route path="facturas" element={<FacturasPage />} />
+        <Route path="facturas" element={<Navigate to="/finanzas" replace />} />
         <Route path="reportes" element={<ReportesPage />} />
         <Route path="usuarios" element={<Navigate to={`/empleados/${readEmpleadosTab()}`} replace />} />
         <Route
           path="configuracion"
-          element={<Navigate to={`/configuracion/${readLastTab("configuracion", "general")}`} replace />}
+          element={<Navigate to={`/configuracion/${readConfigTab()}`} replace />}
         />
         <Route path="configuracion/:tab" element={<ConfiguracionPage />} />
         <Route

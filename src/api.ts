@@ -1,4 +1,32 @@
 import { getAccessToken } from "./auth/token";
+import { readResponseAsBlobYielding } from "./lib/readBlobYielding";
+import { yieldToMain } from "./lib/yieldToMain";
+
+/** Tiempo máximo de espera al API (Puppeteer puede tardar mucho). */
+const CERT_FETCH_MS = 180_000;
+
+function certFetchSignal(): AbortSignal | undefined {
+  try {
+    if (typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function") {
+      return AbortSignal.timeout(CERT_FETCH_MS);
+    }
+  } catch {
+    /* ignore */
+  }
+  return undefined;
+}
+
+function mapCertFetchError(e: unknown): Error {
+  if (e instanceof DOMException && e.name === "AbortError") {
+    return new Error(
+      "Tiempo de espera agotado al generar el PDF. Revisá que el API esté en marcha y la consola del servidor (Puppeteer / Chrome)."
+    );
+  }
+  if (e instanceof TypeError) {
+    return new Error("No se pudo conectar con el servidor. ¿Está el API en marcha (puerto 3010)?");
+  }
+  return e instanceof Error ? e : new Error(String(e));
+}
 
 /** En desarrollo con Vite, las rutas /api se proxifican al Express. Empaquetado: URL absoluta. */
 const API_BASE =
@@ -156,6 +184,8 @@ export type AuthUser = {
   rol: string;
   nombre?: string | null;
   permisos: string[];
+  /** Data URL o URL absoluta de la foto de perfil. */
+  foto_url?: string | null;
 };
 
 export async function bootstrapAdmin(body: {
@@ -392,40 +422,18 @@ export async function deleteCliente(id: number): Promise<void> {
   await requestJson(`/api/clientes/${id}`, { method: "DELETE" });
 }
 
-/** Certificado laboral PDF (requiere admin). Vista previa en nueva pestaña. */
-export async function previewCertificadoLaboral(empleadoId: number): Promise<void> {
-  const token = getAccessToken();
-  if (!token) throw new Error("Sesión requerida");
-  const res = await fetch(`${API_BASE}/api/admin/certificados/${empleadoId}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    let msg = res.statusText;
-    try {
-      const j = JSON.parse(text) as { error?: string };
-      if (j.error) msg = j.error;
-    } catch {
-      if (text.trim()) msg = text;
-    }
-    throw new Error(msg);
-  }
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  const w = window.open(url, "_blank", "noopener,noreferrer");
-  if (!w) {
-    URL.revokeObjectURL(url);
-    throw new Error("El navegador bloqueó la ventana emergente");
-  }
-  setTimeout(() => URL.revokeObjectURL(url), 120_000);
-}
-
 export async function downloadCertificadoLaboral(empleadoId: number): Promise<void> {
   const token = getAccessToken();
   if (!token) throw new Error("Sesión requerida");
-  const res = await fetch(`${API_BASE}/api/admin/certificados/${empleadoId}?descargar=1`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}/api/admin/certificados/${empleadoId}?descargar=1`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: certFetchSignal(),
+    });
+  } catch (e) {
+    throw mapCertFetchError(e);
+  }
   if (!res.ok) {
     const text = await res.text();
     let msg = res.statusText;
@@ -437,16 +445,19 @@ export async function downloadCertificadoLaboral(empleadoId: number): Promise<vo
     }
     throw new Error(msg);
   }
-  const blob = await res.blob();
+  await yieldToMain();
+  const blob = await readResponseAsBlobYielding(res);
+  await yieldToMain();
   const url = URL.createObjectURL(blob);
+  await yieldToMain();
   const a = document.createElement("a");
   a.href = url;
   a.download = `certificado-laboral-${empleadoId}.pdf`;
-  a.rel = "noopener";
+  a.style.display = "none";
   document.body.appendChild(a);
   a.click();
   a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 30_000);
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 /** Walk-in / guest: crea fila temporal o reutiliza cliente existente si el teléfono coincide. */
@@ -544,6 +555,7 @@ export type Proveedor = {
   telefono: string | null;
   email: string | null;
   direccion: string | null;
+  icono_url: string | null;
   estado: "activo" | "inactivo";
   fecha_creacion: string;
   fecha_actualizacion: string;
@@ -578,7 +590,7 @@ export async function fetchProveedor(id: number): Promise<Proveedor> {
 
 export async function createProveedor(
   body: Pick<Proveedor, "nombre" | "nit"> &
-    Partial<Pick<Proveedor, "telefono" | "email" | "direccion" | "estado">>
+    Partial<Pick<Proveedor, "telefono" | "email" | "direccion" | "icono_url" | "estado">>
 ): Promise<Proveedor> {
   return requestJson("/api/proveedores", { method: "POST", body: JSON.stringify(body) });
 }
@@ -586,7 +598,7 @@ export async function createProveedor(
 export async function updateProveedor(
   id: number,
   body: Partial<
-    Pick<Proveedor, "nombre" | "nit" | "telefono" | "email" | "direccion" | "estado">
+    Pick<Proveedor, "nombre" | "nit" | "telefono" | "email" | "direccion" | "icono_url" | "estado">
   >
 ): Promise<Proveedor> {
   return requestJson(`/api/proveedores/${id}`, { method: "PUT", body: JSON.stringify(body) });

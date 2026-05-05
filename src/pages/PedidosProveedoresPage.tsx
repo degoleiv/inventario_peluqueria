@@ -293,7 +293,7 @@ export function PedidosProveedoresPage() {
                     </option>
                   ))}
                 </select>
-                <Link to="/proveedores" className="btn ghost small">
+                <Link to="/pedidos/proveedores" className="btn ghost small">
                   Proveedores
                 </Link>
               </div>

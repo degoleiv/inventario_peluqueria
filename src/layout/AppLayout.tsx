@@ -63,15 +63,6 @@ function IconTruck() {
     </svg>
   );
 }
-function IconStorefront() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M3 9h18v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9z" />
-      <path d="M3 9V7a1 1 0 0 1 .38-.78l3-2.33A1 1 0 0 1 7 3h10a1 1 0 0 1 .62.22l3 2.33A1 1 0 0 1 21 7v2" />
-      <line x1="9" y1="14" x2="15" y2="14" />
-    </svg>
-  );
-}
 function IconWallet() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -123,8 +114,7 @@ const ICONS: Partial<Record<NavKey, React.ReactElement>> = {
   citas: <IconCalendar />,
   clientes: <IconUsers />,
   inventario: <IconBox />,
-  proveedores: <IconStorefront />,
-  pedidos_proveedores: <IconTruck />,
+  pedidos: <IconTruck />,
   finanzas: <IconWallet />,
   facturas: <IconFile />,
   reportes: <IconChart />,
@@ -142,6 +132,8 @@ type Props = {
   collapsed: boolean;
   setCollapsed: (v: boolean) => void;
   userEmail: string | null;
+  /** Foto del usuario actual (`/api/auth/me`). */
+  userFotoUrl?: string | null;
   online: boolean;
   onLogout: () => void;
   onCommandPalette: () => void;
@@ -167,6 +159,7 @@ export function AppLayout({
   collapsed,
   setCollapsed,
   userEmail,
+  userFotoUrl,
   online,
   onLogout,
   onCommandPalette,
@@ -246,7 +239,21 @@ export function AppLayout({
             <kbd className="kbd-mini">K</kbd>
           </button>
           <span className="topbar-user" title={userEmail ?? ""}>
-            {userEmail ?? "Usuario"}
+            {userFotoUrl ? (
+              <img
+                src={userFotoUrl}
+                alt=""
+                className="topbar-user-avatar"
+                width={32}
+                height={32}
+                decoding="async"
+              />
+            ) : (
+              <span className="topbar-user-avatar topbar-user-avatar--ph" aria-hidden>
+                {(userEmail ?? "?").slice(0, 1).toUpperCase()}
+              </span>
+            )}
+            <span className="topbar-user-email">{userEmail ?? "Usuario"}</span>
           </span>
           <button type="button" className="btn ghost btn-compact" onClick={onLogout}>
             Salir

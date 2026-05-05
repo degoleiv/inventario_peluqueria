@@ -8,6 +8,7 @@ import {
   updateCliente,
   type Cliente,
 } from "../api";
+import { EmojiMartButton } from "../components/EmojiMartButton";
 import { Drawer } from "../components/Drawer";
 import { SkeletonCard } from "../components/Skeleton";
 import { useToast } from "../context/ToastContext";
@@ -421,7 +422,10 @@ export function ClientesPage() {
             </label>
           </div>
           <label className="field">
-            <span>Notas</span>
+            <span className="field-label-inline">
+              <span>Notas</span>
+              <EmojiMartButton onPick={(native) => setNotas((prev) => prev + native)} />
+            </span>
             <textarea value={notas} onChange={(e) => setNotas(e.target.value)} rows={3} />
           </label>
           <div className="drawer-actions">

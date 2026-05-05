@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Camera, Trash, Warning } from "@phosphor-icons/react";
 import {
   createProveedor,
   deleteProveedor,
@@ -32,12 +33,147 @@ function matchesEstadoFiltro(p: Proveedor, filtro: EstadoFiltro): boolean {
   return p.estado === filtro;
 }
 
+type DetailFormFields = {
+  nombre: string;
+  nit: string;
+  telefono: string;
+  email: string;
+  iconoUrl: string;
+};
+
+const emptyDetailForm: DetailFormFields = {
+  nombre: "",
+  nit: "",
+  telefono: "",
+  email: "",
+  iconoUrl: "",
+};
+
+const MAX_ICONO_BYTES = 2 * 1024 * 1024;
+
+const PROV_DETAIL_WARN_TITLE =
+  "Tocá la foto para cambiarla. Al cerrar podés guardar o descartar los cambios.";
+
+const PROV_CREATE_WARN_TITLE =
+  "Nombre y NIT son obligatorios. Subí una foto con la cámara sobre el avatar. Usá Guardar al final.";
+
+function serializeDetailForm(f: DetailFormFields): string {
+  return JSON.stringify({
+    nombre: f.nombre.trim(),
+    nit: f.nit.trim(),
+    telefono: f.telefono.trim(),
+    email: f.email.trim(),
+    iconoUrl: f.iconoUrl.trim(),
+  });
+}
+
+function proveedorToDetailForm(p: Proveedor): DetailFormFields {
+  return {
+    nombre: p.nombre,
+    nit: p.nit,
+    telefono: p.telefono ?? "",
+    email: p.email ?? "",
+    iconoUrl: p.icono_url?.trim() ?? "",
+  };
+}
+
+function ProveedorDetailAvatarPicker({
+  nombre,
+  iconoUrl,
+  disabled,
+  onChangeIcono,
+  onFileError,
+}: {
+  nombre: string;
+  iconoUrl: string | null;
+  disabled: boolean;
+  onChangeIcono: (dataUrl: string) => void;
+  onFileError: (message: string) => void;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [broken, setBroken] = useState(false);
+
+  useEffect(() => {
+    setBroken(false);
+  }, [iconoUrl]);
+
+  function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      onFileError("Elegí un archivo de imagen.");
+      return;
+    }
+    if (file.size > MAX_ICONO_BYTES) {
+      onFileError("La imagen es demasiado grande (máx. 2 MB).");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const r = reader.result;
+      if (typeof r === "string") onChangeIcono(r);
+    };
+    reader.onerror = () => onFileError("No se pudo leer la imagen.");
+    reader.readAsDataURL(file);
+  }
+
+  const url = iconoUrl?.trim();
+  const showImg = Boolean(url && !broken);
+
+  return (
+    <div className="prov-detail-hero prov-detail-hero--picker">
+      <input
+        ref={fileRef}
+        type="file"
+        className="prov-detail-avatar-file"
+        accept="image/*"
+        tabIndex={-1}
+        aria-hidden
+        onChange={onPickFile}
+      />
+      <button
+        type="button"
+        className="prov-detail-avatar-hit"
+        disabled={disabled}
+        aria-label="Cambiar foto del proveedor"
+        onClick={() => fileRef.current?.click()}
+      >
+        {showImg ? (
+          <img src={url} alt="" className="prov-detail-hero__img" onError={() => setBroken(true)} />
+        ) : (
+          <div className="prov-detail-hero__ph">{nombre.trim().slice(0, 1).toUpperCase()}</div>
+        )}
+        <span className="prov-detail-avatar-op" aria-hidden>
+          <Camera size={28} weight="fill" className="prov-detail-avatar-op__icon" />
+        </span>
+      </button>
+    </div>
+  );
+}
+
+function ProveedorCardMedia({ proveedor }: { proveedor: Proveedor }) {
+  const [broken, setBroken] = useState(false);
+  const url = proveedor.icono_url?.trim();
+  if (url && !broken) {
+    return (
+      <div className="prov-card__media-wrap">
+        <img src={url} alt="" className="prov-card__img" onError={() => setBroken(true)} />
+      </div>
+    );
+  }
+  return (
+    <div className="prov-card__avatar prov-card__avatar--ph prov-card__media-wrap" aria-hidden>
+      {proveedor.nombre.trim().slice(0, 1).toUpperCase()}
+    </div>
+  );
+}
+
 export function ProveedoresPage() {
   const toast = useToast();
   const [rows, setRows] = useState<Proveedor[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
 
   const [searchText, setSearchText] = useState("");
@@ -47,11 +183,20 @@ export function ProveedoresPage() {
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [estadoSavingId, setEstadoSavingId] = useState<number | null>(null);
 
+  const [detailProveedor, setDetailProveedor] = useState<Proveedor | null>(null);
+  const detailPanelRef = useRef<HTMLDivElement>(null);
+  const [detailForm, setDetailForm] = useState<DetailFormFields>(emptyDetailForm);
+  const detailBaselineRef = useRef<string | null>(null);
+  const lastHydratedDetailIdRef = useRef<number | null>(null);
+  const [detailSaveBusy, setDetailSaveBusy] = useState(false);
+  const [detailNombreEditing, setDetailNombreEditing] = useState(false);
+  const detailNombreInputRef = useRef<HTMLInputElement>(null);
+
   const [nombre, setNombre] = useState("");
   const [nit, setNit] = useState("");
   const [telefono, setTelefono] = useState("");
   const [email, setEmail] = useState("");
-  const [direccion, setDireccion] = useState("");
+  const [iconoUrl, setIconoUrl] = useState("");
   const [estado, setEstado] = useState<"activo" | "inactivo">("activo");
 
   const load = useCallback(async () => {
@@ -73,37 +218,119 @@ export function ProveedoresPage() {
     return rows.filter((p) => matchesEstadoFiltro(p, estadoFiltro) && matchesSearch(p, searchText));
   }, [rows, estadoFiltro, searchText]);
 
+  const detailDisplay = useMemo(() => {
+    if (!detailProveedor) return null;
+    return rows.find((r) => r.id === detailProveedor.id) ?? detailProveedor;
+  }, [rows, detailProveedor]);
+
+  const detailDirty = useMemo(() => {
+    if (!detailProveedor || detailBaselineRef.current == null) return false;
+    return serializeDetailForm(detailForm) !== detailBaselineRef.current;
+  }, [detailProveedor, detailForm]);
+
   useEffect(() => {
-    if (!modalOpen && !deleteTarget) return;
+    if (!detailProveedor) {
+      lastHydratedDetailIdRef.current = null;
+      detailBaselineRef.current = null;
+      setDetailForm(emptyDetailForm);
+      setDetailNombreEditing(false);
+      return;
+    }
+    const id = detailProveedor.id;
+    if (lastHydratedDetailIdRef.current === id) return;
+    lastHydratedDetailIdRef.current = id;
+    setDetailNombreEditing(false);
+    const src = rows.find((r) => r.id === id) ?? detailProveedor;
+    const next = proveedorToDetailForm(src);
+    setDetailForm(next);
+    detailBaselineRef.current = serializeDetailForm(next);
+  }, [detailProveedor, rows]);
+
+  useEffect(() => {
+    if (!detailNombreEditing) return;
+    const id = window.requestAnimationFrame(() => {
+      detailNombreInputRef.current?.focus();
+      detailNombreInputRef.current?.select();
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [detailNombreEditing]);
+
+  useEffect(() => {
+    if (!detailProveedor) return;
+    const id = window.requestAnimationFrame(() => {
+      detailPanelRef.current?.querySelector<HTMLElement>("[data-prov-detail-close]")?.focus();
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [detailProveedor]);
+
+  const requestCloseDetail = useCallback(async () => {
+    if (!detailProveedor || detailSaveBusy) return;
+    if (!detailDirty) {
+      setDetailProveedor(null);
+      return;
+    }
+    const saveFirst = window.confirm(
+      "Hay cambios sin guardar.\n\n¿Deseás guardar antes de cerrar?\n\nAceptar: guardar y cerrar.\nCancelar: otras opciones."
+    );
+    if (saveFirst) {
+      if (!detailForm.nombre.trim() || !detailForm.nit.trim()) {
+        toast("Nombre y NIT son obligatorios", "error");
+        return;
+      }
+      setDetailSaveBusy(true);
+      try {
+        const row = rows.find((r) => r.id === detailProveedor.id) ?? detailProveedor;
+        await updateProveedor(detailProveedor.id, {
+          nombre: detailForm.nombre.trim(),
+          nit: detailForm.nit.trim(),
+          telefono: detailForm.telefono.trim() || null,
+          email: detailForm.email.trim() || null,
+          direccion: row.direccion?.trim() ? row.direccion.trim() : null,
+          icono_url: detailForm.iconoUrl.trim() || null,
+          estado: row.estado,
+        });
+        toast("Cambios guardados.", "success");
+        await load();
+        setDetailProveedor(null);
+      } catch (err) {
+        toast(err instanceof Error ? err.message : "Error al guardar", "error");
+      } finally {
+        setDetailSaveBusy(false);
+      }
+      return;
+    }
+    if (window.confirm("¿Descartar los cambios y cerrar sin guardar?")) {
+      setDetailProveedor(null);
+    }
+  }, [detailProveedor, detailSaveBusy, detailDirty, detailForm, rows, toast, load]);
+
+  useEffect(() => {
+    if (!modalOpen && !deleteTarget && !detailProveedor) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setModalOpen(false);
+      if (e.key !== "Escape") return;
+      if (deleteTarget) {
         setDeleteTarget(null);
+        return;
+      }
+      if (modalOpen) {
+        setModalOpen(false);
+        return;
+      }
+      if (detailProveedor) {
+        void requestCloseDetail();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [modalOpen, deleteTarget]);
+  }, [modalOpen, deleteTarget, detailProveedor, requestCloseDetail]);
 
   function openCreate() {
-    setEditingId(null);
     setNombre("");
     setNit("");
     setTelefono("");
     setEmail("");
-    setDireccion("");
+    setIconoUrl("");
     setEstado("activo");
-    setModalOpen(true);
-  }
-
-  function openEdit(p: Proveedor) {
-    setEditingId(p.id);
-    setNombre(p.nombre);
-    setNit(p.nit);
-    setTelefono(p.telefono ?? "");
-    setEmail(p.email ?? "");
-    setDireccion(p.direccion ?? "");
-    setEstado(p.estado);
     setModalOpen(true);
   }
 
@@ -115,27 +342,16 @@ export function ProveedoresPage() {
     }
     setBusy(true);
     try {
-      if (editingId == null) {
-        await createProveedor({
-          nombre: nombre.trim(),
-          nit: nit.trim(),
-          telefono: telefono.trim() || null,
-          email: email.trim() || null,
-          direccion: direccion.trim() || null,
-          estado,
-        });
-        toast("Proveedor creado", "success");
-      } else {
-        await updateProveedor(editingId, {
-          nombre: nombre.trim(),
-          nit: nit.trim(),
-          telefono: telefono.trim() || null,
-          email: email.trim() || null,
-          direccion: direccion.trim() || null,
-          estado,
-        });
-        toast("Proveedor actualizado", "success");
-      }
+      await createProveedor({
+        nombre: nombre.trim(),
+        nit: nit.trim(),
+        telefono: telefono.trim() || null,
+        email: email.trim() || null,
+        direccion: null,
+        icono_url: iconoUrl.trim() || null,
+        estado,
+      });
+      toast("Proveedor creado", "success");
       setModalOpen(false);
       await load();
     } catch (err) {
@@ -174,13 +390,20 @@ export function ProveedoresPage() {
     try {
       await deleteProveedor(deleteTarget.id);
       toast("Proveedor eliminado.", "success");
+      const removedId = deleteTarget.id;
       setDeleteTarget(null);
+      setDetailProveedor((d) => (d?.id === removedId ? null : d));
       await load();
     } catch (e) {
       toast(e instanceof Error ? e.message : "No se pudo eliminar", "error");
     } finally {
       setDeleteBusy(false);
     }
+  }
+
+  function openDelete(p: Proveedor) {
+    setDetailProveedor(null);
+    setDeleteTarget(p);
   }
 
   return (
@@ -243,139 +466,332 @@ export function ProveedoresPage() {
           <p className="muted">Cargando…</p>
         ) : rows.length === 0 ? (
           <div className="clay-empty" role="status">
-            No hay proveedores registrados. Usá «Nuevo proveedor» para agregar el primero.
+            No hay proveedores disponibles. Usá «Nuevo proveedor» para agregar el primero.
           </div>
         ) : filteredRows.length === 0 ? (
           <div className="clay-empty" role="status">
             Ningún proveedor coincide con los filtros. Probá otra búsqueda o cambiá el estado.
           </div>
         ) : (
-          <div className="table-wrap table--cards-sm">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Nombre</th>
-                  <th>NIT</th>
-                  <th>Teléfono</th>
-                  <th>Email</th>
-                  <th>Estado</th>
-                  <th>Actualizado</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredRows.map((p) => (
-                  <tr key={p.id}>
-                    <td data-label="Nombre">
-                      <span className="cell-main">{p.nombre}</span>
-                      {p.direccion?.trim() ? (
-                        <span className="muted small" style={{ display: "block" }}>
-                          {p.direccion}
-                        </span>
-                      ) : null}
-                    </td>
-                    <td className="mono" data-label="NIT">
-                      {p.nit}
-                    </td>
-                    <td className="mono" data-label="Teléfono">
-                      {p.telefono?.trim() ? p.telefono : "—"}
-                    </td>
-                    <td data-label="Email">{p.email?.trim() ? p.email : "—"}</td>
-                    <td data-label="Estado">
-                      <label className="ui-switch" title={p.estado === "activo" ? "Activo" : "Inactivo"}>
-                        <input
-                          type="checkbox"
-                          className="ui-switch__input"
-                          checked={p.estado === "activo"}
-                          disabled={estadoSavingId === p.id}
-                          aria-label={`${p.nombre}: marcar como activo o inactivo`}
-                          onChange={(e) => void onToggleActivo(p, e.target.checked)}
-                        />
-                        <span className="ui-switch__track" aria-hidden />
-                      </label>
-                      <span
-                        className={`small ${p.estado === "activo" ? "badge-ok" : "muted"}`}
-                        style={{ marginLeft: "0.5rem", verticalAlign: "middle" }}
-                      >
-                        {p.estado === "activo" ? "Activo" : "Inactivo"}
-                      </span>
-                    </td>
-                    <td className="muted small" data-label="Actualizado">
-                      {fmtFecha(p.fecha_actualizacion)}
-                    </td>
-                    <td data-label="Acciones">
-                      <div className="toolbar-inline" style={{ flexWrap: "wrap", gap: "0.35rem" }}>
-                        <button type="button" className="btn ghost small" onClick={() => openEdit(p)}>
-                          Editar
-                        </button>
-                        <button type="button" className="btn ghost small danger-ghost" onClick={() => setDeleteTarget(p)}>
-                          Eliminar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="proveedores-grid" role="list">
+            {filteredRows.map((p) => (
+              <article
+                key={p.id}
+                className="prov-card prov-card--stacked prov-card--clickable"
+                role="listitem"
+                tabIndex={0}
+                aria-label={`Ver detalle de ${p.nombre}`}
+                onClick={() => setDetailProveedor(p)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setDetailProveedor(p);
+                  }
+                }}
+              >
+                <ProveedorCardMedia proveedor={p} />
+                <h3 className="prov-card__nombre-text">{p.nombre}</h3>
+                <div className="prov-card__toolbar" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    className="btn ghost small danger-ghost prov-card__icon-btn"
+                    onClick={() => openDelete(p)}
+                    aria-label={`Eliminar ${p.nombre}`}
+                    title="Eliminar"
+                  >
+                    <Trash size={22} weight="regular" aria-hidden />
+                  </button>
+                  <label className="ui-switch prov-card__switch" title={p.estado === "activo" ? "Activo" : "Inactivo"}>
+                    <input
+                      type="checkbox"
+                      className="ui-switch__input"
+                      checked={p.estado === "activo"}
+                      disabled={estadoSavingId === p.id}
+                      aria-label={`${p.nombre}: proveedor activo`}
+                      onChange={(e) => void onToggleActivo(p, e.target.checked)}
+                    />
+                    <span className="ui-switch__track" aria-hidden />
+                  </label>
+                </div>
+              </article>
+            ))}
           </div>
         )}
       </section>
 
+      {detailDisplay ? (
+        <div
+          className="drawer-overlay prov-detail-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="prov-detail-title"
+          onClick={() => {
+            if (!detailSaveBusy) void requestCloseDetail();
+          }}
+        >
+          <div
+            ref={detailPanelRef}
+            className="card drawer-overlay-card prov-detail-panel"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="prov-detail-warn-btn"
+              title={PROV_DETAIL_WARN_TITLE}
+              aria-label={PROV_DETAIL_WARN_TITLE}
+            >
+              <Warning size={22} weight="fill" aria-hidden />
+            </button>
+            <ProveedorDetailAvatarPicker
+              nombre={detailForm.nombre}
+              iconoUrl={detailForm.iconoUrl.trim() ? detailForm.iconoUrl.trim() : null}
+              disabled={detailSaveBusy}
+              onChangeIcono={(dataUrl) => setDetailForm((f) => ({ ...f, iconoUrl: dataUrl }))}
+              onFileError={(message) => toast(message, "error")}
+            />
+            {detailNombreEditing ? (
+              <input
+                ref={detailNombreInputRef}
+                id="prov-detail-title"
+                className="prov-detail-title-input prov-detail-title--solo"
+                value={detailForm.nombre}
+                onChange={(e) => setDetailForm((f) => ({ ...f, nombre: e.target.value }))}
+                disabled={detailSaveBusy}
+                aria-label="Nombre del proveedor"
+                autoComplete="off"
+                onBlur={() => {
+                  setDetailNombreEditing(false);
+                  if (!detailForm.nombre.trim()) {
+                    setDetailForm((f) => ({ ...f, nombre: detailDisplay.nombre }));
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    (e.target as HTMLInputElement).blur();
+                  }
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    setDetailForm((f) => ({ ...f, nombre: detailDisplay.nombre }));
+                    setDetailNombreEditing(false);
+                  }
+                }}
+              />
+            ) : (
+              <button
+                type="button"
+                id="prov-detail-title"
+                className="prov-detail-title--clickedit prov-detail-title--solo"
+                disabled={detailSaveBusy}
+                onClick={() => {
+                  if (detailSaveBusy) return;
+                  setDetailNombreEditing(true);
+                }}
+              >
+                {detailForm.nombre.trim() || detailDisplay.nombre}
+              </button>
+            )}
+            <div className="prov-detail-meta">
+              <span
+                className={
+                  detailDisplay.estado === "activo"
+                    ? "prov-card__badge prov-card__badge--ok"
+                    : "prov-card__badge prov-card__badge--off"
+                }
+              >
+                {detailDisplay.estado === "activo" ? "Activo" : "Inactivo"}
+              </span>
+              <label className="ui-switch prov-detail-switch" title="Cambiar estado">
+                <input
+                  type="checkbox"
+                  className="ui-switch__input"
+                  checked={detailDisplay.estado === "activo"}
+                  disabled={estadoSavingId === detailDisplay.id || detailSaveBusy}
+                  aria-label={`${detailDisplay.nombre}: activo en el sistema`}
+                  onChange={(e) => void onToggleActivo(detailDisplay, e.target.checked)}
+                />
+                <span className="ui-switch__track" aria-hidden />
+              </label>
+            </div>
+            <dl className="prov-detail-dl prov-detail-dl--form">
+              <div className="prov-detail-row prov-detail-row--field">
+                <dt>
+                  <label htmlFor="prov-detail-nit">NIT *</label>
+                </dt>
+                <dd>
+                  <input
+                    id="prov-detail-nit"
+                    className="prov-detail-input"
+                    value={detailForm.nit}
+                    onChange={(e) => setDetailForm((f) => ({ ...f, nit: e.target.value }))}
+                    autoComplete="off"
+                    disabled={detailSaveBusy}
+                  />
+                </dd>
+              </div>
+              <div className="prov-detail-row prov-detail-row--field">
+                <dt>
+                  <label htmlFor="prov-detail-tel">Teléfono</label>
+                </dt>
+                <dd>
+                  <input
+                    id="prov-detail-tel"
+                    className="prov-detail-input"
+                    value={detailForm.telefono}
+                    onChange={(e) => setDetailForm((f) => ({ ...f, telefono: e.target.value }))}
+                    autoComplete="off"
+                    disabled={detailSaveBusy}
+                  />
+                </dd>
+              </div>
+              <div className="prov-detail-row prov-detail-row--field">
+                <dt>
+                  <label htmlFor="prov-detail-email">Email</label>
+                </dt>
+                <dd>
+                  <input
+                    id="prov-detail-email"
+                    type="email"
+                    className="prov-detail-input"
+                    value={detailForm.email}
+                    onChange={(e) => setDetailForm((f) => ({ ...f, email: e.target.value }))}
+                    disabled={detailSaveBusy}
+                  />
+                </dd>
+              </div>
+              <div className="prov-detail-row">
+                <dt>Actualizado</dt>
+                <dd className="muted small">{fmtFecha(detailDisplay.fecha_actualizacion)}</dd>
+              </div>
+            </dl>
+            <div className="actions prov-detail-footer prov-detail-footer--solo">
+              <button
+                type="button"
+                className="btn ghost"
+                data-prov-detail-close
+                disabled={detailSaveBusy}
+                onClick={() => void requestCloseDetail()}
+              >
+                {detailSaveBusy ? "Guardando…" : "Cerrar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {modalOpen ? (
         <div
-          className="drawer-overlay"
+          className="drawer-overlay prov-detail-overlay"
           role="dialog"
-          aria-modal
+          aria-modal="true"
           aria-labelledby="prov-form-title"
-          onClick={() => setModalOpen(false)}
+          onClick={() => !busy && setModalOpen(false)}
         >
-          <div className="card drawer-overlay-card" onClick={(e) => e.stopPropagation()}>
-            <h3 id="prov-form-title" className="card-title">
-              {editingId == null ? "Nuevo proveedor" : `Editar proveedor #${editingId}`}
+          <div
+            className="card drawer-overlay-card prov-detail-panel"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="prov-detail-warn-btn"
+              title={PROV_CREATE_WARN_TITLE}
+              aria-label={PROV_CREATE_WARN_TITLE}
+            >
+              <Warning size={22} weight="fill" aria-hidden />
+            </button>
+            <ProveedorDetailAvatarPicker
+              nombre={nombre}
+              iconoUrl={iconoUrl.trim() ? iconoUrl.trim() : null}
+              disabled={busy}
+              onChangeIcono={setIconoUrl}
+              onFileError={(message) => toast(message, "error")}
+            />
+            <h3 id="prov-form-title" className="card-title prov-detail-title prov-detail-title--solo">
+              {nombre.trim() || "Nuevo proveedor"}
             </h3>
-            <p className="muted small">
-              Ingrese la información del proveedor. Los campos obligatorios deben completarse para poder
-              registrarlo correctamente.
-            </p>
-            <form className="form" onSubmit={onSubmit}>
-              <div className="grid-2">
-                <label className="field">
-                  <span>Nombre *</span>
-                  <input value={nombre} onChange={(e) => setNombre(e.target.value)} required />
-                </label>
-                <label className="field">
-                  <span>NIT *</span>
-                  <input value={nit} onChange={(e) => setNit(e.target.value)} required />
-                </label>
-                <label className="field">
-                  <span>Teléfono</span>
-                  <input value={telefono} onChange={(e) => setTelefono(e.target.value)} />
-                </label>
-                <label className="field">
-                  <span>Email</span>
-                  <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-                </label>
-                <label className="field" style={{ gridColumn: "1 / -1" }}>
-                  <span>Dirección</span>
-                  <input value={direccion} onChange={(e) => setDireccion(e.target.value)} />
-                </label>
-                <label className="field">
-                  <span>Estado</span>
-                  <select
-                    value={estado}
-                    onChange={(e) => setEstado(e.target.value as "activo" | "inactivo")}
-                  >
-                    <option value="activo">Activo</option>
-                    <option value="inactivo">Inactivo</option>
-                  </select>
-                </label>
-              </div>
-              <div className="actions">
-                <button type="button" className="btn ghost" onClick={() => setModalOpen(false)}>
+            <div className="prov-detail-meta">
+              <span className="prov-card__badge prov-card__badge--ok">Nuevo</span>
+              <label className="ui-switch prov-detail-switch" title={estado === "activo" ? "Activo" : "Inactivo"}>
+                <input
+                  type="checkbox"
+                  className="ui-switch__input"
+                  checked={estado === "activo"}
+                  disabled={busy}
+                  aria-label="Proveedor activo al crear"
+                  onChange={(e) => setEstado(e.target.checked ? "activo" : "inactivo")}
+                />
+                <span className="ui-switch__track" aria-hidden />
+              </label>
+            </div>
+            <form className="prov-create-form" onSubmit={onSubmit}>
+              <dl className="prov-detail-dl prov-detail-dl--form">
+                <div className="prov-detail-row prov-detail-row--field">
+                  <dt>
+                    <label htmlFor="prov-create-nombre">Nombre *</label>
+                  </dt>
+                  <dd>
+                    <input
+                      id="prov-create-nombre"
+                      className="prov-detail-input"
+                      value={nombre}
+                      onChange={(e) => setNombre(e.target.value)}
+                      autoComplete="off"
+                      disabled={busy}
+                    />
+                  </dd>
+                </div>
+                <div className="prov-detail-row prov-detail-row--field">
+                  <dt>
+                    <label htmlFor="prov-create-nit">NIT *</label>
+                  </dt>
+                  <dd>
+                    <input
+                      id="prov-create-nit"
+                      className="prov-detail-input"
+                      value={nit}
+                      onChange={(e) => setNit(e.target.value)}
+                      autoComplete="off"
+                      disabled={busy}
+                    />
+                  </dd>
+                </div>
+                <div className="prov-detail-row prov-detail-row--field">
+                  <dt>
+                    <label htmlFor="prov-create-tel">Teléfono</label>
+                  </dt>
+                  <dd>
+                    <input
+                      id="prov-create-tel"
+                      className="prov-detail-input"
+                      value={telefono}
+                      onChange={(e) => setTelefono(e.target.value)}
+                      autoComplete="off"
+                      disabled={busy}
+                    />
+                  </dd>
+                </div>
+                <div className="prov-detail-row prov-detail-row--field">
+                  <dt>
+                    <label htmlFor="prov-create-email">Email</label>
+                  </dt>
+                  <dd>
+                    <input
+                      id="prov-create-email"
+                      type="email"
+                      className="prov-detail-input"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      disabled={busy}
+                    />
+                  </dd>
+                </div>
+              </dl>
+              <div className="actions prov-detail-footer prov-detail-footer--create">
+                <button type="button" className="btn ghost" disabled={busy} onClick={() => setModalOpen(false)}>
                   Cancelar
                 </button>
                 <button type="submit" className="btn primary" disabled={busy}>
-                  Guardar
+                  {busy ? "Guardando…" : "Guardar"}
                 </button>
               </div>
             </form>
@@ -387,7 +803,7 @@ export function ProveedoresPage() {
         <div
           className="drawer-overlay"
           role="dialog"
-          aria-modal
+          aria-modal="true"
           aria-labelledby="prov-delete-title"
           onClick={() => !deleteBusy && setDeleteTarget(null)}
         >

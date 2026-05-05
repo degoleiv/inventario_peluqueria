@@ -2,14 +2,18 @@ import { useEffect, useState } from "react";
 import {
   bootstrapAdmin,
   fetchBootstrapNeeded,
+  fetchBranding,
   loginApi,
+  type BrandingConfig,
 } from "../api";
 import { setAccessToken } from "../auth/token";
+import { applyBrandingToDocument } from "../lib/brandingDocument";
 
 type Props = { onLoggedIn: () => void };
 
 export function LoginPage({ onLoggedIn }: Props) {
   const [needsBootstrap, setNeedsBootstrap] = useState<boolean | null>(null);
+  const [branding, setBranding] = useState<BrandingConfig | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [nombre, setNombre] = useState("");
@@ -26,6 +30,22 @@ export function LoginPage({ onLoggedIn }: Props) {
         if (!cancel) setNeedsBootstrap(false);
       }
     })();
+    return () => {
+      cancel = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancel = false;
+    void fetchBranding()
+      .then((b) => {
+        if (cancel) return;
+        setBranding(b);
+        applyBrandingToDocument(b);
+      })
+      .catch(() => {
+        if (!cancel) setBranding(null);
+      });
     return () => {
       cancel = true;
     };
@@ -63,10 +83,23 @@ export function LoginPage({ onLoggedIn }: Props) {
     );
   }
 
+  const tituloMarca = branding?.nombre_negocio?.trim() || "Peluquería";
+
   return (
     <div className="layout login-wrap">
       <section className="card login-card">
-        <h1 className="title">Peluquería</h1>
+        <header className="login-brand">
+          {branding?.logo_data_url ? (
+            <img
+              className="login-brand-logo"
+              src={branding.logo_data_url}
+              alt=""
+              width={56}
+              height={56}
+            />
+          ) : null}
+          <h1 className="title">{tituloMarca}</h1>
+        </header>
         <p className="subtitle">
           {needsBootstrap
             ? "Creá el primer usuario administrador (solo esta vez)."

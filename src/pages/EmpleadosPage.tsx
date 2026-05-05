@@ -9,20 +9,15 @@ import {
   deleteTurnoEmpleado,
   deleteUsuario,
   downloadCertificadoLaboral,
-  fetchAuditoria,
   fetchAuthMe,
   fetchEmpleadoResumen,
-  fetchEmpleadosComisiones,
   fetchEmpleadosMovimientos,
   fetchEmpleadosTurnos,
   fetchRoles,
   fetchUsuarios,
-  previewCertificadoLaboral,
   updateEmpleadoMovimientoEstado,
   updateRole,
   updateUsuario,
-  type AuditoriaRow,
-  type ComisionRow,
   type EmpleadoMovimiento,
   type EmpleadoResumen,
   type RolDefinicion,
@@ -34,6 +29,7 @@ import { SubNav } from "../components/SubNav";
 import { EMPLEADOS_TABS, readEmpleadosTab, type EmpleadosTab } from "../lib/moduleRoutes";
 import { NAV_LABEL, PERMISO_MODULOS, type PermisoModulo } from "../nav";
 import { useToast } from "../context/ToastContext";
+import { CircleNotch, Download, PencilSimple, Trash } from "@phosphor-icons/react";
 
 type Props = { onChanged?: () => void };
 
@@ -48,6 +44,23 @@ function isoMonthStart() {
 
 function formatMoney(n: number) {
   return new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 }).format(n);
+}
+
+type EmpleadoEstadoFiltro = "todos" | "activo" | "inactivo";
+
+/** Filtrado de lista de empleados (solo lectura; no muta `rows`). */
+function applyFilters(rows: UsuarioListado[], search: string, estado: EmpleadoEstadoFiltro): UsuarioListado[] {
+  const q = search.trim().toLowerCase();
+  return rows.filter((emp) => {
+    const nombre = (emp.nombre ?? "").toLowerCase();
+    const email = (emp.email ?? "").toLowerCase();
+    const matchSearch = q === "" || nombre.includes(q) || email.includes(q);
+    const matchEstado =
+      estado === "todos" ||
+      (estado === "activo" && emp.activo === 1) ||
+      (estado === "inactivo" && emp.activo !== 1);
+    return matchSearch && matchEstado;
+  });
 }
 
 export function EmpleadosPage({ onChanged }: Props) {
@@ -78,9 +91,7 @@ export function EmpleadosPage({ onChanged }: Props) {
   const [filtHasta, setFiltHasta] = useState(isoToday);
   const [filtUsuario, setFiltUsuario] = useState<number | "">("");
 
-  const [auditoriaRows, setAuditoriaRows] = useState<AuditoriaRow[]>([]);
   const [turnosRows, setTurnosRows] = useState<TurnoEmpleado[]>([]);
-  const [comisionesRows, setComisionesRows] = useState<ComisionRow[]>([]);
   const [movimientosRows, setMovimientosRows] = useState<EmpleadoMovimiento[]>([]);
   const [resumenEmp, setResumenEmp] = useState<EmpleadoResumen | null>(null);
 
@@ -100,6 +111,10 @@ export function EmpleadosPage({ onChanged }: Props) {
   });
 
   const [puedeCertificado, setPuedeCertificado] = useState(false);
+  const [activoSavingId, setActivoSavingId] = useState<number | null>(null);
+  /** Feedback UI mientras el API genera el PDF (Puppeteer puede tardar mucho). */
+  const [certBusy, setCertBusy] = useState<{ id: number } | null>(null);
+  const certLockRef = useRef(false);
 
   const [newRol, setNewRol] = useState({
     slug: "",
@@ -108,28 +123,54 @@ export function EmpleadosPage({ onChanged }: Props) {
     mods: {} as Record<PermisoModulo, boolean>,
   });
 
+  const [empleadoBusqueda, setEmpleadoBusqueda] = useState("");
+  const [empleadoBusquedaDebounced, setEmpleadoBusquedaDebounced] = useState("");
+  const [empleadoEstadoFiltro, setEmpleadoEstadoFiltro] = useState<EmpleadoEstadoFiltro>("todos");
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setEmpleadoBusquedaDebounced(empleadoBusqueda), 300);
+    return () => window.clearTimeout(t);
+  }, [empleadoBusqueda]);
+
+  const usuariosFiltrados = useMemo(
+    () => applyFilters(usuarios, empleadoBusquedaDebounced, empleadoEstadoFiltro),
+    [usuarios, empleadoBusquedaDebounced, empleadoEstadoFiltro]
+  );
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      const me = await fetchAuthMe();
+      setPuedeCertificado(!!me.user.permisos?.includes("*"));
+      if (!me.user.permisos?.includes("*")) {
+        setRoles([]);
+        setUsuarios([]);
+        navigate("/inicio", { replace: true });
+        return;
+      }
       const [r, u] = await Promise.all([fetchRoles(), fetchUsuarios()]);
       setRoles(r);
       setUsuarios(u);
     } catch (e) {
       toast(e instanceof Error ? e.message : "Error", "error");
+      setPuedeCertificado(false);
+      setRoles([]);
+      setUsuarios([]);
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, navigate]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
+  /* Al actualizar usuario/rol desde este módulo, volver a cargar lista y roles */
   useEffect(() => {
-    void fetchAuthMe()
-      .then((m) => setPuedeCertificado(!!m.user.permisos?.includes("*")))
-      .catch(() => setPuedeCertificado(false));
-  }, []);
+    const fn = () => void load();
+    window.addEventListener("peluqueria-auth-refresh", fn);
+    return () => window.removeEventListener("peluqueria-auth-refresh", fn);
+  }, [load]);
 
   const defaultRol = useMemo(
     () => (roles.some((x) => x.slug === "empleado") ? "empleado" : roles[0]?.slug ?? "empleado"),
@@ -219,14 +260,35 @@ export function EmpleadosPage({ onChanged }: Props) {
     }
   }
 
+  async function runCertificadoDescarga(u: UsuarioListado) {
+    if (certLockRef.current) return;
+    certLockRef.current = true;
+    setCertBusy({ id: u.id });
+    toast("Generando PDF en el servidor (puede tardar hasta 3 min). Luego se inicia la descarga…", "info", {
+      durationMs: 28_000,
+    });
+    try {
+      await downloadCertificadoLaboral(u.id);
+      toast("Listo: revisá la carpeta de descargas.", "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Error con el certificado", "error", { durationMs: 14_000 });
+    } finally {
+      certLockRef.current = false;
+      setCertBusy(null);
+    }
+  }
+
   async function toggleActivo(u: UsuarioListado) {
+    setActivoSavingId(u.id);
     try {
       await updateUsuario(u.id, { activo: u.activo === 1 ? false : true });
-      toast(u.activo === 1 ? "Usuario desactivado." : "Usuario activado.", "info");
+      toast(u.activo === 1 ? "Usuario desactivado." : "Usuario activado.", "success");
       void load();
       onChanged?.();
     } catch (err) {
       toast(err instanceof Error ? err.message : "Error", "error");
+    } finally {
+      setActivoSavingId(null);
     }
   }
 
@@ -349,20 +411,6 @@ export function EmpleadosPage({ onChanged }: Props) {
     }
   }, [filtDesde, filtHasta, filtUsuario, toast]);
 
-  const loadComisiones = useCallback(async () => {
-    try {
-      const uid = filtUsuario === "" ? undefined : filtUsuario;
-      const rows = await fetchEmpleadosComisiones({
-        desde: filtDesde,
-        hasta: filtHasta,
-        usuario_id: uid,
-      });
-      setComisionesRows(rows);
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "Error", "error");
-    }
-  }, [filtDesde, filtHasta, filtUsuario, toast]);
-
   const loadMovimientosTab = useCallback(async () => {
     try {
       const uid = filtUsuario === "" ? undefined : filtUsuario;
@@ -382,34 +430,15 @@ export function EmpleadosPage({ onChanged }: Props) {
     }
   }, [filtDesde, filtHasta, filtUsuario, toast]);
 
-  const loadAuditoriaTab = useCallback(async () => {
-    try {
-      const rows = await fetchAuditoria(200);
-      setAuditoriaRows(rows);
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "Error", "error");
-    }
-  }, [toast]);
-
   useEffect(() => {
     if (tabParam !== "turnos") return;
     void loadTurnos();
   }, [tabParam, loadTurnos]);
 
   useEffect(() => {
-    if (tabParam !== "comisiones") return;
-    void loadComisiones();
-  }, [tabParam, loadComisiones]);
-
-  useEffect(() => {
     if (tabParam !== "movimientos") return;
     void loadMovimientosTab();
   }, [tabParam, loadMovimientosTab]);
-
-  useEffect(() => {
-    if (tabParam !== "auditoria") return;
-    void loadAuditoriaTab();
-  }, [tabParam, loadAuditoriaTab]);
 
   const tabOk =
     tabParam != null &&
@@ -426,9 +455,7 @@ export function EmpleadosPage({ onChanged }: Props) {
         items={[
           { id: "lista", label: "Empleados", to: "/empleados/lista" },
           { id: "turnos", label: "Turnos", to: "/empleados/turnos" },
-          { id: "comisiones", label: "Comisiones", to: "/empleados/comisiones" },
           { id: "movimientos", label: "Movimientos", to: "/empleados/movimientos" },
-          { id: "auditoria", label: "Auditoría", to: "/empleados/auditoria" },
           { id: "roles", label: "Roles", to: "/empleados/roles" },
         ]}
       />
@@ -449,30 +476,75 @@ export function EmpleadosPage({ onChanged }: Props) {
           {loading ? (
             <p className="muted">Cargando…</p>
           ) : (
+            <>
+              <div className="empleados-filtros field-row">
+                <label className="field empleados-filtros-busqueda">
+                  <span>Buscador</span>
+                  <input
+                    type="search"
+                    autoComplete="off"
+                    spellCheck={false}
+                    placeholder="Buscar por nombre o correo..."
+                    value={empleadoBusqueda}
+                    onChange={(e) => setEmpleadoBusqueda(e.target.value)}
+                    aria-label="Buscar empleados por nombre o correo electrónico"
+                  />
+                </label>
+                <label className="field empleados-filtros-estado">
+                  <span>Estado</span>
+                  <select
+                    value={empleadoEstadoFiltro}
+                    onChange={(e) => setEmpleadoEstadoFiltro(e.target.value as EmpleadoEstadoFiltro)}
+                    aria-label="Filtrar empleados por estado (activo o inactivo)"
+                  >
+                    <option value="todos">Todos</option>
+                    <option value="activo">Activo</option>
+                    <option value="inactivo">Inactivo</option>
+                  </select>
+                </label>
+              </div>
+              {usuariosFiltrados.length === 0 ? (
+                <p className="muted empleados-sin-resultados" role="status">
+                  No se encontraron empleados
+                </p>
+              ) : (
             <div className="table-wrap">
-              <table className="table">
+              <table className="table table--empleados-equipo">
+                <colgroup>
+                  <col className="col-emp-icono" />
+                  <col className="col-emp-nombre" />
+                  <col className="col-emp-email" />
+                  <col className="col-emp-rol" />
+                  <col className="col-emp-comision" />
+                  <col className="col-emp-estado" />
+                  <col className="col-emp-acciones" />
+                  <col className="col-emp-activo" />
+                </colgroup>
                 <thead>
                   <tr>
-                    <th />
+                    <th className="th-empleado-icono">Icono</th>
                     <th>Nombre</th>
                     <th>Email</th>
                     <th>Rol</th>
                     <th>Comisión</th>
                     <th>Estado</th>
-                    <th />
+                    <th className="th-empleados-acciones">Acciones</th>
+                    <th className="th-empleado-activo">Activo</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {usuarios.map((u) => (
+                  {usuariosFiltrados.map((u) => (
                     <tr key={u.id}>
-                      <td>
-                        {u.foto_url ? (
-                          <img src={u.foto_url} alt="" className="empleado-avatar" width={40} height={40} />
-                        ) : (
-                          <span className="empleado-avatar empleado-avatar--ph">
-                            {(u.nombre || u.email).slice(0, 1).toUpperCase()}
-                          </span>
-                        )}
+                      <td className="td-empleado-icono">
+                        <div className="empleado-cell-icono">
+                          {u.foto_url ? (
+                            <img src={u.foto_url} alt="" className="empleado-avatar" width={40} height={40} />
+                          ) : (
+                            <span className="empleado-avatar empleado-avatar--ph">
+                              {(u.nombre || u.email).slice(0, 1).toUpperCase()}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td>{u.nombre || "—"}</td>
                       <td className="mono small">{u.email}</td>
@@ -485,50 +557,90 @@ export function EmpleadosPage({ onChanged }: Props) {
                           : `${Number(u.valor_comision ?? 0)} %`}
                       </td>
                       <td>{u.activo === 1 ? <span className="badge-ok">Activo</span> : <span className="muted">Inactivo</span>}</td>
-                      <td className="row-actions">
-                        <button type="button" className="link" onClick={() => openEdit(u)}>
-                          Editar
-                        </button>
-                        {puedeCertificado ? (
-                          <>
+                      <td className="td-empleados-acciones">
+                        <div className="empleado-cell-acciones">
+                          {certBusy?.id === u.id ? (
+                            <span className="cert-wait-msg" aria-live="polite">
+                              <CircleNotch
+                                className="empleado-cert-spinner"
+                                size={18}
+                                weight="bold"
+                                aria-hidden
+                              />
+                              Generando descarga…
+                            </span>
+                          ) : null}
+                          <button
+                            type="button"
+                            className="btn-icon-row btn-icon-row--edit"
+                            title="Editar empleado"
+                            aria-label="Editar empleado"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              openEdit(u);
+                            }}
+                          >
+                            <PencilSimple size={20} weight="regular" aria-hidden />
+                          </button>
+                          {puedeCertificado ? (
                             <button
                               type="button"
-                              className="link"
-                              title="Vista previa del PDF"
-                              onClick={() =>
-                                void previewCertificadoLaboral(u.id).catch((err) =>
-                                  toast(err instanceof Error ? err.message : "No se pudo generar el PDF", "error")
-                                )
-                              }
+                              className="btn-icon-row btn-icon-row--download"
+                              title="Descargar certificado"
+                              aria-label="Descargar certificado"
+                              disabled={certBusy !== null}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                void runCertificadoDescarga(u);
+                              }}
                             >
-                              Certificado
+                              <Download size={20} weight="regular" aria-hidden />
                             </button>
-                            <button
-                              type="button"
-                              className="link"
-                              title="Descargar PDF"
-                              onClick={() =>
-                                void downloadCertificadoLaboral(u.id).catch((err) =>
-                                  toast(err instanceof Error ? err.message : "Error al descargar", "error")
-                                )
-                              }
-                            >
-                              Descargar PDF
-                            </button>
-                          </>
-                        ) : null}
-                        <button type="button" className="link" onClick={() => void toggleActivo(u)}>
-                          {u.activo === 1 ? "Desactivar" : "Activar"}
-                        </button>
-                        <button type="button" className="link danger" onClick={() => void onDelete(u)}>
-                          Eliminar
-                        </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            className="btn-icon-row btn-icon-row--delete"
+                            title="Eliminar empleado"
+                            aria-label="Eliminar empleado"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              void onDelete(u);
+                            }}
+                          >
+                            <Trash size={20} weight="regular" aria-hidden />
+                          </button>
+                        </div>
+                      </td>
+                      <td className="td-empleado-switch">
+                        <label
+                          className="ui-switch"
+                          title={u.activo === 1 ? "Empleado activo" : "Empleado inactivo"}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <input
+                            type="checkbox"
+                            className="ui-switch__input"
+                            checked={u.activo === 1}
+                            disabled={activoSavingId === u.id}
+                            aria-label={`${u.nombre || u.email}: empleado activo en el sistema`}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              void toggleActivo(u);
+                            }}
+                          />
+                          <span className="ui-switch__track" aria-hidden />
+                        </label>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+              )}
+            </>
           )}
         </section>
       ) : null}
@@ -706,74 +818,6 @@ export function EmpleadosPage({ onChanged }: Props) {
                         Eliminar
                       </button>
                     </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      ) : null}
-
-      {tab === "comisiones" ? (
-        <section className="card">
-          <div className="card-head">
-            <h2 className="card-title">Comisiones por venta</h2>
-            <button type="button" className="btn ghost small" onClick={() => void loadComisiones()}>
-              Actualizar
-            </button>
-          </div>
-          <div className="field-row" style={{ marginBottom: "1rem", flexWrap: "wrap" }}>
-            <label className="field">
-              <span>Desde</span>
-              <input
-                type="date"
-                value={filtDesde}
-                onChange={(e) => setFiltDesde(e.target.value)}
-              />
-            </label>
-            <label className="field">
-              <span>Hasta</span>
-              <input
-                type="date"
-                value={filtHasta}
-                onChange={(e) => setFiltHasta(e.target.value)}
-              />
-            </label>
-            <label className="field">
-              <span>Empleado</span>
-              <select
-                value={filtUsuario === "" ? "" : String(filtUsuario)}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setFiltUsuario(v === "" ? "" : Number(v));
-                }}
-              >
-                <option value="">Todos</option>
-                {usuarios.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.nombre || u.email}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Fecha</th>
-                  <th>Empleado</th>
-                  <th>Venta</th>
-                  <th>Monto comisión</th>
-                </tr>
-              </thead>
-              <tbody>
-                {comisionesRows.map((c) => (
-                  <tr key={c.id}>
-                    <td className="mono">{c.fecha}</td>
-                    <td>{c.empleado_nombre ?? "—"}</td>
-                    <td className="mono">#{c.venta_id}</td>
-                    <td>{formatMoney(c.monto)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -973,50 +1017,6 @@ export function EmpleadosPage({ onChanged }: Props) {
                           Marcar pagado
                         </button>
                       ) : null}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      ) : null}
-
-      {tab === "auditoria" ? (
-        <section className="card">
-          <div className="card-head">
-            <h2 className="card-title">Auditoría</h2>
-            <button type="button" className="btn ghost small" onClick={() => void loadAuditoriaTab()}>
-              Actualizar
-            </button>
-          </div>
-          <p className="hint">
-            Acciones registradas: ventas, citas, productos y más. Las cancelaciones quedan trazadas con motivo.
-          </p>
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Fecha</th>
-                  <th>Usuario</th>
-                  <th>Acción</th>
-                  <th>Entidad</th>
-                  <th>Detalle</th>
-                </tr>
-              </thead>
-              <tbody>
-                {auditoriaRows.map((a) => (
-                  <tr key={a.id}>
-                    <td className="mono small">{a.created_at.slice(0, 19).replace("T", " ")}</td>
-                    <td className="small">{a.usuario_email ?? "—"}</td>
-                    <td>
-                      <span className="mono">{a.accion}</span>
-                    </td>
-                    <td className="small">
-                      {a.entidad} #{a.entidad_id ?? "—"}
-                    </td>
-                    <td className="small" style={{ maxWidth: "280px", wordBreak: "break-word" }}>
-                      {a.detalle_json ?? "—"}
                     </td>
                   </tr>
                 ))}

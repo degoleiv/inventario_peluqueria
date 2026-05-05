@@ -14,10 +14,14 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@emoji-mart/data": "^1.2.1",
+    "@emoji-mart/react": "^1.1.1",
+    "@phosphor-icons/react": "^2.1.10",
     "@tauri-apps/api": "^2.2.0",
     "bcrypt": "^6.0.0",
     "better-sqlite3": "^11.8.1",
     "cors": "^2.8.5",
+    "emoji-mart": "^5.6.0",
     "express": "^4.21.2",
     "express-async-errors": "^3.1.1",
     "jsonwebtoken": "^9.0.3",

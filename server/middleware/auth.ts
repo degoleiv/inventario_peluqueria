@@ -8,8 +8,19 @@ export function hasPermiso(permisos: string[] | undefined, modulo: string): bool
   if (!permisos?.length) return false;
   if (permisos.includes("*")) return true;
   if (permisos.includes(modulo)) return true;
-  /* Compat: rol antiguo con permiso "compras" → módulo pedidos_proveedores */
+  if (modulo === "pedidos") {
+    if (
+      permisos.includes("proveedores") ||
+      permisos.includes("pedidos_proveedores") ||
+      permisos.includes("compras")
+    ) {
+      return true;
+    }
+  }
+  /* Compat API / tokens antiguos */
   if (modulo === "pedidos_proveedores" && permisos.includes("compras")) return true;
+  if (modulo === "pedidos_proveedores" && permisos.includes("pedidos")) return true;
+  if (modulo === "proveedores" && permisos.includes("pedidos")) return true;
   return false;
 }
 

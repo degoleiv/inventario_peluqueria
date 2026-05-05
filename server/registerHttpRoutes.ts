@@ -69,6 +69,11 @@ export function registerHttpRoutes(app: Express) {
     })
   );
 
+  /** GET sin JWT: pantalla de login, favicon y lecturas que ocurren antes de `requireAuth`. */
+  app.get("/api/configuracion/branding", (_req, res) => {
+    res.json(configuracionService.getBranding());
+  });
+
   const api = Router();
   api.use(requireAuth);
 
@@ -82,6 +87,7 @@ export function registerHttpRoutes(app: Express) {
         nombre: dbUser?.nombre ?? null,
         rol: u.rol,
         permisos: u.permisos,
+        foto_url: dbUser?.foto_url ?? null,
       },
     });
   });
@@ -92,10 +98,6 @@ export function registerHttpRoutes(app: Express) {
 
   api.patch("/configuracion/puntos", requireAdmin, (req, res) => {
     res.json(configuracionService.updatePuntosConfig(req.body as Record<string, unknown>));
-  });
-
-  api.get("/configuracion/branding", (_req, res) => {
-    res.json(configuracionService.getBranding());
   });
 
   api.patch("/configuracion/branding", requireAdmin, (req, res) => {
@@ -359,7 +361,7 @@ export function registerHttpRoutes(app: Express) {
 
   api.get(
     "/proveedores",
-    requireAlguno("proveedores", "pedidos_proveedores"),
+    requirePermiso("pedidos"),
     (req, res, next) => {
       try {
         proveedoresController.list(req, res);
@@ -371,7 +373,7 @@ export function registerHttpRoutes(app: Express) {
 
   api.get(
     "/proveedores/:id",
-    requireAlguno("proveedores", "pedidos_proveedores"),
+    requirePermiso("pedidos"),
     (req, res, next) => {
       try {
         proveedoresController.getById(req, res);
@@ -381,7 +383,7 @@ export function registerHttpRoutes(app: Express) {
     }
   );
 
-  api.post("/proveedores", requirePermiso("proveedores"), (req, res, next) => {
+  api.post("/proveedores", requirePermiso("pedidos"), (req, res, next) => {
     try {
       proveedoresController.create(req, res);
     } catch (e) {
@@ -389,7 +391,7 @@ export function registerHttpRoutes(app: Express) {
     }
   });
 
-  api.put("/proveedores/:id", requirePermiso("proveedores"), (req, res, next) => {
+  api.put("/proveedores/:id", requirePermiso("pedidos"), (req, res, next) => {
     try {
       proveedoresController.update(req, res);
     } catch (e) {
@@ -397,7 +399,7 @@ export function registerHttpRoutes(app: Express) {
     }
   });
 
-  api.patch("/proveedores/:id/estado", requirePermiso("proveedores"), (req, res, next) => {
+  api.patch("/proveedores/:id/estado", requirePermiso("pedidos"), (req, res, next) => {
     try {
       proveedoresController.patchEstado(req, res);
     } catch (e) {
@@ -405,7 +407,7 @@ export function registerHttpRoutes(app: Express) {
     }
   });
 
-  api.delete("/proveedores/:id", requirePermiso("proveedores"), (req, res, next) => {
+  api.delete("/proveedores/:id", requirePermiso("pedidos"), (req, res, next) => {
     try {
       proveedoresController.remove(req, res);
     } catch (e) {
@@ -413,23 +415,23 @@ export function registerHttpRoutes(app: Express) {
     }
   });
 
-  api.get("/pedidos-proveedores", requirePermiso("pedidos_proveedores"), (req, res) => {
+  api.get("/pedidos-proveedores", requirePermiso("pedidos"), (req, res) => {
     const desde = typeof req.query.desde === "string" ? req.query.desde : undefined;
     const hasta = typeof req.query.hasta === "string" ? req.query.hasta : undefined;
     res.json(pedidoProveedorService.list(desde, hasta));
   });
 
-  api.get("/pedidos-proveedores/:id", requirePermiso("pedidos_proveedores"), (req, res) => {
+  api.get("/pedidos-proveedores/:id", requirePermiso("pedidos"), (req, res) => {
     const id = parseId(req, res);
     if (id == null) return;
     res.json(pedidoProveedorService.getById(id));
   });
 
-  api.post("/pedidos-proveedores", requirePermiso("pedidos_proveedores"), (req, res) => {
+  api.post("/pedidos-proveedores", requirePermiso("pedidos"), (req, res) => {
     res.status(201).json(pedidoProveedorService.create(req.body as Record<string, unknown>));
   });
 
-  api.patch("/pedidos-proveedores/:id", requirePermiso("pedidos_proveedores"), (req, res) => {
+  api.patch("/pedidos-proveedores/:id", requirePermiso("pedidos"), (req, res) => {
     const id = parseId(req, res);
     if (id == null) return;
     res.json(pedidoProveedorService.updateMeta(id, req.body as Record<string, unknown>));

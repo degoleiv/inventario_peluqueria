@@ -3,7 +3,7 @@ import { AppError } from "../lib/AppError.js";
 
 /** Ajuste físico vs sistema (trazabilidad de pérdidas / diferencias). */
 export const inventarioAjusteService = {
-  registrarAjuste(
+  async registrarAjuste(
     body: Record<string, unknown>,
     usuarioId: number | null | undefined
   ) {
@@ -15,28 +15,28 @@ export const inventarioAjusteService = {
       typeof body.motivo === "string" && body.motivo.trim() ? body.motivo.trim() : null;
 
     const now = new Date().toISOString();
-    const row = db.prepare(`SELECT id, stock, nombre FROM productos WHERE id = ?`).get(producto_id) as
-      | { id: number; stock: number; nombre: string }
-      | undefined;
+    const row = (await db
+      .prepare(`SELECT id, stock, nombre FROM productos WHERE id = ?`)
+      .get(producto_id)) as { id: number; stock: number; nombre: string } | undefined;
     if (!row) throw new AppError("Producto no existe", 404);
 
     const anterior = row.stock;
     const diferencia = stock_real - anterior;
 
-    db.transaction(() => {
-      db.prepare(
-        `INSERT INTO ajustes_inventario
+    await db.transaction(async () => {
+      await db
+        .prepare(
+          `INSERT INTO ajustes_inventario
          (producto_id, stock_anterior, stock_nuevo, diferencia, motivo, usuario_id, created_at)
          VALUES (?,?,?,?,?,?,?)`
-      ).run(producto_id, anterior, stock_real, diferencia, motivo, usuarioId ?? null, now);
-      db.prepare(`UPDATE productos SET stock = ?, updated_at = ? WHERE id = ?`).run(
-        stock_real,
-        now,
-        producto_id
-      );
-    })();
+        )
+        .run(producto_id, anterior, stock_real, diferencia, motivo, usuarioId ?? null, now);
+      await db
+        .prepare(`UPDATE productos SET stock = ?, updated_at = ? WHERE id = ?`)
+        .run(stock_real, now, producto_id);
+    });
 
-    recordSyncEvent("inventario", "ajuste_stock", {
+    await recordSyncEvent("inventario", "ajuste_stock", {
       producto_id,
       anterior,
       stock_real,

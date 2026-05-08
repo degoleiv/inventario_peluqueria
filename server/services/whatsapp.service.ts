@@ -3,12 +3,12 @@ import { db } from "../db.js";
 
 /** RF-11: recordatorio de cita (stub; conectar proveedor real con env). */
 export async function enviarRecordatorioCita(citaId: number) {
-  const row = db
+  const row = (await db
     .prepare(
       `SELECT c.*, cl.telefono, cl.nombre AS cliente_nombre
        FROM citas c JOIN clientes cl ON cl.id = c.cliente_id WHERE c.id = ?`
     )
-    .get(citaId) as
+    .get(citaId)) as
     | { telefono: string | null; cliente_nombre: string; inicio: string }
     | undefined;
   if (!row) throw new AppError("Cita no encontrada", 404);

@@ -5,7 +5,7 @@ const TIPOS = new Set(["adelanto", "descuento"]);
 const ESTADOS = new Set(["pendiente", "pagado"]);
 
 export const empleadoMovimientoService = {
-  list(empleadoId?: number) {
+  async list(empleadoId?: number) {
     let sql = `SELECT m.*, u.nombre AS empleado_nombre FROM empleado_movimientos m
                JOIN usuarios u ON u.id = m.empleado_id`;
     const params: number[] = [];
@@ -14,13 +14,13 @@ export const empleadoMovimientoService = {
       params.push(empleadoId);
     }
     sql += ` ORDER BY m.created_at DESC`;
-    return db.prepare(sql).all(...params);
+    return await db.prepare(sql).all(...params);
   },
 
-  create(body: Record<string, unknown>) {
+  async create(body: Record<string, unknown>) {
     const empleado_id = Number(body.empleado_id);
     if (!Number.isFinite(empleado_id)) throw new AppError("empleado_id requerido");
-    const ok = db.prepare(`SELECT id FROM usuarios WHERE id = ?`).get(empleado_id) as
+    const ok = (await db.prepare(`SELECT id FROM usuarios WHERE id = ?`).get(empleado_id)) as
       | { id: number }
       | undefined;
     if (!ok) throw new AppError("Empleado no encontrado");
@@ -37,14 +37,14 @@ export const empleadoMovimientoService = {
     const notas = typeof body.notas === "string" ? body.notas || null : null;
     const now = new Date().toISOString();
 
-    const info = db
+    const info = await db
       .prepare(
         `INSERT INTO empleado_movimientos (empleado_id, monto, tipo, estado, notas, created_at)
          VALUES (?,?,?,?,?,?)`
       )
       .run(empleado_id, monto, tipo, estado, notas, now);
 
-    return db
+    return await db
       .prepare(
         `SELECT m.*, u.nombre AS empleado_nombre FROM empleado_movimientos m
          JOIN usuarios u ON u.id = m.empleado_id WHERE m.id = ?`
@@ -52,12 +52,12 @@ export const empleadoMovimientoService = {
       .get(info.lastInsertRowid);
   },
 
-  updateEstado(id: number, estado: string) {
+  async updateEstado(id: number, estado: string) {
     const e = estado.trim().toLowerCase();
     if (!ESTADOS.has(e)) throw new AppError("estado debe ser pendiente o pagado");
-    const info = db.prepare(`UPDATE empleado_movimientos SET estado = ? WHERE id = ?`).run(e, id);
+    const info = await db.prepare(`UPDATE empleado_movimientos SET estado = ? WHERE id = ?`).run(e, id);
     if (info.changes === 0) throw new AppError("no encontrado", 404);
-    return db
+    return await db
       .prepare(
         `SELECT m.*, u.nombre AS empleado_nombre FROM empleado_movimientos m
          JOIN usuarios u ON u.id = m.empleado_id WHERE m.id = ?`
@@ -65,8 +65,8 @@ export const empleadoMovimientoService = {
       .get(id);
   },
 
-  resumen(empleadoId: number, desde?: string, hasta?: string) {
-    const ok = db.prepare(`SELECT id, nombre FROM usuarios WHERE id = ?`).get(empleadoId) as
+  async resumen(empleadoId: number, desde?: string, hasta?: string) {
+    const ok = (await db.prepare(`SELECT id, nombre FROM usuarios WHERE id = ?`).get(empleadoId)) as
       | { id: number; nombre: string | null }
       | undefined;
     if (!ok) throw new AppError("Empleado no encontrado", 404);
@@ -81,16 +81,14 @@ export const empleadoMovimientoService = {
       sqlC += ` AND fecha <= ?`;
       paramsC.push(hasta);
     }
-    const totalComisiones = (
-      db.prepare(sqlC).get(...paramsC) as { t: number }
-    ).t;
+    const totalComisiones = ((await db.prepare(sqlC).get(...paramsC)) as { t: number }).t;
 
-    const pend = db
+    const pend = (await db
       .prepare(
         `SELECT COALESCE(SUM(monto), 0) AS t FROM empleado_movimientos
          WHERE empleado_id = ? AND estado = 'pendiente'`
       )
-      .get(empleadoId) as { t: number };
+      .get(empleadoId)) as { t: number };
 
     const totalAdelantosPendiente = pend.t;
     const saldoFinal = Math.round((totalComisiones - totalAdelantosPendiente) * 100) / 100;

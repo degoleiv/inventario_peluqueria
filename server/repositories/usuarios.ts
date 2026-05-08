@@ -16,22 +16,22 @@ export type UsuarioRow = {
 };
 
 export const usuariosRepo = {
-  count(): number {
-    const r = db.prepare(`SELECT COUNT(*) AS n FROM usuarios`).get() as { n: number };
+  async count(): Promise<number> {
+    const r = (await db.prepare(`SELECT COUNT(*) AS n FROM usuarios`).get()) as { n: number };
     return r.n;
   },
 
-  findByEmail(email: string): UsuarioRow | undefined {
-    return db.prepare(`SELECT * FROM usuarios WHERE email = ? COLLATE NOCASE`).get(email) as
-      | UsuarioRow
-      | undefined;
+  async findByEmail(email: string): Promise<UsuarioRow | undefined> {
+    return (await db
+      .prepare(`SELECT * FROM usuarios WHERE email = ? COLLATE NOCASE`)
+      .get(email)) as UsuarioRow | undefined;
   },
 
-  findById(id: number): UsuarioRow | undefined {
-    return db.prepare(`SELECT * FROM usuarios WHERE id = ?`).get(id) as UsuarioRow | undefined;
+  async findById(id: number): Promise<UsuarioRow | undefined> {
+    return (await db.prepare(`SELECT * FROM usuarios WHERE id = ?`).get(id)) as UsuarioRow | undefined;
   },
 
-  create(params: {
+  async create(params: {
     email: string;
     password_hash: string;
     nombre: string | null;
@@ -41,11 +41,11 @@ export const usuariosRepo = {
     foto_url?: string | null;
     tipo_comision?: string;
     valor_comision?: number;
-  }): UsuarioRow {
+  }): Promise<UsuarioRow> {
     const now = new Date().toISOString();
     const tipo = params.tipo_comision ?? "porcentaje";
     const valor = params.valor_comision ?? 0;
-    const info = db
+    const info = await db
       .prepare(
         `INSERT INTO usuarios (email, password_hash, nombre, rol, activo, telefono, color_agenda, foto_url, tipo_comision, valor_comision, created_at)
          VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)`
@@ -62,60 +62,62 @@ export const usuariosRepo = {
         valor,
         now
       );
-    return db.prepare(`SELECT * FROM usuarios WHERE id = ?`).get(info.lastInsertRowid) as UsuarioRow;
+    return (await db
+      .prepare(`SELECT * FROM usuarios WHERE id = ?`)
+      .get(info.lastInsertRowid)) as UsuarioRow;
   },
 
-  list(): Omit<UsuarioRow, "password_hash">[] {
-    return db
+  async list(): Promise<Omit<UsuarioRow, "password_hash">[]> {
+    return (await db
       .prepare(
         `SELECT id, email, nombre, rol, activo, telefono, color_agenda, foto_url, tipo_comision, valor_comision, created_at FROM usuarios ORDER BY id`
       )
-      .all() as Omit<UsuarioRow, "password_hash">[];
+      .all()) as Omit<UsuarioRow, "password_hash">[];
   },
 
-  listActivos(): Omit<UsuarioRow, "password_hash">[] {
-    return db
+  async listActivos(): Promise<Omit<UsuarioRow, "password_hash">[]> {
+    return (await db
       .prepare(
         `SELECT id, email, nombre, rol, activo, telefono, color_agenda, foto_url, tipo_comision, valor_comision, created_at FROM usuarios WHERE activo = 1 ORDER BY nombre COLLATE NOCASE, email`
       )
-      .all() as Omit<UsuarioRow, "password_hash">[];
+      .all()) as Omit<UsuarioRow, "password_hash">[];
   },
 
-  delete(id: number): boolean {
-    const info = db.prepare(`DELETE FROM usuarios WHERE id = ?`).run(id);
+  async delete(id: number): Promise<boolean> {
+    const info = await db.prepare(`DELETE FROM usuarios WHERE id = ?`).run(id);
     return info.changes > 0;
   },
 
-  updateRol(id: number, rol: string): void {
-    db.prepare(`UPDATE usuarios SET rol = ? WHERE id = ?`).run(rol, id);
+  async updateRol(id: number, rol: string): Promise<void> {
+    await db.prepare(`UPDATE usuarios SET rol = ? WHERE id = ?`).run(rol, id);
   },
 
-  updateNombre(id: number, nombre: string | null): void {
-    db.prepare(`UPDATE usuarios SET nombre = ? WHERE id = ?`).run(nombre, id);
+  async updateNombre(id: number, nombre: string | null): Promise<void> {
+    await db.prepare(`UPDATE usuarios SET nombre = ? WHERE id = ?`).run(nombre, id);
   },
 
-  updatePasswordHash(id: number, password_hash: string): void {
-    db.prepare(`UPDATE usuarios SET password_hash = ? WHERE id = ?`).run(password_hash, id);
+  async updatePasswordHash(id: number, password_hash: string): Promise<void> {
+    await db.prepare(`UPDATE usuarios SET password_hash = ? WHERE id = ?`).run(password_hash, id);
   },
 
-  updateTelefono(id: number, telefono: string | null): void {
-    db.prepare(`UPDATE usuarios SET telefono = ? WHERE id = ?`).run(telefono, id);
+  async updateTelefono(id: number, telefono: string | null): Promise<void> {
+    await db.prepare(`UPDATE usuarios SET telefono = ? WHERE id = ?`).run(telefono, id);
   },
 
-  updateColorAgenda(id: number, color: string | null): void {
-    db.prepare(`UPDATE usuarios SET color_agenda = ? WHERE id = ?`).run(color, id);
+  async updateColorAgenda(id: number, color: string | null): Promise<void> {
+    await db.prepare(`UPDATE usuarios SET color_agenda = ? WHERE id = ?`).run(color, id);
   },
 
-  updateFotoUrl(id: number, url: string | null): void {
-    db.prepare(`UPDATE usuarios SET foto_url = ? WHERE id = ?`).run(url, id);
+  async updateFotoUrl(id: number, url: string | null): Promise<void> {
+    await db.prepare(`UPDATE usuarios SET foto_url = ? WHERE id = ?`).run(url, id);
   },
 
-  setActivo(id: number, activo: boolean): void {
-    db.prepare(`UPDATE usuarios SET activo = ? WHERE id = ?`).run(activo ? 1 : 0, id);
+  async setActivo(id: number, activo: boolean): Promise<void> {
+    await db.prepare(`UPDATE usuarios SET activo = ? WHERE id = ?`).run(activo ? 1 : 0, id);
   },
 
-  updateComision(id: number, tipo: string, valor: number): void {
-    db.prepare(`UPDATE usuarios SET tipo_comision = ?, valor_comision = ? WHERE id = ?`).run(
+  async updateComision(id: number, tipo: string, valor: number): Promise<void> {
+    await db.prepare(`UPDATE usuarios SET tipo_comision = ?, valor_comision = ? WHERE id = ?`).run(
       tipo,
       valor,
       id

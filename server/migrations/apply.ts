@@ -1,52 +1,59 @@
-import type Database from "better-sqlite3";
+import type { SqliteDb } from "../db.js";
 
-function tableExists(db: Database.Database, name: string): boolean {
-  const r = db
+async function tableExists(database: SqliteDb, name: string): Promise<boolean> {
+  const r = (await database
     .prepare(`SELECT 1 AS o FROM sqlite_master WHERE type = 'table' AND name = ?`)
-    .get(name) as { o: number } | undefined;
+    .get(name)) as { o: number } | undefined;
   return !!r;
 }
 
 /** Antes `compras` / `compra_lineas`; ahora `pedidos_proveedor` / `pedido_proveedor_lineas`. */
-function migrateComprasAPedidosProveedor(db: Database.Database) {
-  if (!tableExists(db, "compras") || tableExists(db, "pedidos_proveedor")) return;
+async function migrateComprasAPedidosProveedor(database: SqliteDb) {
+  if ((await tableExists(database, "compras")) === false || (await tableExists(database, "pedidos_proveedor")))
+    return;
 
-  db.pragma("foreign_keys = OFF");
+  await database.pragma("foreign_keys = OFF");
   try {
-    db.exec(`ALTER TABLE compras RENAME TO pedidos_proveedor`);
-    if (tableExists(db, "compra_lineas")) {
-      db.exec(`ALTER TABLE compra_lineas RENAME TO pedido_proveedor_lineas`);
-      db.exec(`ALTER TABLE pedido_proveedor_lineas RENAME COLUMN compra_id TO pedido_proveedor_id`);
+    await database.exec(`ALTER TABLE compras RENAME TO pedidos_proveedor`);
+    if (await tableExists(database, "compra_lineas")) {
+      await database.exec(`ALTER TABLE compra_lineas RENAME TO pedido_proveedor_lineas`);
+      await database.exec(
+        `ALTER TABLE pedido_proveedor_lineas RENAME COLUMN compra_id TO pedido_proveedor_id`
+      );
     }
-    const movCols = db.prepare(`PRAGMA table_info(movimientos_inventario)`).all() as { name: string }[];
+    const movCols = (await database.prepare(`PRAGMA table_info(movimientos_inventario)`).all()) as {
+      name: string;
+    }[];
     const mn = new Set(movCols.map((c) => c.name));
     if (mn.has("compra_id") && !mn.has("pedido_proveedor_id")) {
-      db.exec(`ALTER TABLE movimientos_inventario RENAME COLUMN compra_id TO pedido_proveedor_id`);
+      await database.exec(
+        `ALTER TABLE movimientos_inventario RENAME COLUMN compra_id TO pedido_proveedor_id`
+      );
     }
   } finally {
-    db.pragma("foreign_keys = ON");
+    await database.pragma("foreign_keys = ON");
   }
 
   const now = new Date().toISOString();
   const placeholderNombre = "(Histórico) Sin proveedor";
-  const existing = db.prepare(`SELECT id FROM proveedores WHERE nombre = ?`).get(placeholderNombre) as
-    | { id: number }
-    | undefined;
+  const existing = (await database
+    .prepare(`SELECT id FROM proveedores WHERE nombre = ?`)
+    .get(placeholderNombre)) as { id: number } | undefined;
   let phId = existing?.id;
   if (!phId) {
-    const ins = db
+    const ins = await database
       .prepare(
         `INSERT INTO proveedores (nombre, telefono, email, notas, created_at) VALUES (?,?,?,?,?)`
       )
       .run(placeholderNombre, null, null, "Migración: pedidos sin proveedor enlazado", now);
     phId = Number(ins.lastInsertRowid);
   }
-  db.prepare(`UPDATE pedidos_proveedor SET proveedor_id = ? WHERE proveedor_id IS NULL`).run(phId);
+  await database.prepare(`UPDATE pedidos_proveedor SET proveedor_id = ? WHERE proveedor_id IS NULL`).run(phId);
 }
 
 /** Unifica permisos `compras` / `pedidos_proveedores` / `proveedores` → `pedidos`. */
-function migrateRolesModuloPedidosUnificado(db: Database.Database) {
-  const rows = db.prepare(`SELECT slug, permisos FROM roles_app`).all() as {
+async function migrateRolesModuloPedidosUnificado(database: SqliteDb) {
+  const rows = (await database.prepare(`SELECT slug, permisos FROM roles_app`).all()) as {
     slug: string;
     permisos: string;
   }[];
@@ -61,7 +68,7 @@ function migrateRolesModuloPedidosUnificado(db: Database.Database) {
       );
       const next = [...new Set(mapped)];
       if (JSON.stringify(next) !== JSON.stringify(arr)) {
-        db.prepare(`UPDATE roles_app SET permisos = ? WHERE slug = ?`).run(
+        await database.prepare(`UPDATE roles_app SET permisos = ? WHERE slug = ?`).run(
           JSON.stringify(next),
           row.slug
         );
@@ -72,30 +79,32 @@ function migrateRolesModuloPedidosUnificado(db: Database.Database) {
   }
 }
 
-export function applyMigrations(db: Database.Database) {
-  const productCols = db.prepare(`PRAGMA table_info(productos)`).all() as { name: string }[];
+export async function applyMigrations(database: SqliteDb) {
+  const productCols = (await database.prepare(`PRAGMA table_info(productos)`).all()) as {
+    name: string;
+  }[];
   const pNames = new Set(productCols.map((c) => c.name));
 
   if (!pNames.has("precio_compra")) {
-    db.exec(`ALTER TABLE productos ADD COLUMN precio_compra REAL`);
+    await database.exec(`ALTER TABLE productos ADD COLUMN precio_compra REAL`);
   }
   if (!pNames.has("precio_venta")) {
-    db.exec(`ALTER TABLE productos ADD COLUMN precio_venta REAL`);
+    await database.exec(`ALTER TABLE productos ADD COLUMN precio_venta REAL`);
   }
   if (!pNames.has("stock_minimo")) {
-    db.exec(`ALTER TABLE productos ADD COLUMN stock_minimo INTEGER NOT NULL DEFAULT 5`);
+    await database.exec(`ALTER TABLE productos ADD COLUMN stock_minimo INTEGER NOT NULL DEFAULT 5`);
   }
   if (!pNames.has("fecha_vencimiento")) {
-    db.exec(`ALTER TABLE productos ADD COLUMN fecha_vencimiento TEXT`);
+    await database.exec(`ALTER TABLE productos ADD COLUMN fecha_vencimiento TEXT`);
   }
 
   if (pNames.has("precio")) {
-    db.exec(
+    await database.exec(
       `UPDATE productos SET precio_venta = COALESCE(precio_venta, precio), precio_compra = COALESCE(precio_compra, precio) WHERE precio IS NOT NULL`
     );
   }
 
-  db.exec(`
+  await database.exec(`
     CREATE TABLE IF NOT EXISTS usuarios (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       email TEXT NOT NULL UNIQUE COLLATE NOCASE,
@@ -123,13 +132,13 @@ export function applyMigrations(db: Database.Database) {
 
   `);
 
-  db.exec(`
+  await database.exec(`
     UPDATE citas SET estado = 'confirmado' WHERE estado = 'confirmada';
     UPDATE citas SET estado = 'cancelado' WHERE estado = 'cancelada';
   `);
 
   try {
-    db.exec(`
+    await database.exec(`
       CREATE UNIQUE INDEX IF NOT EXISTS idx_clientes_telefono_unique
         ON clientes(telefono) WHERE telefono IS NOT NULL AND telefono != '';
     `);
@@ -137,9 +146,9 @@ export function applyMigrations(db: Database.Database) {
     /* Duplicados históricos */
   }
 
-  migrateComprasAPedidosProveedor(db);
+  await migrateComprasAPedidosProveedor(database);
 
-  db.exec(`
+  await database.exec(`
     CREATE TABLE IF NOT EXISTS proveedores (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       nombre TEXT NOT NULL,
@@ -220,87 +229,93 @@ export function applyMigrations(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_facturas_fecha ON facturas_electronicas(fecha_emision);
   `);
 
-  if (tableExists(db, "proveedores")) {
-    const prCols = db.prepare(`PRAGMA table_info(proveedores)`).all() as { name: string }[];
+  if (await tableExists(database, "proveedores")) {
+    const prCols = (await database.prepare(`PRAGMA table_info(proveedores)`).all()) as { name: string }[];
     const prNames = new Set(prCols.map((c) => c.name));
     if (!prNames.has("nit")) {
-      db.exec(`ALTER TABLE proveedores ADD COLUMN nit TEXT`);
+      await database.exec(`ALTER TABLE proveedores ADD COLUMN nit TEXT`);
     }
     if (!prNames.has("direccion")) {
-      db.exec(`ALTER TABLE proveedores ADD COLUMN direccion TEXT`);
+      await database.exec(`ALTER TABLE proveedores ADD COLUMN direccion TEXT`);
     }
     if (!prNames.has("estado")) {
-      db.exec(`ALTER TABLE proveedores ADD COLUMN estado TEXT NOT NULL DEFAULT 'activo'`);
+      await database.exec(`ALTER TABLE proveedores ADD COLUMN estado TEXT NOT NULL DEFAULT 'activo'`);
     }
     if (!prNames.has("fecha_creacion")) {
-      db.exec(`ALTER TABLE proveedores ADD COLUMN fecha_creacion TEXT`);
+      await database.exec(`ALTER TABLE proveedores ADD COLUMN fecha_creacion TEXT`);
     }
     if (!prNames.has("fecha_actualizacion")) {
-      db.exec(`ALTER TABLE proveedores ADD COLUMN fecha_actualizacion TEXT`);
+      await database.exec(`ALTER TABLE proveedores ADD COLUMN fecha_actualizacion TEXT`);
     }
-    db.exec(
+    await database.exec(
       `UPDATE proveedores SET estado = 'activo' WHERE estado IS NULL OR trim(estado) = ''`
     );
-    db.exec(`UPDATE proveedores SET fecha_creacion = COALESCE(nullif(trim(fecha_creacion),''), created_at, datetime('now')) WHERE fecha_creacion IS NULL OR trim(fecha_creacion) = ''`);
-    db.exec(
+    await database.exec(
+      `UPDATE proveedores SET fecha_creacion = COALESCE(nullif(trim(fecha_creacion),''), created_at, datetime('now')) WHERE fecha_creacion IS NULL OR trim(fecha_creacion) = ''`
+    );
+    await database.exec(
       `UPDATE proveedores SET fecha_actualizacion = COALESCE(nullif(trim(fecha_actualizacion),''), created_at, fecha_creacion, datetime('now')) WHERE fecha_actualizacion IS NULL OR trim(fecha_actualizacion) = ''`
     );
-    db.exec(
+    await database.exec(
       `UPDATE proveedores SET nit = 'MIGRA-' || printf('%09d', id) WHERE nit IS NULL OR trim(nit) = ''`
     );
-    db.exec(`DROP INDEX IF EXISTS idx_proveedores_nit_unique`);
-    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_proveedores_nit_unique ON proveedores(nit)`);
+    await database.exec(`DROP INDEX IF EXISTS idx_proveedores_nit_unique`);
+    await database.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_proveedores_nit_unique ON proveedores(nit)`);
     if (!prNames.has("icono_url")) {
-      db.exec(`ALTER TABLE proveedores ADD COLUMN icono_url TEXT`);
+      await database.exec(`ALTER TABLE proveedores ADD COLUMN icono_url TEXT`);
     }
   }
 
-  const movCols = db.prepare(`PRAGMA table_info(movimientos_inventario)`).all() as { name: string }[];
+  const movCols = (await database.prepare(`PRAGMA table_info(movimientos_inventario)`).all()) as {
+    name: string;
+  }[];
   const movNames = new Set(movCols.map((c) => c.name));
   if (!movNames.has("pedido_proveedor_id")) {
-    db.exec(
+    await database.exec(
       `ALTER TABLE movimientos_inventario ADD COLUMN pedido_proveedor_id INTEGER REFERENCES pedidos_proveedor(id) ON DELETE SET NULL`
     );
   }
 
-  const pedCols = db.prepare(`PRAGMA table_info(pedidos_proveedor)`).all() as { name: string }[];
+  const pedCols = (await database.prepare(`PRAGMA table_info(pedidos_proveedor)`).all()) as {
+    name: string;
+  }[];
   const pedNames = new Set(pedCols.map((c) => c.name));
-  if (tableExists(db, "pedidos_proveedor")) {
+  if (await tableExists(database, "pedidos_proveedor")) {
     if (!pedNames.has("fecha_pago_con_descuento")) {
-      db.exec(`ALTER TABLE pedidos_proveedor ADD COLUMN fecha_pago_con_descuento TEXT`);
+      await database.exec(`ALTER TABLE pedidos_proveedor ADD COLUMN fecha_pago_con_descuento TEXT`);
     }
     if (!pedNames.has("fecha_pago_maxima")) {
-      db.exec(`ALTER TABLE pedidos_proveedor ADD COLUMN fecha_pago_maxima TEXT`);
+      await database.exec(`ALTER TABLE pedidos_proveedor ADD COLUMN fecha_pago_maxima TEXT`);
     }
     if (!pedNames.has("valor_pago_con_descuento")) {
-      db.exec(`ALTER TABLE pedidos_proveedor ADD COLUMN valor_pago_con_descuento REAL`);
+      await database.exec(`ALTER TABLE pedidos_proveedor ADD COLUMN valor_pago_con_descuento REAL`);
     }
     if (!pedNames.has("valor_pago_sin_descuento")) {
-      db.exec(`ALTER TABLE pedidos_proveedor ADD COLUMN valor_pago_sin_descuento REAL`);
+      await database.exec(`ALTER TABLE pedidos_proveedor ADD COLUMN valor_pago_sin_descuento REAL`);
     }
     if (!pedNames.has("estado")) {
-      db.exec(`ALTER TABLE pedidos_proveedor ADD COLUMN estado TEXT NOT NULL DEFAULT 'pendiente'`);
+      await database.exec(`ALTER TABLE pedidos_proveedor ADD COLUMN estado TEXT NOT NULL DEFAULT 'pendiente'`);
     }
   }
 
-  db.exec(`
+  await database.exec(`
     CREATE TABLE IF NOT EXISTS configuracion (
       clave TEXT PRIMARY KEY,
       valor TEXT NOT NULL
     );
   `);
-  db.exec(`
+  await database.exec(`
     INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('puntos_activo', '0');
     INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('puntos_por_unidad_moneda', '1');
   `);
 
-  const cliCols = db.prepare(`PRAGMA table_info(clientes)`).all() as { name: string }[];
+  const cliCols = (await database.prepare(`PRAGMA table_info(clientes)`).all()) as { name: string }[];
   const cliNames = new Set(cliCols.map((c) => c.name));
   if (!cliNames.has("puntos")) {
-    db.exec(`ALTER TABLE clientes ADD COLUMN puntos INTEGER NOT NULL DEFAULT 0`);
+    await database.exec(`ALTER TABLE clientes ADD COLUMN puntos INTEGER NOT NULL DEFAULT 0`);
   }
 
-  db.exec(`
+  await database.exec(`
     CREATE TABLE IF NOT EXISTS gastos_operativos (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       concepto TEXT NOT NULL,
@@ -362,11 +377,11 @@ export function applyMigrations(db: Database.Database) {
     );
   `);
 
-  db.exec(`
+  await database.exec(`
     INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('puntos_valor_redencion', '0');
   `);
 
-  db.exec(`
+  await database.exec(`
     CREATE TABLE IF NOT EXISTS roles_app (
       slug TEXT PRIMARY KEY,
       nombre TEXT NOT NULL,
@@ -375,20 +390,22 @@ export function applyMigrations(db: Database.Database) {
     );
   `);
 
-  const rolesCount = db.prepare(`SELECT COUNT(*) AS n FROM roles_app`).get() as { n: number };
+  const rolesCount = (await database.prepare(`SELECT COUNT(*) AS n FROM roles_app`).get()) as {
+    n: number;
+  };
   if (rolesCount.n === 0) {
     const now = new Date().toISOString();
-    const ins = db.prepare(
+    const ins = database.prepare(
       `INSERT INTO roles_app (slug, nombre, permisos, created_at) VALUES (?, ?, ?, ?)`
     );
-    ins.run("admin", "Administrador", JSON.stringify(["*"]), now);
-    ins.run(
+    await ins.run("admin", "Administrador", JSON.stringify(["*"]), now);
+    await ins.run(
       "vendedor",
       "Vendedor",
       JSON.stringify(["inicio", "ventas", "citas", "clientes"]),
       now
     );
-    ins.run(
+    await ins.run(
       "empleado",
       "Empleado",
       JSON.stringify([
@@ -405,88 +422,90 @@ export function applyMigrations(db: Database.Database) {
     );
   }
 
-  const ventaCols = db.prepare(`PRAGMA table_info(ventas)`).all() as { name: string }[];
+  const ventaCols = (await database.prepare(`PRAGMA table_info(ventas)`).all()) as { name: string }[];
   const ventaNames = new Set(ventaCols.map((c) => c.name));
   if (!ventaNames.has("descuento_puntos")) {
-    db.exec(`ALTER TABLE ventas ADD COLUMN descuento_puntos REAL NOT NULL DEFAULT 0`);
+    await database.exec(`ALTER TABLE ventas ADD COLUMN descuento_puntos REAL NOT NULL DEFAULT 0`);
   }
   if (!ventaNames.has("puntos_canjeados")) {
-    db.exec(`ALTER TABLE ventas ADD COLUMN puntos_canjeados INTEGER NOT NULL DEFAULT 0`);
+    await database.exec(`ALTER TABLE ventas ADD COLUMN puntos_canjeados INTEGER NOT NULL DEFAULT 0`);
   }
 
-  const factCols = db.prepare(`PRAGMA table_info(facturas_electronicas)`).all() as { name: string }[];
+  const factCols = (await database.prepare(`PRAGMA table_info(facturas_electronicas)`).all()) as {
+    name: string;
+  }[];
   const factNames = new Set(factCols.map((c) => c.name));
   if (!factNames.has("email_enviado_at")) {
-    db.exec(`ALTER TABLE facturas_electronicas ADD COLUMN email_enviado_at TEXT`);
+    await database.exec(`ALTER TABLE facturas_electronicas ADD COLUMN email_enviado_at TEXT`);
   }
 
-  const usrCols = db.prepare(`PRAGMA table_info(usuarios)`).all() as { name: string }[];
+  const usrCols = (await database.prepare(`PRAGMA table_info(usuarios)`).all()) as { name: string }[];
   const usrNames = new Set(usrCols.map((c) => c.name));
   if (!usrNames.has("telefono")) {
-    db.exec(`ALTER TABLE usuarios ADD COLUMN telefono TEXT`);
+    await database.exec(`ALTER TABLE usuarios ADD COLUMN telefono TEXT`);
   }
   if (!usrNames.has("color_agenda")) {
-    db.exec(`ALTER TABLE usuarios ADD COLUMN color_agenda TEXT`);
+    await database.exec(`ALTER TABLE usuarios ADD COLUMN color_agenda TEXT`);
   }
   if (!usrNames.has("foto_url")) {
-    db.exec(`ALTER TABLE usuarios ADD COLUMN foto_url TEXT`);
+    await database.exec(`ALTER TABLE usuarios ADD COLUMN foto_url TEXT`);
   }
 
-  const ventaCols2 = db.prepare(`PRAGMA table_info(ventas)`).all() as { name: string }[];
+  const ventaCols2 = (await database.prepare(`PRAGMA table_info(ventas)`).all()) as { name: string }[];
   const ventaNames2 = new Set(ventaCols2.map((c) => c.name));
   if (!ventaNames2.has("usuario_id")) {
-    db.exec(
+    await database.exec(
       `ALTER TABLE ventas ADD COLUMN usuario_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL`
     );
   }
 
-  const citaCols = db.prepare(`PRAGMA table_info(citas)`).all() as { name: string }[];
+  const citaCols = (await database.prepare(`PRAGMA table_info(citas)`).all()) as { name: string }[];
   const citaNames = new Set(citaCols.map((c) => c.name));
   if (!citaNames.has("usuario_id")) {
-    db.exec(
+    await database.exec(
       `ALTER TABLE citas ADD COLUMN usuario_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL`
     );
   }
 
-  const usrCols2 = db.prepare(`PRAGMA table_info(usuarios)`).all() as { name: string }[];
+  const usrCols2 = (await database.prepare(`PRAGMA table_info(usuarios)`).all()) as { name: string }[];
   const usrNames2 = new Set(usrCols2.map((c) => c.name));
   if (!usrNames2.has("tipo_comision")) {
-    db.exec(
+    await database.exec(
       `ALTER TABLE usuarios ADD COLUMN tipo_comision TEXT NOT NULL DEFAULT 'porcentaje'`
     );
   }
   if (!usrNames2.has("valor_comision")) {
-    db.exec(`ALTER TABLE usuarios ADD COLUMN valor_comision REAL NOT NULL DEFAULT 0`);
+    await database.exec(`ALTER TABLE usuarios ADD COLUMN valor_comision REAL NOT NULL DEFAULT 0`);
   }
 
-  const ventaCols3 = db.prepare(`PRAGMA table_info(ventas)`).all() as { name: string }[];
+  const ventaCols3 = (await database.prepare(`PRAGMA table_info(ventas)`).all()) as { name: string }[];
   const ventaNames3 = new Set(ventaCols3.map((c) => c.name));
   if (!ventaNames3.has("estado")) {
-    db.exec(`ALTER TABLE ventas ADD COLUMN estado TEXT NOT NULL DEFAULT 'confirmada'`);
+    await database.exec(`ALTER TABLE ventas ADD COLUMN estado TEXT NOT NULL DEFAULT 'confirmada'`);
   }
   if (!ventaNames3.has("cancelado_por")) {
-    db.exec(`ALTER TABLE ventas ADD COLUMN cancelado_por TEXT`);
+    await database.exec(`ALTER TABLE ventas ADD COLUMN cancelado_por TEXT`);
   }
   if (!ventaNames3.has("cancelado_motivo")) {
-    db.exec(`ALTER TABLE ventas ADD COLUMN cancelado_motivo TEXT`);
+    await database.exec(`ALTER TABLE ventas ADD COLUMN cancelado_motivo TEXT`);
   }
   if (!ventaNames3.has("cancelado_at")) {
-    db.exec(`ALTER TABLE ventas ADD COLUMN cancelado_at TEXT`);
+    await database.exec(`ALTER TABLE ventas ADD COLUMN cancelado_at TEXT`);
   }
 
-  const citaCols2 = db.prepare(`PRAGMA table_info(citas)`).all() as { name: string }[];
+  const citaCols2 = (await database.prepare(`PRAGMA table_info(citas)`).all()) as { name: string }[];
   const citaNames2 = new Set(citaCols2.map((c) => c.name));
   if (!citaNames2.has("cancelado_por")) {
-    db.exec(`ALTER TABLE citas ADD COLUMN cancelado_por TEXT`);
+    await database.exec(`ALTER TABLE citas ADD COLUMN cancelado_por TEXT`);
   }
   if (!citaNames2.has("cancelado_motivo")) {
-    db.exec(`ALTER TABLE citas ADD COLUMN cancelado_motivo TEXT`);
+    await database.exec(`ALTER TABLE citas ADD COLUMN cancelado_motivo TEXT`);
   }
   if (!citaNames2.has("cancelado_at")) {
-    db.exec(`ALTER TABLE citas ADD COLUMN cancelado_at TEXT`);
+    await database.exec(`ALTER TABLE citas ADD COLUMN cancelado_at TEXT`);
   }
 
-  db.exec(`
+  await database.exec(`
     CREATE TABLE IF NOT EXISTS comisiones (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       empleado_id INTEGER NOT NULL REFERENCES usuarios(id),
@@ -521,13 +540,15 @@ export function applyMigrations(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_emp_mov_empleado ON empleado_movimientos(empleado_id);
   `);
 
-  const cliColsGuest = db.prepare(`PRAGMA table_info(clientes)`).all() as { name: string }[];
+  const cliColsGuest = (await database.prepare(`PRAGMA table_info(clientes)`).all()) as {
+    name: string;
+  }[];
   const cliGuestNames = new Set(cliColsGuest.map((c) => c.name));
   if (!cliGuestNames.has("tipo_cliente")) {
-    db.exec(`ALTER TABLE clientes ADD COLUMN tipo_cliente TEXT NOT NULL DEFAULT 'registrado'`);
+    await database.exec(`ALTER TABLE clientes ADD COLUMN tipo_cliente TEXT NOT NULL DEFAULT 'registrado'`);
   }
   if (!cliGuestNames.has("activo")) {
-    db.exec(`ALTER TABLE clientes ADD COLUMN activo INTEGER NOT NULL DEFAULT 1`);
+    await database.exec(`ALTER TABLE clientes ADD COLUMN activo INTEGER NOT NULL DEFAULT 1`);
   }
-  migrateRolesModuloPedidosUnificado(db);
+  await migrateRolesModuloPedidosUnificado(database);
 }

@@ -21,7 +21,7 @@ function rangesOverlap(a0: number, a1: number, b0: number, b1: number) {
 }
 
 export const turnoService = {
-  list(desde?: string, hasta?: string, empleadoId?: number) {
+  async list(desde?: string, hasta?: string, empleadoId?: number) {
     let sql = `SELECT t.*, u.nombre AS empleado_nombre FROM turnos_empleado t
                JOIN usuarios u ON u.id = t.empleado_id WHERE 1=1`;
     const params: (string | number)[] = [];
@@ -38,13 +38,13 @@ export const turnoService = {
       params.push(hasta);
     }
     sql += ` ORDER BY t.fecha ASC, t.hora_inicio ASC`;
-    return db.prepare(sql).all(...params);
+    return await db.prepare(sql).all(...params);
   },
 
-  create(body: Record<string, unknown>) {
+  async create(body: Record<string, unknown>) {
     const empleado_id = Number(body.empleado_id);
     if (!Number.isFinite(empleado_id)) throw new AppError("empleado_id requerido");
-    const ok = db.prepare(`SELECT id FROM usuarios WHERE id = ?`).get(empleado_id) as
+    const ok = (await db.prepare(`SELECT id FROM usuarios WHERE id = ?`).get(empleado_id)) as
       | { id: number }
       | undefined;
     if (!ok) throw new AppError("Empleado no encontrado");
@@ -61,11 +61,11 @@ export const turnoService = {
     let estado = typeof body.estado === "string" ? body.estado : "activo";
     if (estado !== "activo" && estado !== "finalizado") estado = "activo";
 
-    const rows = db
+    const rows = (await db
       .prepare(
         `SELECT id, hora_inicio, hora_fin FROM turnos_empleado WHERE empleado_id = ? AND fecha = ?`
       )
-      .all(empleado_id, fecha) as { id: number; hora_inicio: string; hora_fin: string }[];
+      .all(empleado_id, fecha)) as { id: number; hora_inicio: string; hora_fin: string }[];
 
     for (const r of rows) {
       const r0 = toMinutes(r.hora_inicio);
@@ -76,14 +76,14 @@ export const turnoService = {
     }
 
     const now = new Date().toISOString();
-    const info = db
+    const info = await db
       .prepare(
         `INSERT INTO turnos_empleado (empleado_id, fecha, hora_inicio, hora_fin, estado, created_at)
          VALUES (?,?,?,?,?,?)`
       )
       .run(empleado_id, fecha, hora_inicio.trim(), hora_fin.trim(), estado, now);
 
-    return db
+    return await db
       .prepare(
         `SELECT t.*, u.nombre AS empleado_nombre FROM turnos_empleado t
          JOIN usuarios u ON u.id = t.empleado_id WHERE t.id = ?`
@@ -91,17 +91,17 @@ export const turnoService = {
       .get(info.lastInsertRowid);
   },
 
-  update(id: number, body: Record<string, unknown>) {
-    const ex = db
+  async update(id: number, body: Record<string, unknown>) {
+    const ex = (await db
       .prepare(`SELECT * FROM turnos_empleado WHERE id = ?`)
-      .get(id) as Record<string, unknown> | undefined;
+      .get(id)) as Record<string, unknown> | undefined;
     if (!ex) throw new AppError("no encontrado", 404);
 
     const empleado_id =
       body.empleado_id != null && Number.isFinite(Number(body.empleado_id))
         ? Math.floor(Number(body.empleado_id))
         : Number(ex.empleado_id);
-    const ok = db.prepare(`SELECT id FROM usuarios WHERE id = ?`).get(empleado_id) as
+    const ok = (await db.prepare(`SELECT id FROM usuarios WHERE id = ?`).get(empleado_id)) as
       | { id: number }
       | undefined;
     if (!ok) throw new AppError("Empleado no encontrado");
@@ -120,11 +120,11 @@ export const turnoService = {
     let estado = typeof body.estado === "string" ? body.estado : String(ex.estado);
     if (estado !== "activo" && estado !== "finalizado") estado = "activo";
 
-    const rows = db
+    const rows = (await db
       .prepare(
         `SELECT id, hora_inicio, hora_fin FROM turnos_empleado WHERE empleado_id = ? AND fecha = ? AND id != ?`
       )
-      .all(empleado_id, fecha, id) as { id: number; hora_inicio: string; hora_fin: string }[];
+      .all(empleado_id, fecha, id)) as { id: number; hora_inicio: string; hora_fin: string }[];
 
     for (const r of rows) {
       const r0 = toMinutes(r.hora_inicio);
@@ -134,11 +134,13 @@ export const turnoService = {
       }
     }
 
-    db.prepare(
-      `UPDATE turnos_empleado SET empleado_id = ?, fecha = ?, hora_inicio = ?, hora_fin = ?, estado = ? WHERE id = ?`
-    ).run(empleado_id, fecha, hora_inicio.trim(), hora_fin.trim(), estado, id);
+    await db
+      .prepare(
+        `UPDATE turnos_empleado SET empleado_id = ?, fecha = ?, hora_inicio = ?, hora_fin = ?, estado = ? WHERE id = ?`
+      )
+      .run(empleado_id, fecha, hora_inicio.trim(), hora_fin.trim(), estado, id);
 
-    return db
+    return await db
       .prepare(
         `SELECT t.*, u.nombre AS empleado_nombre FROM turnos_empleado t
          JOIN usuarios u ON u.id = t.empleado_id WHERE t.id = ?`
@@ -146,8 +148,8 @@ export const turnoService = {
       .get(id);
   },
 
-  delete(id: number) {
-    const info = db.prepare(`DELETE FROM turnos_empleado WHERE id = ?`).run(id);
+  async delete(id: number) {
+    const info = await db.prepare(`DELETE FROM turnos_empleado WHERE id = ?`).run(id);
     if (info.changes === 0) throw new AppError("no encontrado", 404);
   },
 };

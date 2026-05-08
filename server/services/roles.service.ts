@@ -46,10 +46,10 @@ function slugOk(slug: string): boolean {
 }
 
 export const rolesService = {
-  permisosParaRol(slug: string): string[] {
-    const row = db
+  async permisosParaRol(slug: string): Promise<string[]> {
+    const row = (await db
       .prepare(`SELECT permisos FROM roles_app WHERE slug = ?`)
-      .get(slug) as { permisos: string } | undefined;
+      .get(slug)) as { permisos: string } | undefined;
     if (!row) {
       if (slug === RESERVED_ADMIN_SLUG) return ["*"];
       return [];
@@ -63,27 +63,27 @@ export const rolesService = {
     }
   },
 
-  exists(slug: string): boolean {
-    const row = db.prepare(`SELECT 1 AS ok FROM roles_app WHERE slug = ?`).get(slug) as
+  async exists(slug: string): Promise<boolean> {
+    const row = (await db.prepare(`SELECT 1 AS ok FROM roles_app WHERE slug = ?`).get(slug)) as
       | { ok: number }
       | undefined;
     return !!row;
   },
 
-  list() {
-    return db
+  async list() {
+    return (await db
       .prepare(`SELECT slug, nombre, permisos, created_at FROM roles_app ORDER BY nombre`)
-      .all() as { slug: string; nombre: string; permisos: string; created_at: string }[];
+      .all()) as { slug: string; nombre: string; permisos: string; created_at: string }[];
   },
 
-  get(slug: string) {
-    const row = db
+  async get(slug: string) {
+    const row = (await db
       .prepare(`SELECT slug, nombre, permisos, created_at FROM roles_app WHERE slug = ?`)
-      .get(slug) as { slug: string; nombre: string; permisos: string; created_at: string } | undefined;
+      .get(slug)) as { slug: string; nombre: string; permisos: string; created_at: string } | undefined;
     return row ?? null;
   },
 
-  create(body: Record<string, unknown>) {
+  async create(body: Record<string, unknown>) {
     const slug = String(body.slug ?? "")
       .trim()
       .toLowerCase();
@@ -95,7 +95,7 @@ export const rolesService = {
     }
     if (!nombre) throw new AppError("nombre requerido");
     if (slug === RESERVED_ADMIN_SLUG) throw new AppError("El rol admin está reservado");
-    if (rolesService.exists(slug)) throw new AppError("Ya existe ese rol");
+    if (await rolesService.exists(slug)) throw new AppError("Ya existe ese rol");
 
     const raw = body.permisos;
     if (!Array.isArray(raw)) throw new AppError("permisos debe ser un array de strings");
@@ -103,14 +103,14 @@ export const rolesService = {
     if (permisos.length === 0) throw new AppError("Definí al menos un permiso o *");
 
     const now = new Date().toISOString();
-    db.prepare(
-      `INSERT INTO roles_app (slug, nombre, permisos, created_at) VALUES (?, ?, ?, ?)`
-    ).run(slug, nombre, JSON.stringify(permisos), now);
-    return rolesService.get(slug);
+    await db
+      .prepare(`INSERT INTO roles_app (slug, nombre, permisos, created_at) VALUES (?, ?, ?, ?)`)
+      .run(slug, nombre, JSON.stringify(permisos), now);
+    return await rolesService.get(slug);
   },
 
-  update(slug: string, body: Record<string, unknown>) {
-    const row = rolesService.get(slug);
+  async update(slug: string, body: Record<string, unknown>) {
+    const row = await rolesService.get(slug);
     if (!row) throw new AppError("Rol no encontrado", 404);
     if (slug === RESERVED_ADMIN_SLUG) {
       const permisos = JSON.stringify(["*"]);
@@ -118,12 +118,12 @@ export const rolesService = {
         typeof body.nombre === "string" && body.nombre.trim()
           ? body.nombre.trim()
           : row.nombre;
-      db.prepare(`UPDATE roles_app SET nombre = ?, permisos = ? WHERE slug = ?`).run(
+      await db.prepare(`UPDATE roles_app SET nombre = ?, permisos = ? WHERE slug = ?`).run(
         nombre,
         permisos,
         slug
       );
-      return rolesService.get(slug);
+      return await rolesService.get(slug);
     }
 
     let nombre = row.nombre;
@@ -137,22 +137,22 @@ export const rolesService = {
       permJson = JSON.stringify(permisos);
     }
 
-    db.prepare(`UPDATE roles_app SET nombre = ?, permisos = ? WHERE slug = ?`).run(
+    await db.prepare(`UPDATE roles_app SET nombre = ?, permisos = ? WHERE slug = ?`).run(
       nombre,
       permJson,
       slug
     );
-    return rolesService.get(slug);
+    return await rolesService.get(slug);
   },
 
-  delete(slug: string) {
+  async delete(slug: string) {
     if (slug === RESERVED_ADMIN_SLUG) throw new AppError("No se puede eliminar el rol administrador");
-    const row = rolesService.get(slug);
+    const row = await rolesService.get(slug);
     if (!row) throw new AppError("Rol no encontrado", 404);
-    const n = db.prepare(`SELECT COUNT(*) AS c FROM usuarios WHERE rol = ?`).get(slug) as {
+    const n = (await db.prepare(`SELECT COUNT(*) AS c FROM usuarios WHERE rol = ?`).get(slug)) as {
       c: number;
     };
     if (n.c > 0) throw new AppError("Hay usuarios con este rol; reasigná antes de borrar");
-    db.prepare(`DELETE FROM roles_app WHERE slug = ?`).run(slug);
+    await db.prepare(`DELETE FROM roles_app WHERE slug = ?`).run(slug);
   },
 };

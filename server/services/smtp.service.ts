@@ -10,18 +10,20 @@ const SMTP_KEYS = {
   from: "smtp_from",
 } as const;
 
-function getValor(clave: string): string | null {
-  const row = db.prepare(`SELECT valor FROM configuracion WHERE clave = ?`).get(clave) as
+async function getValor(clave: string): Promise<string | null> {
+  const row = (await db.prepare(`SELECT valor FROM configuracion WHERE clave = ?`).get(clave)) as
     | { valor: string }
     | undefined;
   return row?.valor ?? null;
 }
 
-function setValor(clave: string, valor: string) {
-  db.prepare(
-    `INSERT INTO configuracion (clave, valor) VALUES (?, ?)
+async function setValor(clave: string, valor: string): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO configuracion (clave, valor) VALUES (?, ?)
      ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor`
-  ).run(clave, valor);
+    )
+    .run(clave, valor);
 }
 
 export type ResolvedSmtp = {
@@ -42,32 +44,32 @@ function parseBoolEnv(v: string | undefined): boolean | undefined {
 }
 
 /** Configuración efectiva: variables de entorno tienen prioridad sobre la tabla `configuracion`. */
-export function resolveSmtp(): ResolvedSmtp | null {
-  const host = (process.env.SMTP_HOST || getValor(SMTP_KEYS.host) || "").trim();
-  const portRaw = process.env.SMTP_PORT?.trim() || getValor(SMTP_KEYS.port)?.trim() || "587";
+export async function resolveSmtp(): Promise<ResolvedSmtp | null> {
+  const host = (process.env.SMTP_HOST || (await getValor(SMTP_KEYS.host)) || "").trim();
+  const portRaw = process.env.SMTP_PORT?.trim() || (await getValor(SMTP_KEYS.port))?.trim() || "587";
   const port = Number(portRaw);
   const portN = Number.isFinite(port) && port > 0 ? port : 587;
 
   const secureEnv = parseBoolEnv(process.env.SMTP_SECURE);
-  const secureDb = getValor(SMTP_KEYS.secure);
+  const secureDb = await getValor(SMTP_KEYS.secure);
   let secure: boolean;
   if (secureEnv !== undefined) secure = secureEnv;
   else if (secureDb === "1" || secureDb === "true") secure = true;
   else if (secureDb === "0" || secureDb === "false") secure = false;
   else secure = portN === 465;
 
-  const user = (process.env.SMTP_USER?.trim() || getValor(SMTP_KEYS.user)?.trim() || "").trim();
+  const user = (process.env.SMTP_USER?.trim() || (await getValor(SMTP_KEYS.user))?.trim() || "").trim();
   const pass = (process.env.SMTP_PASSWORD?.trim() || process.env.SMTP_PASS?.trim() || "").trim();
   const fromEnv = process.env.SMTP_FROM?.trim();
-  const fromDb = getValor(SMTP_KEYS.from)?.trim();
+  const fromDb = (await getValor(SMTP_KEYS.from))?.trim();
   const from = (fromEnv || fromDb || user || "").trim();
 
   if (!host || !from) return null;
   return { host, port: portN, secure, user, pass, from };
 }
 
-function requireSmtp(): ResolvedSmtp {
-  const c = resolveSmtp();
+async function requireSmtp(): Promise<ResolvedSmtp> {
+  const c = await resolveSmtp();
   if (!c) {
     throw new AppError(
       "SMTP no configurado: definí SMTP_HOST y SMTP_FROM (y credenciales SMTP_PASSWORD / SMTP_USER si tu servidor lo exige). Opcionalmente podés guardar host/puerto en Configuración.",
@@ -78,11 +80,11 @@ function requireSmtp(): ResolvedSmtp {
 }
 
 export const smtpService = {
-  isReady(): boolean {
-    return resolveSmtp() != null;
+  async isReady(): Promise<boolean> {
+    return (await resolveSmtp()) != null;
   },
 
-  getPublicConfig(): {
+  async getPublicConfig(): Promise<{
     configured: boolean;
     host: string;
     port: number;
@@ -90,8 +92,8 @@ export const smtpService = {
     user: string;
     from: string;
     password_set_via_env: boolean;
-  } {
-    const c = resolveSmtp();
+  }> {
+    const c = await resolveSmtp();
     const password_set_via_env = !!(
       process.env.SMTP_PASSWORD?.trim() || process.env.SMTP_PASS?.trim()
     );
@@ -117,23 +119,23 @@ export const smtpService = {
     };
   },
 
-  updateStoredConfig(body: Record<string, unknown>) {
-    if (typeof body.host === "string") setValor(SMTP_KEYS.host, body.host.trim());
+  async updateStoredConfig(body: Record<string, unknown>) {
+    if (typeof body.host === "string") await setValor(SMTP_KEYS.host, body.host.trim());
     if (body.port != null) {
       const n = Number(body.port);
       if (!Number.isFinite(n) || n <= 0 || n > 65535) {
         throw new AppError("smtp port inválido");
       }
-      setValor(SMTP_KEYS.port, String(Math.floor(n)));
+      await setValor(SMTP_KEYS.port, String(Math.floor(n)));
     }
-    if (typeof body.secure === "boolean") setValor(SMTP_KEYS.secure, body.secure ? "1" : "0");
-    if (typeof body.user === "string") setValor(SMTP_KEYS.user, body.user.trim());
-    if (typeof body.from === "string") setValor(SMTP_KEYS.from, body.from.trim());
-    return smtpService.getPublicConfig();
+    if (typeof body.secure === "boolean") await setValor(SMTP_KEYS.secure, body.secure ? "1" : "0");
+    if (typeof body.user === "string") await setValor(SMTP_KEYS.user, body.user.trim());
+    if (typeof body.from === "string") await setValor(SMTP_KEYS.from, body.from.trim());
+    return await smtpService.getPublicConfig();
   },
 
   async verifyConnection(): Promise<void> {
-    const c = requireSmtp();
+    const c = await requireSmtp();
     const transporter = nodemailer.createTransport({
       host: c.host,
       port: c.port,
@@ -150,7 +152,7 @@ export const smtpService = {
     html?: string;
     attachments?: Array<{ filename: string; content: string | Buffer; contentType?: string }>;
   }): Promise<void> {
-    const c = requireSmtp();
+    const c = await requireSmtp();
     const transporter = nodemailer.createTransport({
       host: c.host,
       port: c.port,

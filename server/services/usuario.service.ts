@@ -6,8 +6,8 @@ import { usuariosRepo } from "../repositories/usuarios.js";
 import { rolesService } from "./roles.service.js";
 
 export const usuarioService = {
-  list() {
-    return usuariosRepo.list();
+  async list() {
+    return await usuariosRepo.list();
   },
 
   async create(params: {
@@ -25,11 +25,11 @@ export const usuarioService = {
     if (!email || params.password.length < 6) {
       throw new AppError("Email y contraseña (≥6) requeridos");
     }
-    if (usuariosRepo.findByEmail(email)) {
+    if (await usuariosRepo.findByEmail(email)) {
       throw new AppError("Email ya registrado");
     }
     const rol = (params.rol ?? "empleado").trim().toLowerCase();
-    if (!rolesService.exists(rol)) {
+    if (!(await rolesService.exists(rol))) {
       throw new AppError("Rol inválido o inexistente");
     }
     const hash = await bcrypt.hash(params.password, BCRYPT_ROUNDS);
@@ -40,7 +40,7 @@ export const usuarioService = {
         ? Number(params.valor_comision)
         : 0;
 
-    const row = usuariosRepo.create({
+    const row = await usuariosRepo.create({
       email,
       password_hash: hash,
       nombre: params.nombre?.trim() || null,
@@ -51,7 +51,7 @@ export const usuarioService = {
       tipo_comision: tipoCom,
       valor_comision: valorCom,
     });
-    recordSyncEvent("usuario", "creado", { id: row.id, email: row.email });
+    await recordSyncEvent("usuario", "creado", { id: row.id, email: row.email });
     const { password_hash: _p, ...safe } = row;
     return safe;
   },
@@ -70,53 +70,53 @@ export const usuarioService = {
       valor_comision?: number;
     }
   ) {
-    const u = usuariosRepo.findById(id);
+    const u = await usuariosRepo.findById(id);
     if (!u) throw new AppError("Usuario no encontrado", 404);
 
     const nextRol =
       params.rol != null ? params.rol.trim().toLowerCase() : undefined;
     if (nextRol != null) {
-      if (!rolesService.exists(nextRol)) throw new AppError("Rol inválido");
+      if (!(await rolesService.exists(nextRol))) throw new AppError("Rol inválido");
       if (u.rol === "admin" && nextRol !== "admin") {
-        const admins = db
+        const admins = (await db
           .prepare(`SELECT COUNT(*) AS c FROM usuarios WHERE rol = 'admin'`)
-          .get() as { c: number };
+          .get()) as { c: number };
         if (admins.c <= 1) {
           throw new AppError("Debe existir al menos un usuario administrador");
         }
       }
-      usuariosRepo.updateRol(id, nextRol);
+      await usuariosRepo.updateRol(id, nextRol);
     }
 
     if (params.nombre !== undefined) {
-      usuariosRepo.updateNombre(id, params.nombre?.trim() || null);
+      await usuariosRepo.updateNombre(id, params.nombre?.trim() || null);
     }
 
     if (params.password != null && params.password.length > 0) {
       if (params.password.length < 6) throw new AppError("La contraseña debe tener al menos 6 caracteres");
       const hash = await bcrypt.hash(params.password, BCRYPT_ROUNDS);
-      usuariosRepo.updatePasswordHash(id, hash);
+      await usuariosRepo.updatePasswordHash(id, hash);
     }
 
     if (params.telefono !== undefined) {
-      usuariosRepo.updateTelefono(id, params.telefono?.trim() || null);
+      await usuariosRepo.updateTelefono(id, params.telefono?.trim() || null);
     }
     if (params.color_agenda !== undefined) {
-      usuariosRepo.updateColorAgenda(id, params.color_agenda?.trim() || null);
+      await usuariosRepo.updateColorAgenda(id, params.color_agenda?.trim() || null);
     }
     if (params.foto_url !== undefined) {
-      usuariosRepo.updateFotoUrl(id, params.foto_url?.trim() || null);
+      await usuariosRepo.updateFotoUrl(id, params.foto_url?.trim() || null);
     }
     if (params.activo !== undefined) {
       if (!params.activo && u.rol === "admin") {
-        const admins = db
+        const admins = (await db
           .prepare(`SELECT COUNT(*) AS c FROM usuarios WHERE rol = 'admin' AND activo = 1`)
-          .get() as { c: number };
+          .get()) as { c: number };
         if (admins.c <= 1) {
           throw new AppError("No se puede desactivar el último administrador activo");
         }
       }
-      usuariosRepo.setActivo(id, params.activo);
+      await usuariosRepo.setActivo(id, params.activo);
     }
 
     if (params.tipo_comision !== undefined || params.valor_comision !== undefined) {
@@ -126,30 +126,30 @@ export const usuarioService = {
         params.valor_comision !== undefined && Number.isFinite(Number(params.valor_comision))
           ? Number(params.valor_comision)
           : Number((u as { valor_comision?: number }).valor_comision ?? 0);
-      usuariosRepo.updateComision(id, tipo, valor);
+      await usuariosRepo.updateComision(id, tipo, valor);
     }
 
-    recordSyncEvent("usuario", "actualizado", { id });
-    const row = usuariosRepo.findById(id)!;
+    await recordSyncEvent("usuario", "actualizado", { id });
+    const row = (await usuariosRepo.findById(id))!;
     const { password_hash: _p, ...safe } = row;
     return safe;
   },
 
-  delete(id: number) {
-    if (usuariosRepo.count() <= 1) {
+  async delete(id: number) {
+    if ((await usuariosRepo.count()) <= 1) {
       throw new AppError("No se puede eliminar el último usuario");
     }
-    const u = usuariosRepo.findById(id);
+    const u = await usuariosRepo.findById(id);
     if (!u) throw new AppError("no encontrado", 404);
     if (u.rol === "admin") {
-      const admins = db
+      const admins = (await db
         .prepare(`SELECT COUNT(*) AS c FROM usuarios WHERE rol = 'admin'`)
-        .get() as { c: number };
+        .get()) as { c: number };
       if (admins.c <= 1) {
         throw new AppError("No se puede eliminar el último administrador");
       }
     }
-    usuariosRepo.delete(id);
-    recordSyncEvent("usuario", "eliminado", { id: u.id, email: u.email });
+    await usuariosRepo.delete(id);
+    await recordSyncEvent("usuario", "eliminado", { id: u.id, email: u.email });
   },
 };

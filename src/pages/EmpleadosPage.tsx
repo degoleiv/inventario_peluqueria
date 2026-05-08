@@ -570,48 +570,50 @@ export function EmpleadosPage({ onChanged }: Props) {
                               Generando descarga…
                             </span>
                           ) : null}
-                          <button
-                            type="button"
-                            className="btn-icon-row btn-icon-row--edit"
-                            title="Editar empleado"
-                            aria-label="Editar empleado"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              openEdit(u);
-                            }}
-                          >
-                            <PencilSimple size={20} weight="regular" aria-hidden />
-                          </button>
-                          {puedeCertificado ? (
+                          <div className="empleado-cell-acciones__buttons">
                             <button
                               type="button"
-                              className="btn-icon-row btn-icon-row--download"
-                              title="Descargar certificado"
-                              aria-label="Descargar certificado"
-                              disabled={certBusy !== null}
+                              className="btn-icon-row btn-icon-row--edit"
+                              title="Editar empleado"
+                              aria-label="Editar empleado"
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                void runCertificadoDescarga(u);
+                                openEdit(u);
                               }}
                             >
-                              <Download size={20} weight="regular" aria-hidden />
+                              <PencilSimple size={20} weight="regular" aria-hidden />
                             </button>
-                          ) : null}
-                          <button
-                            type="button"
-                            className="btn-icon-row btn-icon-row--delete"
-                            title="Eliminar empleado"
-                            aria-label="Eliminar empleado"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              void onDelete(u);
-                            }}
-                          >
-                            <Trash size={20} weight="regular" aria-hidden />
-                          </button>
+                            {puedeCertificado ? (
+                              <button
+                                type="button"
+                                className="btn-icon-row btn-icon-row--download"
+                                title="Descargar certificado"
+                                aria-label="Descargar certificado"
+                                disabled={certBusy !== null}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  void runCertificadoDescarga(u);
+                                }}
+                              >
+                                <Download size={20} weight="regular" aria-hidden />
+                              </button>
+                            ) : null}
+                            <button
+                              type="button"
+                              className="btn-icon-row btn-icon-row--delete"
+                              title="Eliminar empleado"
+                              aria-label="Eliminar empleado"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                void onDelete(u);
+                              }}
+                            >
+                              <Trash size={20} weight="regular" aria-hidden />
+                            </button>
+                          </div>
                         </div>
                       </td>
                       <td className="td-empleado-switch">

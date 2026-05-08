@@ -13,7 +13,7 @@ function parseId(req: Request, res: Response): number | null {
 }
 
 export const proveedoresController = {
-  list(req: Request, res: Response): void {
+  async list(req: Request, res: Response): Promise<void> {
     const incluirInactivos = req.query.incluir_inactivos === "1";
     const puedeGestionar = hasPermiso(req.user?.permisos, "pedidos");
     if (incluirInactivos && !puedeGestionar) {
@@ -25,7 +25,7 @@ export const proveedoresController = {
       throw new AppError("Sin permiso para filtrar proveedores inactivos", 403);
     }
     res.json(
-      proveedoresService.list({
+      await proveedoresService.list({
         incluirInactivos,
         userMayViewInactive: puedeGestionar,
         search,
@@ -34,32 +34,32 @@ export const proveedoresController = {
     );
   },
 
-  getById(req: Request, res: Response): void {
+  async getById(req: Request, res: Response): Promise<void> {
     const id = parseId(req, res);
     if (id == null) return;
-    res.json(proveedoresService.getById(id));
+    res.json(await proveedoresService.getById(id));
   },
 
-  create(req: Request, res: Response): void {
-    res.status(201).json(proveedoresService.create(req.body as Record<string, unknown>));
+  async create(req: Request, res: Response): Promise<void> {
+    res.status(201).json(await proveedoresService.create(req.body as Record<string, unknown>));
   },
 
-  update(req: Request, res: Response): void {
+  async update(req: Request, res: Response): Promise<void> {
     const id = parseId(req, res);
     if (id == null) return;
-    res.json(proveedoresService.update(id, req.body as Record<string, unknown>));
+    res.json(await proveedoresService.update(id, req.body as Record<string, unknown>));
   },
 
-  patchEstado(req: Request, res: Response): void {
+  async patchEstado(req: Request, res: Response): Promise<void> {
     const id = parseId(req, res);
     if (id == null) return;
-    res.json(proveedoresService.patchEstado(id, req.body as Record<string, unknown>));
+    res.json(await proveedoresService.patchEstado(id, req.body as Record<string, unknown>));
   },
 
-  remove(req: Request, res: Response): void {
+  async remove(req: Request, res: Response): Promise<void> {
     const id = parseId(req, res);
     if (id == null) return;
-    proveedoresService.deletePermanently(id);
+    await proveedoresService.deletePermanently(id);
     res.status(204).send();
   },
 };

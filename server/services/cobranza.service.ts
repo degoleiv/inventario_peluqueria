@@ -2,7 +2,7 @@ import { db } from "../db.js";
 import { AppError } from "../lib/AppError.js";
 
 export const cobranzaService = {
-  list(estado?: string) {
+  async list(estado?: string) {
     let sql = `SELECT d.*, c.nombre AS cliente_nombre
                FROM cobranzas_pendientes d
                JOIN clientes c ON c.id = d.cliente_id`;
@@ -12,10 +12,10 @@ export const cobranzaService = {
       params.push(estado.trim());
     }
     sql += ` ORDER BY (d.vencimiento IS NULL), d.vencimiento ASC, d.id DESC`;
-    return db.prepare(sql).all(...params);
+    return await db.prepare(sql).all(...params);
   },
 
-  create(body: Record<string, unknown>) {
+  async create(body: Record<string, unknown>) {
     const cliente_id = Number(body.cliente_id);
     if (!Number.isFinite(cliente_id)) throw new AppError("cliente_id requerido");
     const descripcion =
@@ -28,14 +28,14 @@ export const cobranzaService = {
       typeof body.vencimiento === "string" && body.vencimiento.trim()
         ? body.vencimiento.trim().slice(0, 10)
         : null;
-    const info = db
+    const info = await db
       .prepare(
         `INSERT INTO cobranzas_pendientes
          (cliente_id, descripcion, monto, saldo_pendiente, vencimiento, estado, created_at, updated_at)
          VALUES (?,?,?,?,?,?,?,?)`
       )
       .run(cliente_id, descripcion, monto, monto, vencimiento, "pendiente", now, now);
-    return db
+    return await db
       .prepare(
         `SELECT d.*, c.nombre AS cliente_nombre FROM cobranzas_pendientes d
          JOIN clientes c ON c.id = d.cliente_id WHERE d.id = ?`
@@ -43,8 +43,8 @@ export const cobranzaService = {
       .get(info.lastInsertRowid);
   },
 
-  registrarPago(id: number, body: Record<string, unknown>) {
-    const row = db.prepare(`SELECT * FROM cobranzas_pendientes WHERE id = ?`).get(id) as
+  async registrarPago(id: number, body: Record<string, unknown>) {
+    const row = (await db.prepare(`SELECT * FROM cobranzas_pendientes WHERE id = ?`).get(id)) as
       | { saldo_pendiente: number; estado: string }
       | undefined;
     if (!row) throw new AppError("no encontrado", 404);
@@ -54,10 +54,12 @@ export const cobranzaService = {
     const nuevo = Math.max(0, row.saldo_pendiente - pago);
     const estado = nuevo <= 0.0001 ? "cobrado" : "pendiente";
     const now = new Date().toISOString();
-    db.prepare(
-      `UPDATE cobranzas_pendientes SET saldo_pendiente = ?, estado = ?, updated_at = ? WHERE id = ?`
-    ).run(nuevo, estado, now, id);
-    return db
+    await db
+      .prepare(
+        `UPDATE cobranzas_pendientes SET saldo_pendiente = ?, estado = ?, updated_at = ? WHERE id = ?`
+      )
+      .run(nuevo, estado, now, id);
+    return await db
       .prepare(
         `SELECT d.*, c.nombre AS cliente_nombre FROM cobranzas_pendientes d
          JOIN clientes c ON c.id = d.cliente_id WHERE d.id = ?`

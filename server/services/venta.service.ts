@@ -8,7 +8,7 @@ function todayISODate() {
 }
 
 export const ventaService = {
-  list(desde?: string, hasta?: string) {
+  async list(desde?: string, hasta?: string) {
     let sql = `SELECT v.*, c.nombre AS cliente_nombre, u.nombre AS vendedor_nombre
                FROM ventas v
                LEFT JOIN clientes c ON c.id = v.cliente_id
@@ -26,11 +26,11 @@ export const ventaService = {
       params.push(hasta);
     }
     sql += ` ORDER BY v.fecha DESC`;
-    return db.prepare(sql).all(...params);
+    return await db.prepare(sql).all(...params);
   },
 
-  getById(id: number) {
-    const venta = db
+  async getById(id: number) {
+    const venta = await db
       .prepare(
         `SELECT v.*, c.nombre AS cliente_nombre, u.nombre AS vendedor_nombre
          FROM ventas v
@@ -40,7 +40,7 @@ export const ventaService = {
       )
       .get(id);
     if (!venta) throw new AppError("no encontrado", 404);
-    const lineas = db
+    const lineas = await db
       .prepare(
         `SELECT vl.*, p.nombre AS producto_nombre
          FROM venta_lineas vl
@@ -51,7 +51,7 @@ export const ventaService = {
     return { ...venta, lineas };
   },
 
-  create(body: Record<string, unknown>) {
+  async create(body: Record<string, unknown>) {
     const lineasIn = body.lineas;
     if (!Array.isArray(lineasIn) || lineasIn.length === 0) {
       throw new AppError("Debe incluir al menos una línea de venta");
@@ -68,9 +68,9 @@ export const ventaService = {
     if (usuario_id == null) {
       throw new AppError("usuario_id (vendedor) requerido");
     }
-    const vu = db.prepare(`SELECT id FROM usuarios WHERE id = ? AND activo = 1`).get(usuario_id) as
-      | { id: number }
-      | undefined;
+    const vu = (await db
+      .prepare(`SELECT id FROM usuarios WHERE id = ? AND activo = 1`)
+      .get(usuario_id)) as { id: number } | undefined;
     if (!vu) throw new AppError("Vendedor no encontrado o inactivo");
 
     const insVenta = db.prepare(
@@ -82,7 +82,7 @@ export const ventaService = {
        VALUES (?, 'SALIDA', ?, ?, ?, ?)`
     );
 
-    const { ventaId, puntosOtorgados } = db.transaction(() => {
+    const { ventaId, puntosOtorgados } = await db.transaction(async () => {
       let totalBruto = 0;
       const prepared: {
         producto_id: number;
@@ -99,11 +99,11 @@ export const ventaService = {
         if (!Number.isFinite(producto_id) || cantidad <= 0) {
           throw new AppError("Línea inválida (producto o cantidad)");
         }
-        const prod = db
+        const prod = (await db
           .prepare(
             `SELECT stock, precio, precio_venta, nombre, fecha_vencimiento FROM productos WHERE id = ?`
           )
-          .get(producto_id) as
+          .get(producto_id)) as
           | {
               stock: number;
               precio: number | null;
@@ -136,7 +136,7 @@ export const ventaService = {
           ? Number(body.cliente_id)
           : null;
 
-      const valorRedencion = configuracionService.getPuntosValorRedencion();
+      const valorRedencion = await configuracionService.getPuntosValorRedencion();
       const reqCanje = Math.floor(
         Number(
           body.puntos_canjeados != null ? body.puntos_canjeados : 0
@@ -150,9 +150,9 @@ export const ventaService = {
         reqCanje > 0 &&
         totalBruto > 0
       ) {
-        const cli = db
-          .prepare(`SELECT puntos FROM clientes WHERE id = ?`)
-          .get(clienteIdPre) as { puntos: number } | undefined;
+        const cli = (await db.prepare(`SELECT puntos FROM clientes WHERE id = ?`).get(clienteIdPre)) as
+          | { puntos: number }
+          | undefined;
         if (!cli) throw new AppError("Cliente no existe");
         const maxPtsPorMonto = Math.floor(totalBruto / valorRedencion + 1e-12);
         const usar = Math.min(reqCanje, Math.max(0, cli.puntos), maxPtsPorMonto);
@@ -162,7 +162,7 @@ export const ventaService = {
           const quitarPts = db.prepare(
             `UPDATE clientes SET puntos = puntos - ?, updated_at = ? WHERE id = ? AND puntos >= ?`
           );
-          const ch = quitarPts.run(usar, now, clienteIdPre, usar);
+          const ch = await quitarPts.run(usar, now, clienteIdPre, usar);
           if (ch.changes === 0) {
             throw new AppError("Puntos insuficientes para canje");
           }
@@ -171,7 +171,7 @@ export const ventaService = {
 
       const totalFinal = Math.max(0, totalBruto - descuentoPuntos);
 
-      const info = insVenta.run(
+      const info = await insVenta.run(
         clienteIdPre,
         fechaVenta,
         totalFinal,
@@ -193,9 +193,9 @@ export const ventaService = {
       );
 
       for (const pl of prepared) {
-        insLine.run(vid, pl.producto_id, pl.cantidad, pl.precio_unitario, pl.subtotal);
-        updStock.run(pl.cantidad, now, pl.producto_id);
-        insMov.run(
+        await insLine.run(vid, pl.producto_id, pl.cantidad, pl.precio_unitario, pl.subtotal);
+        await updStock.run(pl.cantidad, now, pl.producto_id);
+        await insMov.run(
           pl.producto_id,
           pl.cantidad,
           vid,
@@ -206,23 +206,23 @@ export const ventaService = {
 
       const clienteId = clienteIdPre;
       let puntosOtorgados = 0;
-      const puntosCfg = configuracionService.getPuntosConfig();
+      const puntosCfg = await configuracionService.getPuntosConfig();
       if (puntosCfg.activo && clienteId != null && totalFinal > 0) {
         puntosOtorgados = Math.floor(totalFinal * puntosCfg.puntos_por_unidad_moneda);
         if (puntosOtorgados > 0) {
           const updPts = db.prepare(
             `UPDATE clientes SET puntos = COALESCE(puntos, 0) + ?, updated_at = ? WHERE id = ?`
           );
-          const ch = updPts.run(puntosOtorgados, now, clienteId);
+          const ch = await updPts.run(puntosOtorgados, now, clienteId);
           if (ch.changes === 0) {
             throw new AppError("Cliente de la venta no existe");
           }
         }
       }
 
-      commissionService.insertForVenta(vid, usuario_id, totalFinal, fechaVenta);
+      await commissionService.insertForVenta(vid, usuario_id, totalFinal, fechaVenta);
 
-      recordSyncEvent("venta", "creada", {
+      await recordSyncEvent("venta", "creada", {
         venta_id: vid,
         total: totalFinal,
         total_bruto: totalBruto,
@@ -232,13 +232,13 @@ export const ventaService = {
         puntos_canjeados: puntosCanjeadosEfectivos,
       });
       return { ventaId: vid, puntosOtorgados };
-    })();
+    });
 
-    const detalle = ventaService.getById(ventaId);
+    const detalle = await ventaService.getById(ventaId);
     return { ...detalle, puntos_otorgados: puntosOtorgados };
   },
 
-  cancelar(
+  async cancelar(
     id: number,
     body: {
       motivo: string;
@@ -253,7 +253,7 @@ export const ventaService = {
       throw new AppError("cancelado_por debe ser cliente, empleado o admin");
     }
 
-    const venta = db.prepare(`SELECT * FROM ventas WHERE id = ?`).get(id) as
+    const venta = (await db.prepare(`SELECT * FROM ventas WHERE id = ?`).get(id)) as
       | Record<string, unknown>
       | undefined;
     if (!venta) throw new AppError("no encontrado", 404);
@@ -263,14 +263,14 @@ export const ventaService = {
       throw new AppError("La venta ya está cancelada");
     }
 
-    const lineas = db
+    const lineas = (await db
       .prepare(`SELECT producto_id, cantidad FROM venta_lineas WHERE venta_id = ?`)
-      .all(id) as { producto_id: number; cantidad: number }[];
+      .all(id)) as { producto_id: number; cantidad: number }[];
 
     const now = new Date().toISOString();
 
-    db.transaction(() => {
-      commissionService.deleteByVentaId(id);
+    await db.transaction(async () => {
+      await commissionService.deleteByVentaId(id);
 
       const insEntrada = db.prepare(
         `INSERT INTO movimientos_inventario (producto_id, tipo, cantidad, venta_id, referencia, created_at)
@@ -281,8 +281,8 @@ export const ventaService = {
       );
 
       for (const ln of lineas) {
-        updStock.run(ln.cantidad, now, ln.producto_id);
-        insEntrada.run(
+        await updStock.run(ln.cantidad, now, ln.producto_id);
+        await insEntrada.run(
           ln.producto_id,
           ln.cantidad,
           id,
@@ -291,27 +291,29 @@ export const ventaService = {
         );
       }
 
-      db.prepare(
-        `UPDATE ventas SET estado = 'cancelada', cancelado_por = ?, cancelado_motivo = ?, cancelado_at = ? WHERE id = ?`
-      ).run(por, motivo, now, id);
+      await db
+        .prepare(
+          `UPDATE ventas SET estado = 'cancelada', cancelado_por = ?, cancelado_motivo = ?, cancelado_at = ? WHERE id = ?`
+        )
+        .run(por, motivo, now, id);
 
       const clienteId =
         venta.cliente_id != null ? Number(venta.cliente_id) : null;
       const totalFinal = Number(venta.total);
-      const puntosCfg = configuracionService.getPuntosConfig();
+      const puntosCfg = await configuracionService.getPuntosConfig();
       if (puntosCfg.activo && clienteId != null && totalFinal > 0) {
         const quitar = Math.floor(totalFinal * puntosCfg.puntos_por_unidad_moneda);
         if (quitar > 0) {
-          db.prepare(`UPDATE clientes SET puntos = MAX(0, COALESCE(puntos, 0) - ?), updated_at = ? WHERE id = ?`).run(
-            quitar,
-            now,
-            clienteId
-          );
+          await db
+            .prepare(
+              `UPDATE clientes SET puntos = MAX(0, COALESCE(puntos, 0) - ?), updated_at = ? WHERE id = ?`
+            )
+            .run(quitar, now, clienteId);
         }
       }
-    })();
+    });
 
-    recordSyncEvent("venta", "cancelada", { venta_id: id, cancelado_por: por });
-    return ventaService.getById(id);
+    await recordSyncEvent("venta", "cancelada", { venta_id: id, cancelado_por: por });
+    return await ventaService.getById(id);
   },
 };

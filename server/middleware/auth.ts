@@ -31,24 +31,26 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction) {
     next(new AppError("No autorizado", 401));
     return;
   }
-  try {
-    const jwtUser = verifyAccessToken(token);
-    const dbUser = usuariosRepo.findById(jwtUser.sub);
-    if (!dbUser || !dbUser.activo) {
-      next(new AppError("Usuario inválido o inactivo", 401));
-      return;
+  void (async () => {
+    try {
+      const jwtUser = verifyAccessToken(token);
+      const dbUser = await usuariosRepo.findById(jwtUser.sub);
+      if (!dbUser || !dbUser.activo) {
+        next(new AppError("Usuario inválido o inactivo", 401));
+        return;
+      }
+      const permisos = await rolesService.permisosParaRol(dbUser.rol);
+      req.user = {
+        sub: jwtUser.sub,
+        email: dbUser.email,
+        rol: dbUser.rol,
+        permisos,
+      };
+      next();
+    } catch (e) {
+      next(e);
     }
-    const permisos = rolesService.permisosParaRol(dbUser.rol);
-    req.user = {
-      sub: jwtUser.sub,
-      email: dbUser.email,
-      rol: dbUser.rol,
-      permisos,
-    };
-    next();
-  } catch (e) {
-    next(e);
-  }
+  })();
 }
 
 /** Acceso total (configuración, usuarios, roles, auditoría sensible). */

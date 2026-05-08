@@ -16,9 +16,9 @@ function escapeXml(s: string) {
     .replace(/"/g, "&quot;");
 }
 
-function nextNumeroFactura(): number {
-  db.prepare(`UPDATE correlativos SET ultimo = ultimo + 1 WHERE clave = 'factura'`).run();
-  const r = db.prepare(`SELECT ultimo FROM correlativos WHERE clave = 'factura'`).get() as {
+async function nextNumeroFactura(): Promise<number> {
+  await db.prepare(`UPDATE correlativos SET ultimo = ultimo + 1 WHERE clave = 'factura'`).run();
+  const r = (await db.prepare(`SELECT ultimo FROM correlativos WHERE clave = 'factura'`).get()) as {
     ultimo: number;
   };
   return r.ultimo;
@@ -27,7 +27,7 @@ function nextNumeroFactura(): number {
 export type FacturaEmitida = Record<string, unknown>;
 
 export const facturaElectronicaService = {
-  list(desde?: string, hasta?: string) {
+  async list(desde?: string, hasta?: string) {
     let sql = `SELECT * FROM facturas_electronicas WHERE 1=1`;
     const p: string[] = [];
     if (desde) {
@@ -39,38 +39,38 @@ export const facturaElectronicaService = {
       p.push(hasta);
     }
     sql += ` ORDER BY fecha_emision DESC, id DESC`;
-    return db.prepare(sql).all(...p);
+    return await db.prepare(sql).all(...p);
   },
 
-  getById(id: number) {
-    const row = db.prepare(`SELECT * FROM facturas_electronicas WHERE id = ?`).get(id);
+  async getById(id: number) {
+    const row = await db.prepare(`SELECT * FROM facturas_electronicas WHERE id = ?`).get(id);
     if (!row) throw new AppError("Factura no encontrada", 404);
     return row;
   },
 
-  getByVentaId(ventaId: number) {
-    return db.prepare(`SELECT * FROM facturas_electronicas WHERE venta_id = ?`).get(ventaId);
+  async getByVentaId(ventaId: number) {
+    return await db.prepare(`SELECT * FROM facturas_electronicas WHERE venta_id = ?`).get(ventaId);
   },
 
   /** Emite comprobante electrónico local (XML+JSON firmado HMAC). Integrable con AFIP/Verifactu vía adaptador externo. */
-  emitirParaVenta(
+  async emitirParaVenta(
     ventaId: number,
     opts?: { condicion_iva_cliente?: string; tipo?: string }
-  ): FacturaEmitida {
-    const dup = db.prepare(`SELECT id FROM facturas_electronicas WHERE venta_id = ?`).get(ventaId);
+  ): Promise<FacturaEmitida> {
+    const dup = await db.prepare(`SELECT id FROM facturas_electronicas WHERE venta_id = ?`).get(ventaId);
     if (dup) throw new AppError("La venta ya tiene factura electrónica emitida", 409);
 
-    const venta = db
+    const venta = (await db
       .prepare(
         `SELECT v.*, c.nombre AS cliente_nombre, c.email AS cliente_email
          FROM ventas v
          LEFT JOIN clientes c ON c.id = v.cliente_id
          WHERE v.id = ?`
       )
-      .get(ventaId) as Record<string, unknown> | undefined;
+      .get(ventaId)) as Record<string, unknown> | undefined;
     if (!venta) throw new AppError("Venta no encontrada", 404);
 
-    const lineas = db
+    const lineas = await db
       .prepare(
         `SELECT vl.*, p.nombre AS producto_nombre
          FROM venta_lineas vl
@@ -85,7 +85,7 @@ export const facturaElectronicaService = {
     const neto = Math.round((total / factor) * 100) / 100;
     const iva_monto = Math.round((total - neto) * 100) / 100;
 
-    const numero = nextNumeroFactura();
+    const numero = await nextNumeroFactura();
     const punto = Number(process.env.FACTURA_PUNTO_VENTA ?? 1);
     const uuid = randomUUID();
     const fecha_emision = new Date().toISOString();
@@ -144,50 +144,47 @@ export const facturaElectronicaService = {
     });
 
     const now = new Date().toISOString();
-    const info = db
+    const info = await db
       .prepare(
         `INSERT INTO facturas_electronicas (
           venta_id, uuid, tipo, punto_venta, numero, fecha_emision,
           emisor_razon_social, emisor_cuit, cliente_nombre, cliente_doc, condicion_iva_cliente,
           total, neto, iva_alicuota, iva_monto, moneda, hash_integridad, xml_documento, json_documento, estado, created_at
-        ) VALUES (
-          @venta_id, @uuid, @tipo, @punto_venta, @numero, @fecha_emision,
-          @emisor_razon_social, @emisor_cuit, @cliente_nombre, @cliente_doc, @condicion_iva_cliente,
-          @total, @neto, @iva_alicuota, @iva_monto, @moneda, @hash_integridad, @xml_documento, @json_documento, 'emitida', @created_at
-        )`
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
       )
-      .run({
-        venta_id: ventaId,
+      .run(
+        ventaId,
         uuid,
         tipo,
-        punto_venta: punto,
+        punto,
         numero,
         fecha_emision,
-        emisor_razon_social: emisor_razon,
+        emisor_razon,
         emisor_cuit,
         cliente_nombre,
         cliente_doc,
-        condicion_iva_cliente: opts?.condicion_iva_cliente ?? null,
+        opts?.condicion_iva_cliente ?? null,
         total,
         neto,
-        iva_alicuota: alicuota,
+        alicuota,
         iva_monto,
-        moneda: "ARS",
+        "ARS",
         hash_integridad,
-        xml_documento: xml,
+        xml,
         json_documento,
-        created_at: now,
-      });
+        "emitida",
+        now
+      );
 
-    const row = db.prepare(`SELECT * FROM facturas_electronicas WHERE id = ?`).get(info.lastInsertRowid);
-    recordSyncEvent("factura_electronica", "emitida", { id: info.lastInsertRowid, venta_id: ventaId });
+    const row = await db.prepare(`SELECT * FROM facturas_electronicas WHERE id = ?`).get(info.lastInsertRowid);
+    await recordSyncEvent("factura_electronica", "emitida", { id: info.lastInsertRowid, venta_id: ventaId });
     return row as FacturaEmitida;
   },
 
-  documento(id: number, formato: "xml" | "json") {
-    const f = db
+  async documento(id: number, formato: "xml" | "json") {
+    const f = (await db
       .prepare(`SELECT xml_documento, json_documento FROM facturas_electronicas WHERE id = ?`)
-      .get(id) as { xml_documento: string; json_documento: string } | undefined;
+      .get(id)) as { xml_documento: string; json_documento: string } | undefined;
     if (!f) throw new AppError("Factura no encontrada", 404);
     if (formato === "xml") return { contentType: "application/xml", body: f.xml_documento };
     return { contentType: "application/json", body: f.json_documento };
@@ -195,7 +192,7 @@ export const facturaElectronicaService = {
 
   /** Envía XML y JSON por correo (SMTP). Destinatario: override o email del cliente de la venta. */
   async enviarPorEmail(facturaId: number, destinatarioOverride?: string) {
-    const row = db
+    const row = (await db
       .prepare(
         `SELECT fe.id, fe.punto_venta, fe.numero, fe.cliente_nombre, fe.xml_documento, fe.json_documento,
                 c.email AS cliente_email
@@ -204,7 +201,7 @@ export const facturaElectronicaService = {
          LEFT JOIN clientes c ON c.id = v.cliente_id
          WHERE fe.id = ?`
       )
-      .get(facturaId) as
+      .get(facturaId)) as
       | {
           id: number;
           punto_venta: number;
@@ -256,12 +253,12 @@ export const facturaElectronicaService = {
     });
 
     const now = new Date().toISOString();
-    db.prepare(`UPDATE facturas_electronicas SET email_enviado_at = ? WHERE id = ?`).run(
+    await db.prepare(`UPDATE facturas_electronicas SET email_enviado_at = ? WHERE id = ?`).run(
       now,
       facturaId
     );
 
-    recordSyncEvent("factura_electronica", "email_enviado", { id: facturaId, to: rawTo });
+    await recordSyncEvent("factura_electronica", "email_enviado", { id: facturaId, to: rawTo });
     return { ok: true as const, to: rawTo, enviado_en: now };
   },
 };

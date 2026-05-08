@@ -8,7 +8,7 @@ import { rolesService } from "./roles.service.js";
 export type JwtUser = { sub: number; email: string; rol: string };
 
 export async function login(email: string, password: string) {
-  const u = usuariosRepo.findByEmail(email.trim());
+  const u = await usuariosRepo.findByEmail(email.trim());
   if (!u || !u.activo) throw new AppError("Credenciales inválidas", 401);
   const ok = await bcrypt.compare(password, u.password_hash);
   if (!ok) throw new AppError("Credenciales inválidas", 401);
@@ -17,7 +17,7 @@ export async function login(email: string, password: string) {
     getJwtSecret(),
     { expiresIn: JWT_EXPIRY_SEC }
   );
-  const permisos = rolesService.permisosParaRol(u.rol);
+  const permisos = await rolesService.permisosParaRol(u.rol);
   return {
     accessToken: token,
     expiresIn: JWT_EXPIRY_SEC,
@@ -32,14 +32,14 @@ export async function login(email: string, password: string) {
 }
 
 export async function bootstrapFirstAdmin(email: string, password: string, nombre?: string) {
-  if (usuariosRepo.count() > 0) {
+  if ((await usuariosRepo.count()) > 0) {
     throw new AppError("Ya existe un usuario; no se puede inicializar de nuevo", 403);
   }
   if (!email.trim() || password.length < 6) {
     throw new AppError("Email válido y contraseña de al menos 6 caracteres", 400);
   }
   const hash = await bcrypt.hash(password, BCRYPT_ROUNDS);
-  const u = usuariosRepo.create({
+  const u = await usuariosRepo.create({
     email: email.trim().toLowerCase(),
     password_hash: hash,
     nombre: nombre?.trim() || null,
@@ -50,7 +50,7 @@ export async function bootstrapFirstAdmin(email: string, password: string, nombr
     getJwtSecret(),
     { expiresIn: JWT_EXPIRY_SEC }
   );
-  const permisos = rolesService.permisosParaRol(u.rol);
+  const permisos = await rolesService.permisosParaRol(u.rol);
   return {
     accessToken: token,
     expiresIn: JWT_EXPIRY_SEC,

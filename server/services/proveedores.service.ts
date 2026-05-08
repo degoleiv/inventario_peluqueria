@@ -1,4 +1,3 @@
-import Database from "better-sqlite3";
 import { AppError } from "../lib/AppError.js";
 import { proveedorRepository, type ProveedorRow } from "../repositories/proveedor.repository.js";
 
@@ -88,8 +87,21 @@ function parseEstado(body: Record<string, unknown>, fallback: "activo" | "inacti
   throw new AppError('El estado debe ser "activo" o "inactivo"');
 }
 
+function sqliteErrCode(e: unknown): string {
+  if (e != null && typeof e === "object" && "code" in e) {
+    return String((e as { code: unknown }).code);
+  }
+  return "";
+}
+
 function isUniqueConstraint(e: unknown): boolean {
-  return e instanceof Database.SqliteError && e.code === "SQLITE_CONSTRAINT_UNIQUE";
+  const c = sqliteErrCode(e);
+  return c === "SQLITE_CONSTRAINT_UNIQUE" || c.includes("SQLITE_CONSTRAINT_UNIQUE");
+}
+
+function isAnyConstraint(e: unknown): boolean {
+  const c = sqliteErrCode(e);
+  return c.includes("CONSTRAINT") || c.startsWith("SQLITE_CONSTRAINT");
 }
 
 function parseEstadoFiltroQuery(v: unknown): "todos" | "activo" | "inactivo" {
@@ -100,12 +112,12 @@ function parseEstadoFiltroQuery(v: unknown): "todos" | "activo" | "inactivo" {
 }
 
 export const proveedoresService = {
-  list(opts: {
+  async list(opts: {
     incluirInactivos: boolean;
     userMayViewInactive: boolean;
     search?: string;
     estado?: string;
-  }): ProveedorDto[] {
+  }): Promise<ProveedorDto[]> {
     const rawSearch = typeof opts.search === "string" ? opts.search.trim() : "";
     const inner = rawSearch.replace(/%/g, "").replace(/_/g, "");
     const searchPattern = inner ? `%${inner}%` : null;
@@ -113,7 +125,7 @@ export const proveedoresService = {
     const incluirTodosLosEstados =
       opts.userMayViewInactive && (opts.incluirInactivos || estadoF === "inactivo");
 
-    const rows = proveedorRepository.listFiltered({
+    const rows = await proveedorRepository.listFiltered({
       forceSoloActivos: !opts.userMayViewInactive,
       incluirTodosLosEstados,
       estado: estadoF,
@@ -122,13 +134,13 @@ export const proveedoresService = {
     return rows.map(toDto);
   },
 
-  getById(id: number): ProveedorDto {
-    const r = proveedorRepository.findById(id);
+  async getById(id: number): Promise<ProveedorDto> {
+    const r = await proveedorRepository.findById(id);
     if (!r) throw new AppError("Proveedor no encontrado", 404);
     return toDto(r);
   },
 
-  create(body: Record<string, unknown>): ProveedorDto {
+  async create(body: Record<string, unknown>): Promise<ProveedorDto> {
     const nombre = parseNombre(body);
     const nit = parseNit(body);
     const email = parseEmail(body);
@@ -138,12 +150,12 @@ export const proveedoresService = {
     const estado = parseEstado(body, "activo");
     const now = new Date().toISOString();
 
-    if (proveedorRepository.findByNitNormalized(nit)) {
+    if (await proveedorRepository.findByNitNormalized(nit)) {
       throw new AppError("Ya existe un proveedor con ese NIT", 409);
     }
 
     try {
-      const info = proveedorRepository.insert({
+      const info = await proveedorRepository.insert({
         nombre,
         nit,
         telefono,
@@ -156,7 +168,7 @@ export const proveedoresService = {
         created_at: now,
       });
       const id = Number(info.lastInsertRowid);
-      const row = proveedorRepository.findById(id);
+      const row = await proveedorRepository.findById(id);
       if (!row) throw new AppError("Error al crear proveedor", 500);
       return toDto(row);
     } catch (e) {
@@ -167,8 +179,8 @@ export const proveedoresService = {
     }
   },
 
-  update(id: number, body: Record<string, unknown>): ProveedorDto {
-    const cur = proveedorRepository.findById(id);
+  async update(id: number, body: Record<string, unknown>): Promise<ProveedorDto> {
+    const cur = await proveedorRepository.findById(id);
     if (!cur) throw new AppError("Proveedor no encontrado", 404);
 
     const nombre = typeof body.nombre === "string" ? body.nombre.trim() : cur.nombre;
@@ -181,15 +193,14 @@ export const proveedoresService = {
     const icono_url =
       body.icono_url !== undefined ? parseIconoUrl(body.icono_url) : (cur.icono_url ?? null);
     const estadoCur: "activo" | "inactivo" = cur.estado === "inactivo" ? "inactivo" : "activo";
-    const estado =
-      body.estado !== undefined ? parseEstado(body, estadoCur) : estadoCur;
+    const estado = body.estado !== undefined ? parseEstado(body, estadoCur) : estadoCur;
     const now = new Date().toISOString();
 
-    const dup = proveedorRepository.findByNitNormalized(nit, id);
+    const dup = await proveedorRepository.findByNitNormalized(nit, id);
     if (dup) throw new AppError("Ya existe otro proveedor con ese NIT", 409);
 
     try {
-      proveedorRepository.update(id, {
+      await proveedorRepository.update(id, {
         nombre,
         nit,
         telefono,
@@ -206,21 +217,21 @@ export const proveedoresService = {
       throw e;
     }
 
-    const row = proveedorRepository.findById(id);
+    const row = await proveedorRepository.findById(id);
     if (!row) throw new AppError("Proveedor no encontrado", 404);
     return toDto(row);
   },
 
-  patchEstado(id: number, body: Record<string, unknown>): ProveedorDto {
+  async patchEstado(id: number, body: Record<string, unknown>): Promise<ProveedorDto> {
     if (typeof body.estado !== "string" || !body.estado.trim()) {
       throw new AppError('El campo "estado" es obligatorio', 400);
     }
     const estado = parseEstado(body, "activo");
-    const cur = proveedorRepository.findById(id);
+    const cur = await proveedorRepository.findById(id);
     if (!cur) throw new AppError("Proveedor no encontrado", 404);
     const now = new Date().toISOString();
-    proveedorRepository.setEstado(id, estado, now);
-    const row = proveedorRepository.findById(id);
+    await proveedorRepository.setEstado(id, estado, now);
+    const row = await proveedorRepository.findById(id);
     if (!row) throw new AppError("Proveedor no encontrado", 404);
     return toDto(row);
   },
@@ -229,10 +240,10 @@ export const proveedoresService = {
    * Elimina el registro si no hay pedidos asociados (FK RESTRICT).
    * Si hay pedidos, responde error claro (409).
    */
-  deletePermanently(id: number): void {
-    const cur = proveedorRepository.findById(id);
+  async deletePermanently(id: number): Promise<void> {
+    const cur = await proveedorRepository.findById(id);
     if (!cur) throw new AppError("Proveedor no encontrado", 404);
-    const n = proveedorRepository.countPedidosByProveedorId(id);
+    const n = await proveedorRepository.countPedidosByProveedorId(id);
     if (n > 0) {
       throw new AppError(
         `No se puede eliminar: el proveedor tiene ${n} pedido(s) asociado(s). Podés desactivarlo desde el interruptor de estado.`,
@@ -240,10 +251,9 @@ export const proveedoresService = {
       );
     }
     try {
-      proveedorRepository.deleteById(id);
+      await proveedorRepository.deleteById(id);
     } catch (e) {
-      const code = e instanceof Database.SqliteError ? String(e.code) : "";
-      if (e instanceof Database.SqliteError && code.includes("CONSTRAINT")) {
+      if (isAnyConstraint(e)) {
         throw new AppError(
           "No se puede eliminar: el proveedor está referenciado en pedidos u otros registros.",
           409

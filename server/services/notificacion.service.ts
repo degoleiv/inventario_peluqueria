@@ -2,8 +2,8 @@ import { db } from "../db.js";
 
 /** RF-10: alertas locales sin duplicar entradas (dedupe por id). */
 export const notificacionService = {
-  listar() {
-    const stock = db
+  async listar() {
+    const stock = await db
       .prepare(
         `SELECT id, nombre, stock, stock_minimo
          FROM productos
@@ -13,7 +13,7 @@ export const notificacionService = {
       .all();
 
     const limite = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
-    const citas = db
+    const citas = await db
       .prepare(
         `SELECT c.id, c.inicio, c.estado, cl.nombre AS cliente_nombre
          FROM citas c

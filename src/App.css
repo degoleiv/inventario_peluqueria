@@ -326,7 +326,7 @@ textarea {
 }
 
 .table.table--empleados-equipo col.col-emp-acciones {
-  width: 148px;
+  width: 180px;
 }
 
 .table.table--empleados-equipo col.col-emp-activo {
@@ -399,25 +399,31 @@ textarea {
 
 .empleado-cell-acciones {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.empleado-cell-acciones__buttons {
+  display: flex;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: center;
   gap: 12px;
+  white-space: nowrap;
 }
 
 .table.table--empleados-equipo .empleado-cell-acciones .cert-wait-msg {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
-  flex: 1 0 100%;
-  width: 100%;
   text-align: center;
   font-size: 0.78rem;
   font-weight: 600;
   color: #6d5010;
   margin: 0;
-  padding-bottom: 2px;
 }
 
 .table.table--empleados-equipo .empleado-cell-acciones .empleado-cert-spinner {

@@ -24,21 +24,24 @@ function mismoProfesional(a: number | null, b: number | null) {
   return (a ?? null) === (b ?? null);
 }
 
-function parseUsuarioIdOrThrow(body: Record<string, unknown>, required: boolean): number | null {
+async function parseUsuarioIdOrThrow(
+  body: Record<string, unknown>,
+  required: boolean
+): Promise<number | null> {
   if (body.usuario_id == null || body.usuario_id === "") {
     if (required) throw new AppError("Seleccioná un profesional (usuario_id)");
     return null;
   }
   const n = Number(body.usuario_id);
   if (!Number.isFinite(n)) throw new AppError("usuario_id inválido");
-  const ok = db.prepare(`SELECT id FROM usuarios WHERE id = ? AND activo = 1`).get(n) as
+  const ok = (await db.prepare(`SELECT id FROM usuarios WHERE id = ? AND activo = 1`).get(n)) as
     | { id: number }
     | undefined;
   if (!ok) throw new AppError("Profesional no encontrado o inactivo");
   return n;
 }
 
-function assertNoOverlap(
+async function assertNoOverlap(
   inicioIso: string,
   duracionMin: number,
   excludeId: number | null,
@@ -55,12 +58,12 @@ function assertNoOverlap(
     );
   }
 
-  const rows = db
+  const rows = (await db
     .prepare(
       `SELECT id, inicio, duracion_min, usuario_id FROM citas
        WHERE estado NOT IN ('cancelado','cancelada')`
     )
-    .all() as { id: number; inicio: string; duracion_min: number; usuario_id: number | null }[];
+    .all()) as { id: number; inicio: string; duracion_min: number; usuario_id: number | null }[];
 
   for (const r of rows) {
     if (excludeId != null && r.id === excludeId) continue;
@@ -80,7 +83,7 @@ const rowSql = `SELECT c.*, cl.nombre AS cliente_nombre,
     JOIN clientes cl ON cl.id = c.cliente_id
     LEFT JOIN usuarios u ON u.id = c.usuario_id`;
 
-function crearCita(body: Record<string, unknown>) {
+async function crearCita(body: Record<string, unknown>) {
   const cid = Number(body.cliente_id);
   if (!Number.isFinite(cid)) throw new AppError("cliente_id requerido");
   const inicio = typeof body.inicio === "string" ? body.inicio.trim() : "";
@@ -93,12 +96,12 @@ function crearCita(body: Record<string, unknown>) {
     typeof body.estado === "string" && body.estado ? body.estado : "pendiente";
   if (!ESTADOS.has(estado)) estado = "pendiente";
 
-  const usuario_id = parseUsuarioIdOrThrow(body, true);
+  const usuario_id = await parseUsuarioIdOrThrow(body, true);
 
-  if (estado !== "cancelado") assertNoOverlap(inicio, duracion_min, null, usuario_id);
+  if (estado !== "cancelado") await assertNoOverlap(inicio, duracion_min, null, usuario_id);
 
   const now = new Date().toISOString();
-  const info = db
+  const info = await db
     .prepare(
       `INSERT INTO citas (cliente_id, usuario_id, inicio, duracion_min, servicio, estado, notas, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -114,20 +117,20 @@ function crearCita(body: Record<string, unknown>) {
       now,
       now
     );
-  const row = db.prepare(`${rowSql} WHERE c.id = ?`).get(info.lastInsertRowid);
-  recordSyncEvent("cita", "creada", row);
+  const row = await db.prepare(`${rowSql} WHERE c.id = ?`).get(info.lastInsertRowid);
+  await recordSyncEvent("cita", "creada", row);
   return row;
 }
 
 export const citaService = {
-  list() {
-    return db.prepare(`${rowSql} ORDER BY c.inicio ASC`).all();
+  async list() {
+    return await db.prepare(`${rowSql} ORDER BY c.inicio ASC`).all();
   },
 
   create: crearCita,
 
-  update(id: number, body: Record<string, unknown>) {
-    const existing = db.prepare(`SELECT * FROM citas WHERE id = ?`).get(id) as Record<
+  async update(id: number, body: Record<string, unknown>) {
+    const existing = (await db.prepare(`SELECT * FROM citas WHERE id = ?`).get(id)) as Record<
       string,
       unknown
     > | undefined;
@@ -150,7 +153,7 @@ export const citaService = {
     let usuario_id: number | null =
       existing.usuario_id != null ? Number(existing.usuario_id) : null;
     if (body.usuario_id !== undefined) {
-      usuario_id = parseUsuarioIdOrThrow(
+      usuario_id = await parseUsuarioIdOrThrow(
         { ...body, usuario_id: body.usuario_id === null ? "" : body.usuario_id },
         true
       );
@@ -160,29 +163,31 @@ export const citaService = {
     }
 
     if (estado !== "cancelado") {
-      assertNoOverlap(inicio, duracion_min, id, usuario_id);
+      await assertNoOverlap(inicio, duracion_min, id, usuario_id);
     }
 
     const now = new Date().toISOString();
-    db.prepare(
-      `UPDATE citas SET cliente_id = ?, usuario_id = ?, inicio = ?, duracion_min = ?, servicio = ?, estado = ?, notas = ?, updated_at = ? WHERE id = ?`
-    ).run(
-      cliente_id,
-      usuario_id,
-      inicio,
-      duracion_min,
-      typeof body.servicio === "string" ? body.servicio || null : existing.servicio,
-      estado,
-      typeof body.notas === "string" ? body.notas || null : existing.notas,
-      now,
-      id
-    );
-    const row = db.prepare(`${rowSql} WHERE c.id = ?`).get(id);
-    recordSyncEvent("cita", "actualizada", row);
+    await db
+      .prepare(
+        `UPDATE citas SET cliente_id = ?, usuario_id = ?, inicio = ?, duracion_min = ?, servicio = ?, estado = ?, notas = ?, updated_at = ? WHERE id = ?`
+      )
+      .run(
+        cliente_id,
+        usuario_id,
+        inicio,
+        duracion_min,
+        typeof body.servicio === "string" ? body.servicio || null : existing.servicio,
+        estado,
+        typeof body.notas === "string" ? body.notas || null : existing.notas,
+        now,
+        id
+      );
+    const row = await db.prepare(`${rowSql} WHERE c.id = ?`).get(id);
+    await recordSyncEvent("cita", "actualizada", row);
     return row;
   },
 
-  cancelar(
+  async cancelar(
     id: number,
     body: {
       motivo: string;
@@ -197,7 +202,7 @@ export const citaService = {
       throw new AppError("cancelado_por debe ser cliente, empleado o admin");
     }
 
-    const existing = db.prepare(`SELECT * FROM citas WHERE id = ?`).get(id) as
+    const existing = (await db.prepare(`SELECT * FROM citas WHERE id = ?`).get(id)) as
       | Record<string, unknown>
       | undefined;
     if (!existing) throw new AppError("no encontrado", 404);
@@ -206,23 +211,25 @@ export const citaService = {
     }
 
     const now = new Date().toISOString();
-    db.prepare(
-      `UPDATE citas SET estado = 'cancelado', cancelado_por = ?, cancelado_motivo = ?, cancelado_at = ?, updated_at = ? WHERE id = ?`
-    ).run(por, motivo, now, now, id);
+    await db
+      .prepare(
+        `UPDATE citas SET estado = 'cancelado', cancelado_por = ?, cancelado_motivo = ?, cancelado_at = ?, updated_at = ? WHERE id = ?`
+      )
+      .run(por, motivo, now, now, id);
 
-    const row = db.prepare(`${rowSql} WHERE c.id = ?`).get(id);
-    recordSyncEvent("cita", "cancelada", row);
+    const row = await db.prepare(`${rowSql} WHERE c.id = ?`).get(id);
+    await recordSyncEvent("cita", "cancelada", row);
     return row;
   },
 
-  delete(id: number) {
-    const row = db.prepare(`${rowSql} WHERE c.id = ?`).get(id);
-    const info = db.prepare(`DELETE FROM citas WHERE id = ?`).run(id);
+  async delete(id: number) {
+    const row = await db.prepare(`${rowSql} WHERE c.id = ?`).get(id);
+    const info = await db.prepare(`DELETE FROM citas WHERE id = ?`).run(id);
     if (info.changes === 0) throw new AppError("no encontrado", 404);
-    recordSyncEvent("cita", "eliminada", row);
+    await recordSyncEvent("cita", "eliminada", row);
   },
 
-  sugerirHorarios(fechaDia: string, duracionMin: number, staffId: number | null) {
+  async sugerirHorarios(fechaDia: string, duracionMin: number, staffId: number | null) {
     const dur = Math.max(15, Math.floor(duracionMin));
     const parts = fechaDia.trim().split("-").map((x) => Number(x));
     if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) {
@@ -237,7 +244,7 @@ export const citaService = {
     for (let t = startDay.getTime(); t + dur * 60_000 <= endClose.getTime(); t += slotMs) {
       const inicioIso = new Date(t).toISOString();
       try {
-        assertNoOverlap(inicioIso, dur, null, staffId);
+        await assertNoOverlap(inicioIso, dur, null, staffId);
         slots.push(inicioIso);
         if (slots.length >= 64) break;
       } catch {
@@ -247,7 +254,7 @@ export const citaService = {
     return { fecha: fechaDia, duracion_min: dur, slots };
   },
 
-  crearSerieRecurrente(body: Record<string, unknown>) {
+  async crearSerieRecurrente(body: Record<string, unknown>) {
     const reps = Math.min(52, Math.max(1, Math.floor(Number(body.repeticiones ?? 6))));
     const intervalo = Math.max(1, Math.floor(Number(body.intervalo_dias ?? 14)));
     const inicioPrimera =
@@ -257,7 +264,7 @@ export const citaService = {
     const ids: number[] = [];
     for (let i = 0; i < reps; i++) {
       const inicioIso = new Date(t).toISOString();
-      const row = crearCita({
+      const row = (await crearCita({
         cliente_id: body.cliente_id,
         usuario_id: body.usuario_id,
         inicio: inicioIso,
@@ -265,7 +272,7 @@ export const citaService = {
         servicio: body.servicio,
         estado: typeof body.estado === "string" ? body.estado : undefined,
         notas: body.notas,
-      }) as { id: number };
+      })) as { id: number };
       ids.push(row.id);
       t += intervalo * 86_400_000;
     }

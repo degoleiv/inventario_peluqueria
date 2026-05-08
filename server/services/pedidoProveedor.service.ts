@@ -73,7 +73,7 @@ function enrichRow(row: Record<string, unknown>) {
 }
 
 export const pedidoProveedorService = {
-  list(desde?: string, hasta?: string) {
+  async list(desde?: string, hasta?: string) {
     let sql = `SELECT co.*, pr.nombre AS proveedor_nombre_ref
                FROM pedidos_proveedor co
                LEFT JOIN proveedores pr ON pr.id = co.proveedor_id`;
@@ -90,21 +90,21 @@ export const pedidoProveedorService = {
       params.push(hasta);
     }
     sql += ` ORDER BY co.fecha DESC`;
-    const rows = db.prepare(sql).all(...params) as Record<string, unknown>[];
+    const rows = (await db.prepare(sql).all(...params)) as Record<string, unknown>[];
     return rows.map((r) => enrichRow(r));
   },
 
-  getById(id: number) {
-    const c = db
+  async getById(id: number) {
+    const c = (await db
       .prepare(
         `SELECT co.*, pr.nombre AS proveedor_nombre_ref
          FROM pedidos_proveedor co
          LEFT JOIN proveedores pr ON pr.id = co.proveedor_id
          WHERE co.id = ?`
       )
-      .get(id) as Record<string, unknown> | undefined;
+      .get(id)) as Record<string, unknown> | undefined;
     if (!c) throw new AppError("no encontrado", 404);
-    const lineas = db
+    const lineas = await db
       .prepare(
         `SELECT cl.*, p.nombre AS producto_nombre
          FROM pedido_proveedor_lineas cl
@@ -115,7 +115,7 @@ export const pedidoProveedorService = {
     return enrichRow({ ...c, lineas });
   },
 
-  create(body: Record<string, unknown>) {
+  async create(body: Record<string, unknown>) {
     const lineasIn = body.lineas;
     if (!Array.isArray(lineasIn) || lineasIn.length === 0) {
       throw new AppError("Debe incluir al menos una línea de pedido");
@@ -125,7 +125,7 @@ export const pedidoProveedorService = {
     if (!Number.isFinite(proveedor_id) || proveedor_id <= 0) {
       throw new AppError("proveedor_id es obligatorio: elegí un proveedor de la lista");
     }
-    const pr = db.prepare(`SELECT nombre FROM proveedores WHERE id = ?`).get(proveedor_id) as
+    const pr = (await db.prepare(`SELECT nombre FROM proveedores WHERE id = ?`).get(proveedor_id)) as
       | { nombre: string }
       | undefined;
     if (!pr) throw new AppError("Proveedor no encontrado");
@@ -185,7 +185,7 @@ export const pedidoProveedorService = {
        precio = COALESCE(?, precio), updated_at = ? WHERE id = ?`
     );
 
-    const pedidoId = db.transaction(() => {
+    const pedidoId = await db.transaction(async () => {
       let total = 0;
       const resolvedLines: {
         producto_id: number;
@@ -214,19 +214,19 @@ export const pedidoProveedorService = {
               ? np.precio_venta
               : null;
           if (pv == null) throw new AppError("nuevo_producto.precio_venta es requerido");
-          const created = productoService.create({
+          const created = (await productoService.create({
             ...np,
             stock: 0,
             precio_compra: costo_unitario,
             precio_venta: pv,
-          }) as { id: number };
+          })) as { id: number };
           producto_id = created.id;
         } else {
           producto_id = Number(raw.producto_id);
           if (!Number.isFinite(producto_id)) {
             throw new AppError("producto_id o nuevo_producto requerido por línea");
           }
-          const exists = db.prepare(`SELECT id FROM productos WHERE id = ?`).get(producto_id);
+          const exists = await db.prepare(`SELECT id FROM productos WHERE id = ?`).get(producto_id);
           if (!exists) throw new AppError(`Producto ${producto_id} no existe`);
         }
 
@@ -248,7 +248,7 @@ export const pedidoProveedorService = {
         });
       }
 
-      const info = insPedido.run(
+      const info = await insPedido.run(
         proveedor_id,
         pr.nombre,
         fecha,
@@ -269,10 +269,10 @@ export const pedidoProveedorService = {
       const pid = Number(info.lastInsertRowid);
 
       for (const ln of resolvedLines) {
-        insLine.run(pid, ln.producto_id, ln.cantidad, ln.costo_unitario, ln.subtotal);
-        updStock.run(ln.cantidad, now, ln.producto_id);
+        await insLine.run(pid, ln.producto_id, ln.cantidad, ln.costo_unitario, ln.subtotal);
+        await updStock.run(ln.cantidad, now, ln.producto_id);
         if (ln.actualizar_precios) {
-          updPrecios.run(
+          await updPrecios.run(
             ln.costo_unitario,
             ln.nuevo_precio_venta,
             ln.nuevo_precio_venta,
@@ -280,23 +280,23 @@ export const pedidoProveedorService = {
             ln.producto_id
           );
         }
-        insMov.run(ln.producto_id, ln.cantidad, pid, `pedido_proveedor:${pid}`, now);
+        await insMov.run(ln.producto_id, ln.cantidad, pid, `pedido_proveedor:${pid}`, now);
       }
 
-      recordSyncEvent("pedido_proveedor", "creado", {
+      await recordSyncEvent("pedido_proveedor", "creado", {
         pedido_proveedor_id: pid,
         total,
         lineas: resolvedLines.length,
       });
       return pid;
-    })();
+    });
 
-    return pedidoProveedorService.getById(pedidoId);
+    return await pedidoProveedorService.getById(pedidoId);
   },
 
   /** Solo metadatos de pago / fechas / estado (no modifica líneas ni stock). */
-  updateMeta(id: number, body: Record<string, unknown>) {
-    const cur = db.prepare(`SELECT * FROM pedidos_proveedor WHERE id = ?`).get(id) as
+  async updateMeta(id: number, body: Record<string, unknown>) {
+    const cur = (await db.prepare(`SELECT * FROM pedidos_proveedor WHERE id = ?`).get(id)) as
       | Record<string, unknown>
       | undefined;
     if (!cur) throw new AppError("no encontrado", 404);
@@ -355,8 +355,9 @@ export const pedidoProveedorService = {
           : (cur.referencia as string | null)
         : (cur.referencia as string | null);
 
-    db.prepare(
-      `UPDATE pedidos_proveedor SET
+    await db
+      .prepare(
+        `UPDATE pedidos_proveedor SET
         fecha = ?,
         fecha_pago_con_descuento = ?,
         fecha_pago_maxima = ?,
@@ -366,23 +367,24 @@ export const pedidoProveedorService = {
         notas = ?,
         referencia = ?
       WHERE id = ?`
-    ).run(
-      fecha,
-      fecha_pago_con_descuento,
-      fecha_pago_maxima,
-      valor_pago_con_descuento != null && Number.isFinite(valor_pago_con_descuento)
-        ? valor_pago_con_descuento
-        : null,
-      valor_pago_sin_descuento != null && Number.isFinite(valor_pago_sin_descuento)
-        ? valor_pago_sin_descuento
-        : null,
-      estado,
-      notas,
-      referencia,
-      id
-    );
+      )
+      .run(
+        fecha,
+        fecha_pago_con_descuento,
+        fecha_pago_maxima,
+        valor_pago_con_descuento != null && Number.isFinite(valor_pago_con_descuento)
+          ? valor_pago_con_descuento
+          : null,
+        valor_pago_sin_descuento != null && Number.isFinite(valor_pago_sin_descuento)
+          ? valor_pago_sin_descuento
+          : null,
+        estado,
+        notas,
+        referencia,
+        id
+      );
 
-    recordSyncEvent("pedido_proveedor", "actualizado", { pedido_proveedor_id: id });
-    return pedidoProveedorService.getById(id);
+    await recordSyncEvent("pedido_proveedor", "actualizado", { pedido_proveedor_id: id });
+    return await pedidoProveedorService.getById(id);
   },
 };

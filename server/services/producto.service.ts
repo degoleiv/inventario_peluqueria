@@ -14,7 +14,7 @@ function validatePrecios(precio_compra: number | null, precio_venta: number | nu
 export type ProductoDTO = Record<string, unknown>;
 
 export const productoService = {
-  list() {
+  async list() {
     return db
       .prepare(
         `SELECT id, codigo_barras, nombre, marca, categoria, descripcion, imagen_url,
@@ -25,7 +25,7 @@ export const productoService = {
       .all();
   },
 
-  create(body: Record<string, unknown>) {
+  async create(body: Record<string, unknown>) {
     const nombre = typeof body.nombre === "string" ? body.nombre.trim() : "";
     if (!nombre) throw new AppError("nombre requerido");
 
@@ -55,49 +55,44 @@ export const productoService = {
     const codigo =
       typeof body.codigo_barras === "string" ? body.codigo_barras.trim() || null : null;
     if (codigo) {
-      const dup = db.prepare(`SELECT id FROM productos WHERE codigo_barras = ?`).get(codigo);
+      const dup = await db.prepare(`SELECT id FROM productos WHERE codigo_barras = ?`).get(codigo);
       if (dup) throw new AppError("Ya existe un producto con ese código de barras");
     }
 
-    const info = db
+    const info = await db
       .prepare(
         `INSERT INTO productos (
           codigo_barras, nombre, marca, categoria, descripcion, imagen_url,
           stock, precio, precio_compra, precio_venta, stock_minimo, fecha_vencimiento,
           created_at, updated_at
-        ) VALUES (
-          @codigo_barras, @nombre, @marca, @categoria, @descripcion, @imagen_url,
-          @stock, @precio, @precio_compra, @precio_venta, @stock_minimo, @fecha_vencimiento,
-          @created_at, @updated_at
-        )`
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
       )
-      .run({
-        codigo_barras: codigo,
+      .run(
+        codigo,
         nombre,
-        marca: typeof body.marca === "string" ? body.marca || null : null,
-        categoria: typeof body.categoria === "string" ? body.categoria || null : null,
-        descripcion: typeof body.descripcion === "string" ? body.descripcion || null : null,
-        imagen_url: typeof body.imagen_url === "string" ? body.imagen_url || null : null,
+        typeof body.marca === "string" ? body.marca || null : null,
+        typeof body.categoria === "string" ? body.categoria || null : null,
+        typeof body.descripcion === "string" ? body.descripcion || null : null,
+        typeof body.imagen_url === "string" ? body.imagen_url || null : null,
         stock,
-        precio: precio_venta,
+        precio_venta,
         precio_compra,
         precio_venta,
         stock_minimo,
-        fecha_vencimiento:
-          typeof body.fecha_vencimiento === "string" && body.fecha_vencimiento.trim()
-            ? body.fecha_vencimiento.trim()
-            : null,
-        created_at: now,
-        updated_at: now,
-      });
+        typeof body.fecha_vencimiento === "string" && body.fecha_vencimiento.trim()
+          ? body.fecha_vencimiento.trim()
+          : null,
+        now,
+        now
+      );
 
-    const row = db.prepare(`SELECT * FROM productos WHERE id = ?`).get(info.lastInsertRowid);
-    recordSyncEvent("producto", "creado", row);
+    const row = await db.prepare(`SELECT * FROM productos WHERE id = ?`).get(info.lastInsertRowid);
+    await recordSyncEvent("producto", "creado", row);
     return row;
   },
 
-  update(id: number, body: Record<string, unknown>) {
-    const existing = db.prepare(`SELECT * FROM productos WHERE id = ?`).get(id) as Record<
+  async update(id: number, body: Record<string, unknown>) {
+    const existing = (await db.prepare(`SELECT * FROM productos WHERE id = ?`).get(id)) as Record<
       string,
       unknown
     > | undefined;
@@ -110,7 +105,7 @@ export const productoService = {
         ? body.codigo_barras.trim() || null
         : existing.codigo_barras;
     if (codigo_barras && String(codigo_barras) !== String(existing.codigo_barras)) {
-      const dup = db
+      const dup = await db
         .prepare(`SELECT id FROM productos WHERE codigo_barras = ? AND id != ?`)
         .get(codigo_barras, id);
       if (dup) throw new AppError("Ya existe un producto con ese código de barras");
@@ -143,39 +138,41 @@ export const productoService = {
         : Number(existing.stock);
 
     const now = new Date().toISOString();
-    db.prepare(
-      `UPDATE productos SET
+    await db
+      .prepare(
+        `UPDATE productos SET
         codigo_barras = ?, nombre = ?, marca = ?, categoria = ?, descripcion = ?, imagen_url = ?,
         stock = ?, precio = ?, precio_compra = ?, precio_venta = ?, stock_minimo = ?, fecha_vencimiento = ?,
         updated_at = ?
        WHERE id = ?`
-    ).run(
-      codigo_barras,
-      nombre,
-      typeof body.marca === "string" ? body.marca || null : existing.marca,
-      typeof body.categoria === "string" ? body.categoria || null : existing.categoria,
-      typeof body.descripcion === "string" ? body.descripcion || null : existing.descripcion,
-      typeof body.imagen_url === "string" ? body.imagen_url || null : existing.imagen_url,
-      stock,
-      precio_venta,
-      precio_compra,
-      precio_venta,
-      stock_minimo,
-      typeof body.fecha_vencimiento === "string"
-        ? body.fecha_vencimiento.trim() || null
-        : existing.fecha_vencimiento,
-      now,
-      id
-    );
-    const row = db.prepare(`SELECT * FROM productos WHERE id = ?`).get(id);
-    recordSyncEvent("producto", "actualizado", row);
+      )
+      .run(
+        codigo_barras,
+        nombre,
+        typeof body.marca === "string" ? body.marca || null : existing.marca,
+        typeof body.categoria === "string" ? body.categoria || null : existing.categoria,
+        typeof body.descripcion === "string" ? body.descripcion || null : existing.descripcion,
+        typeof body.imagen_url === "string" ? body.imagen_url || null : existing.imagen_url,
+        stock,
+        precio_venta,
+        precio_compra,
+        precio_venta,
+        stock_minimo,
+        typeof body.fecha_vencimiento === "string"
+          ? body.fecha_vencimiento.trim() || null
+          : existing.fecha_vencimiento,
+        now,
+        id
+      );
+    const row = await db.prepare(`SELECT * FROM productos WHERE id = ?`).get(id);
+    await recordSyncEvent("producto", "actualizado", row);
     return row;
   },
 
-  delete(id: number) {
-    const row = db.prepare(`SELECT * FROM productos WHERE id = ?`).get(id);
-    const info = db.prepare(`DELETE FROM productos WHERE id = ?`).run(id);
+  async delete(id: number) {
+    const row = await db.prepare(`SELECT * FROM productos WHERE id = ?`).get(id);
+    const info = await db.prepare(`DELETE FROM productos WHERE id = ?`).run(id);
     if (info.changes === 0) throw new AppError("no encontrado", 404);
-    recordSyncEvent("producto", "eliminado", row);
+    await recordSyncEvent("producto", "eliminado", row);
   },
 };

@@ -111,12 +111,12 @@ function normalizeEanSearchPayload(
   };
 }
 
-export function getCacheRow(codigo: string): ProductoNormalizado | null {
-  const row = db
+export async function getCacheRow(codigo: string): Promise<ProductoNormalizado | null> {
+  const row = (await db
     .prepare(
       `SELECT respuesta_json FROM productos_cache_api WHERE codigo_barras = ?`
     )
-    .get(codigo.trim()) as { respuesta_json: string } | undefined;
+    .get(codigo.trim())) as { respuesta_json: string } | undefined;
   if (!row) return null;
   try {
     const parsed = JSON.parse(row.respuesta_json) as ProductoNormalizado;
@@ -126,12 +126,14 @@ export function getCacheRow(codigo: string): ProductoNormalizado | null {
   }
 }
 
-function saveCache(codigo: string, data: ProductoNormalizado) {
+async function saveCache(codigo: string, data: ProductoNormalizado) {
   const json = JSON.stringify(data);
-  db.prepare(
-    `INSERT OR REPLACE INTO productos_cache_api (codigo_barras, respuesta_json, fecha_consulta)
+  await db
+    .prepare(
+      `INSERT OR REPLACE INTO productos_cache_api (codigo_barras, respuesta_json, fecha_consulta)
      VALUES (?, ?, ?)`
-  ).run(codigo, json, nowIso());
+    )
+    .run(codigo, json, nowIso());
 }
 
 async function fetchOpenFactsProduct(
@@ -204,11 +206,11 @@ export async function lookupBarcode(codigo: string): Promise<LookupResult> {
   const trimmed = codigo.trim();
   if (!trimmed) return { ok: false, manual: true };
 
-  const inv = db
+  const inv = (await db
     .prepare(
       `SELECT nombre, marca, categoria, descripcion, imagen_url FROM productos WHERE codigo_barras = ?`
     )
-    .get(trimmed) as
+    .get(trimmed)) as
     | {
         nombre: string;
         marca: string | null;
@@ -232,24 +234,24 @@ export async function lookupBarcode(codigo: string): Promise<LookupResult> {
     };
   }
 
-  const cached = getCacheRow(trimmed);
+  const cached = await getCacheRow(trimmed);
   if (cached) return { ok: true, data: cached };
 
   const fromOff = await fetchOpenFoodFacts(trimmed);
   if (fromOff) {
-    saveCache(trimmed, fromOff);
+    await saveCache(trimmed, fromOff);
     return { ok: true, data: fromOff };
   }
 
   const fromObf = await fetchOpenBeautyFacts(trimmed);
   if (fromObf) {
-    saveCache(trimmed, fromObf);
+    await saveCache(trimmed, fromObf);
     return { ok: true, data: fromObf };
   }
 
   const fromEan = await fetchEanSearchOrg(trimmed);
   if (fromEan) {
-    saveCache(trimmed, fromEan);
+    await saveCache(trimmed, fromEan);
     return { ok: true, data: fromEan };
   }
 

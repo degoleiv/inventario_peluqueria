@@ -2,7 +2,7 @@ import { db } from "../db.js";
 import { AppError } from "../lib/AppError.js";
 
 export const finanzaService = {
-  listGastos(desde?: string, hasta?: string) {
+  async listGastos(desde?: string, hasta?: string) {
     let sql = `SELECT * FROM gastos_operativos WHERE 1=1`;
     const p: string[] = [];
     if (desde) {
@@ -14,10 +14,10 @@ export const finanzaService = {
       p.push(hasta);
     }
     sql += ` ORDER BY fecha DESC, id DESC`;
-    return db.prepare(sql).all(...p);
+    return await db.prepare(sql).all(...p);
   },
 
-  createGasto(body: Record<string, unknown>) {
+  async createGasto(body: Record<string, unknown>) {
     const concepto = typeof body.concepto === "string" ? body.concepto.trim() : "";
     if (!concepto) throw new AppError("concepto requerido");
     const monto = Number(body.monto);
@@ -27,7 +27,7 @@ export const finanzaService = {
         ? body.fecha.trim()
         : new Date().toISOString().slice(0, 10);
     const now = new Date().toISOString();
-    const info = db
+    const info = await db
       .prepare(
         `INSERT INTO gastos_operativos (concepto, categoria, monto, fecha, notas, created_at)
          VALUES (?,?,?,?,?,?)`
@@ -40,24 +40,24 @@ export const finanzaService = {
         typeof body.notas === "string" ? body.notas || null : null,
         now
       );
-    return db.prepare(`SELECT * FROM gastos_operativos WHERE id = ?`).get(info.lastInsertRowid);
+    return await db.prepare(`SELECT * FROM gastos_operativos WHERE id = ?`).get(info.lastInsertRowid);
   },
 
   /** Ingresos por ventas, egresos por gastos operativos + total pedidos a proveedores en el período. */
-  flujoCaja(desde: string, hasta: string) {
-    const ingresos = db
+  async flujoCaja(desde: string, hasta: string) {
+    const ingresos = (await db
       .prepare(`SELECT COALESCE(SUM(total), 0) AS s FROM ventas WHERE fecha >= ? AND fecha <= ?`)
-      .get(desde, hasta) as { s: number };
-    const egresosGastos = db
+      .get(desde, hasta)) as { s: number };
+    const egresosGastos = (await db
       .prepare(
         `SELECT COALESCE(SUM(monto), 0) AS s FROM gastos_operativos WHERE fecha >= ? AND fecha <= ?`
       )
-      .get(desde.slice(0, 10), hasta.slice(0, 10)) as { s: number };
-    const egresosPedidos = db
+      .get(desde.slice(0, 10), hasta.slice(0, 10))) as { s: number };
+    const egresosPedidos = (await db
       .prepare(
         `SELECT COALESCE(SUM(total), 0) AS s FROM pedidos_proveedor WHERE fecha >= ? AND fecha <= ?`
       )
-      .get(desde.slice(0, 10), hasta.slice(0, 10)) as { s: number };
+      .get(desde.slice(0, 10), hasta.slice(0, 10))) as { s: number };
     const egresos = egresosGastos.s + egresosPedidos.s;
     return {
       periodo: { desde, hasta },

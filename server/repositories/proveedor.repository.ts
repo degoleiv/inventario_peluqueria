@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { RunResult } from "../db.js";
 import { db } from "../db.js";
 
 /** Fila persistida (SQLite). */
@@ -15,10 +15,6 @@ export type ProveedorRow = {
   fecha_actualizacion: string;
 };
 
-function dbh(): Database.Database {
-  return db;
-}
-
 export type ProveedorListFilter = {
   /** Sin permiso de gestión: sólo activos. */
   forceSoloActivos: boolean;
@@ -29,8 +25,13 @@ export type ProveedorListFilter = {
   searchPattern: string | null;
 };
 
+async function columnExists(col: string): Promise<boolean> {
+  const rows = (await db.prepare(`PRAGMA table_info(proveedores)`).all()) as { name: string }[];
+  return rows.some((r) => r.name === col);
+}
+
 export const proveedorRepository = {
-  listFiltered(opts: ProveedorListFilter): ProveedorRow[] {
+  async listFiltered(opts: ProveedorListFilter): Promise<ProveedorRow[]> {
     const conditions: string[] = [];
     const params: unknown[] = [];
 
@@ -52,44 +53,42 @@ export const proveedorRepository = {
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
     const sql = `SELECT id, nombre, nit, telefono, email, direccion, icono_url, estado, fecha_creacion, fecha_actualizacion
          FROM proveedores ${where} ORDER BY nombre COLLATE NOCASE`;
-    return dbh().prepare(sql).all(...params) as ProveedorRow[];
+    return (await db.prepare(sql).all(...params)) as ProveedorRow[];
   },
 
-  countPedidosByProveedorId(proveedorId: number): number {
-    const row = dbh()
+  async countPedidosByProveedorId(proveedorId: number): Promise<number> {
+    const row = (await db
       .prepare(`SELECT COUNT(*) AS c FROM pedidos_proveedor WHERE proveedor_id = ?`)
-      .get(proveedorId) as { c: number } | undefined;
+      .get(proveedorId)) as { c: number } | undefined;
     return row?.c ?? 0;
   },
 
-  deleteById(id: number): void {
-    dbh().prepare(`DELETE FROM proveedores WHERE id = ?`).run(id);
+  async deleteById(id: number): Promise<void> {
+    await db.prepare(`DELETE FROM proveedores WHERE id = ?`).run(id);
   },
 
-  findById(id: number): ProveedorRow | undefined {
-    return dbh()
+  async findById(id: number): Promise<ProveedorRow | undefined> {
+    return (await db
       .prepare(
         `SELECT id, nombre, nit, telefono, email, direccion, icono_url, estado, fecha_creacion, fecha_actualizacion
          FROM proveedores WHERE id = ?`
       )
-      .get(id) as ProveedorRow | undefined;
+      .get(id)) as ProveedorRow | undefined;
   },
 
-  findByNitNormalized(nit: string, excludeId?: number): { id: number } | undefined {
+  async findByNitNormalized(nit: string, excludeId?: number): Promise<{ id: number } | undefined> {
     const n = nit.trim().toLowerCase();
     if (excludeId != null) {
-      return dbh()
-        .prepare(
-          `SELECT id FROM proveedores WHERE lower(trim(nit)) = ? AND id != ?`
-        )
-        .get(n, excludeId) as { id: number } | undefined;
+      return (await db
+        .prepare(`SELECT id FROM proveedores WHERE lower(trim(nit)) = ? AND id != ?`)
+        .get(n, excludeId)) as { id: number } | undefined;
     }
-    return dbh()
-      .prepare(`SELECT id FROM proveedores WHERE lower(trim(nit)) = ?`)
-      .get(n) as { id: number } | undefined;
+    return (await db.prepare(`SELECT id FROM proveedores WHERE lower(trim(nit)) = ?`).get(n)) as
+      | { id: number }
+      | undefined;
   },
 
-  insert(row: {
+  async insert(row: {
     nombre: string;
     nit: string;
     telefono: string | null;
@@ -100,10 +99,10 @@ export const proveedorRepository = {
     fecha_creacion: string;
     fecha_actualizacion: string;
     created_at: string | null;
-  }) {
-    const hasCreated = columnExists("created_at");
+  }): Promise<RunResult> {
+    const hasCreated = await columnExists("created_at");
     if (hasCreated) {
-      return dbh()
+      return db
         .prepare(
           `INSERT INTO proveedores (
             nombre, nit, telefono, email, direccion, icono_url, estado,
@@ -123,7 +122,7 @@ export const proveedorRepository = {
           row.created_at ?? row.fecha_creacion
         );
     }
-    return dbh()
+    return db
       .prepare(
         `INSERT INTO proveedores (
           nombre, nit, telefono, email, direccion, icono_url, estado,
@@ -143,7 +142,7 @@ export const proveedorRepository = {
       );
   },
 
-  update(
+  async update(
     id: number,
     patch: {
       nombre: string;
@@ -155,10 +154,10 @@ export const proveedorRepository = {
       estado: string;
       fecha_actualizacion: string;
     }
-  ) {
-    const hasCreated = columnExists("created_at");
+  ): Promise<void> {
+    const hasCreated = await columnExists("created_at");
     if (hasCreated) {
-      dbh()
+      await db
         .prepare(
           `UPDATE proveedores SET
             nombre = ?, nit = ?, telefono = ?, email = ?, direccion = ?, icono_url = ?,
@@ -179,7 +178,7 @@ export const proveedorRepository = {
         );
       return;
     }
-    dbh()
+    await db
       .prepare(
         `UPDATE proveedores SET
           nombre = ?, nit = ?, telefono = ?, email = ?, direccion = ?, icono_url = ?,
@@ -199,23 +198,18 @@ export const proveedorRepository = {
       );
   },
 
-  setEstado(id: number, estado: string, fecha_actualizacion: string) {
-    const hasCreated = columnExists("created_at");
+  async setEstado(id: number, estado: string, fecha_actualizacion: string): Promise<void> {
+    const hasCreated = await columnExists("created_at");
     if (hasCreated) {
-      dbh()
+      await db
         .prepare(
           `UPDATE proveedores SET estado = ?, fecha_actualizacion = ?, created_at = ? WHERE id = ?`
         )
         .run(estado, fecha_actualizacion, fecha_actualizacion, id);
     } else {
-      dbh()
+      await db
         .prepare(`UPDATE proveedores SET estado = ?, fecha_actualizacion = ? WHERE id = ?`)
         .run(estado, fecha_actualizacion, id);
     }
   },
 };
-
-function columnExists(col: string): boolean {
-  const rows = dbh().prepare(`PRAGMA table_info(proveedores)`).all() as { name: string }[];
-  return rows.some((r) => r.name === col);
-}

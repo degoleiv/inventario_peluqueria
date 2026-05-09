@@ -1,31 +1,23 @@
 import { Navigate, useParams } from "react-router-dom";
-import { SubNav } from "../components/SubNav";
-import { PEDIDOS_TABS, readPedidosTab, type PedidosTab } from "../lib/moduleRoutes";
 import { PedidosProveedoresPage } from "./PedidosProveedoresPage";
-import { ProveedoresPage } from "./ProveedoresPage";
 
 export function PedidosModulePage() {
-  const { tab: tabParam } = useParams<{ tab: string }>();
-  const tabOk = tabParam != null && PEDIDOS_TABS.includes(tabParam as PedidosTab);
-  if (!tabOk) {
-    return <Navigate to={`/pedidos/${readPedidosTab()}`} replace />;
+  const { tab: tabParam } = useParams<{ tab?: string }>();
+  const normalized = (tabParam ?? "").trim().toLowerCase();
+
+  if (normalized === "proveedores") {
+    return <Navigate to="/proveedores" replace />;
   }
-  const tab = tabParam as PedidosTab;
+  if (normalized === "pedidos_proveedores" || normalized === "compras") {
+    return <Navigate to="/pedidos" replace />;
+  }
+  if (normalized !== "" && normalized !== "pedidos-proveedores") {
+    return <Navigate to="/pedidos" replace />;
+  }
 
   return (
-    <>
-      <SubNav
-        moduleId="pedidos"
-        items={[
-          { id: "proveedores", label: "Proveedores", to: "/pedidos/proveedores" },
-          {
-            id: "pedidos-proveedores",
-            label: "Pedidos a proveedores",
-            to: "/pedidos/pedidos-proveedores",
-          },
-        ]}
-      />
-      {tab === "proveedores" ? <ProveedoresPage /> : <PedidosProveedoresPage />}
-    </>
+    <div className="page-pedidos">
+      <PedidosProveedoresPage />
+    </div>
   );
 }

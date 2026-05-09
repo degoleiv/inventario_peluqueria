@@ -14,13 +14,15 @@ export type ClientesTab = (typeof CLIENTES_TABS)[number];
 export const VENTAS_TABS = ["pos", "historial", "devoluciones"] as const;
 export type VentasTab = (typeof VENTAS_TABS)[number];
 
-export const PEDIDOS_TABS = ["proveedores", "pedidos-proveedores"] as const;
+export const PEDIDOS_TABS = ["pedidos-proveedores"] as const;
 export type PedidosTab = (typeof PEDIDOS_TABS)[number];
 
-/** Última sub-pestaña del módulo Pedidos (proveedores | pedidos a proveedores). */
+/** Compatibilidad histórica: normaliza tabs antiguas hacia pedidos principales. */
 export function readPedidosTab(): PedidosTab {
   let t = readLastTab("pedidos", "pedidos-proveedores");
-  if (t === "compras" || t === "pedidos_proveedores") return "pedidos-proveedores";
+  if (t === "compras" || t === "pedidos_proveedores" || t === "proveedores") {
+    return "pedidos-proveedores";
+  }
   if (PEDIDOS_TABS.includes(t as PedidosTab)) return t as PedidosTab;
   return "pedidos-proveedores";
 }
@@ -85,7 +87,7 @@ export function getModuleEntryPath(key: NavKey): string {
     case "clientes":
       return `/clientes/${readLastTab("clientes", "lista")}`;
     case "pedidos":
-      return `/pedidos/${readPedidosTab()}`;
+      return "/pedidos";
     case "finanzas":
       return "/finanzas";
     case "facturas":

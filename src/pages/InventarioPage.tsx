@@ -12,9 +12,13 @@ import {
   type Producto,
 } from "../api";
 import { ContextMenu, type ContextMenuItem } from "../components/ContextMenu";
+import {
+  ProductoCatalogoForm,
+  catalogoFieldsToCreateBody,
+  type ProductoCatalogoFields,
+} from "../components/ProductoCatalogoForm";
 import { Drawer } from "../components/Drawer";
 import { useToast } from "../context/ToastContext";
-import { filterIntegerTyping } from "../lib/decimalInput";
 import { SubNav } from "../components/SubNav";
 import { INVENTARIO_TABS, readLastTab, type InventarioTab } from "../lib/moduleRoutes";
 
@@ -180,22 +184,38 @@ export function InventarioPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [drawerOpen]);
 
+  const catalogoValues: ProductoCatalogoFields = {
+    codigo,
+    nombre,
+    marca,
+    categoria,
+    descripcion,
+    imagenUrl,
+    stock,
+    precioCompra,
+    precioVenta,
+    stockMinimo,
+    fechaVencimiento,
+  };
+
+  function patchCatalogo(patch: Partial<ProductoCatalogoFields>) {
+    if (patch.codigo !== undefined) setCodigo(patch.codigo);
+    if (patch.nombre !== undefined) setNombre(patch.nombre);
+    if (patch.marca !== undefined) setMarca(patch.marca);
+    if (patch.categoria !== undefined) setCategoria(patch.categoria);
+    if (patch.descripcion !== undefined) setDescripcion(patch.descripcion);
+    if (patch.imagenUrl !== undefined) setImagenUrl(patch.imagenUrl);
+    if (patch.stock !== undefined) setStock(patch.stock);
+    if (patch.precioCompra !== undefined) setPrecioCompra(patch.precioCompra);
+    if (patch.precioVenta !== undefined) setPrecioVenta(patch.precioVenta);
+    if (patch.stockMinimo !== undefined) setStockMinimo(patch.stockMinimo);
+    if (patch.fechaVencimiento !== undefined) setFechaVencimiento(patch.fechaVencimiento);
+  }
+
   async function onGuardar(e: React.FormEvent) {
     e.preventDefault();
     if (!nombre.trim()) return;
-    const body = {
-      codigo_barras: codigo.trim() || null,
-      nombre: nombre.trim(),
-      marca: marca.trim() || null,
-      categoria: categoria.trim() || null,
-      descripcion: descripcion.trim() || null,
-      imagen_url: imagenUrl.trim() || null,
-      stock: stock === "" ? 0 : Number(stock),
-      precio_compra: precioCompra === "" ? null : Number(precioCompra),
-      precio_venta: precioVenta === "" ? null : Number(precioVenta),
-      stock_minimo: stockMinimo === "" ? undefined : Number(stockMinimo),
-      fecha_vencimiento: fechaVencimiento.trim() || null,
-    };
+    const body = catalogoFieldsToCreateBody(catalogoValues);
     setError(null);
     try {
       if (editingId != null) {
@@ -413,128 +433,16 @@ export function InventarioPage() {
           className="form drawer-form"
           onSubmit={onGuardar}
         >
-          <div className="field-row">
-            <label className="field">
-              <span>Código de barras</span>
-              <input
-                value={codigo}
-                onChange={(e) => setCodigo(e.target.value)}
-                placeholder="EAN-13 / escáner"
-                autoComplete="off"
-              />
-            </label>
-            <button
-              type="button"
-              className="btn secondary"
-              onClick={() => void onBuscarCodigo()}
-              disabled={lookupLoading}
-            >
-              {lookupLoading ? "Buscando…" : "Buscar datos"}
-            </button>
-          </div>
-          {!editingId ? (
-            <p className="muted" style={{ marginTop: "-0.25rem", marginBottom: "0.35rem" }}>
-              Con código de al menos 8 caracteres se consultan APIs externas y caché.
-            </p>
-          ) : null}
-          {lookupHint ? <p className="hint">{lookupHint}</p> : null}
-
-          <label className="field">
-            <span>Nombre *</span>
-            <input
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-              required
-              placeholder="Nombre del producto"
-            />
-          </label>
-
-          <div className="grid-2">
-            <label className="field">
-              <span>Marca</span>
-              <input value={marca} onChange={(e) => setMarca(e.target.value)} />
-            </label>
-            <label className="field">
-              <span>Categoría</span>
-              <input value={categoria} onChange={(e) => setCategoria(e.target.value)} />
-            </label>
-          </div>
-
-          <label className="field">
-            <span>Descripción</span>
-            <textarea
-              value={descripcion}
-              onChange={(e) => setDescripcion(e.target.value)}
-              rows={3}
-            />
-          </label>
-
-          <label className="field">
-            <span>URL imagen</span>
-            <input value={imagenUrl} onChange={(e) => setImagenUrl(e.target.value)} />
-          </label>
-
-          <div className="grid-2">
-            <label className="field">
-              <span>Precio compra</span>
-              <input
-                type="number"
-                step="0.01"
-                min={0}
-                value={precioCompra}
-                onChange={(e) =>
-                  setPrecioCompra(e.target.value === "" ? "" : Number(e.target.value))
-                }
-              />
-            </label>
-            <label className="field">
-              <span>Precio venta</span>
-              <input
-                type="number"
-                step="0.01"
-                min={0}
-                value={precioVenta}
-                onChange={(e) =>
-                  setPrecioVenta(e.target.value === "" ? "" : Number(e.target.value))
-                }
-              />
-            </label>
-          </div>
-
-          <div className="grid-2">
-            <label className="field">
-              <span>Stock</span>
-              <input
-                type="number"
-                min={0}
-                value={stock === "" ? "" : stock}
-                onChange={(e) => {
-                  const raw = filterIntegerTyping(e.target.value);
-                  setStock(raw === "" ? "" : Number(raw));
-                }}
-              />
-            </label>
-            <label className="field">
-              <span>Stock mínimo (alerta)</span>
-              <input
-                type="number"
-                min={0}
-                value={stockMinimo}
-                onChange={(e) =>
-                  setStockMinimo(e.target.value === "" ? "" : Number(e.target.value))
-                }
-              />
-            </label>
-          </div>
-
-          <label className="field">
-            <span>Vencimiento (opcional)</span>
-            <input
-              type="date"
-              value={fechaVencimiento}
-              onChange={(e) => setFechaVencimiento(e.target.value)}
-            />
-          </label>
+          <ProductoCatalogoForm
+            values={catalogoValues}
+            onChange={patchCatalogo}
+            mode={editingId != null ? "edit" : "create"}
+            barcodeLookup={{
+              loading: lookupLoading,
+              hint: lookupHint,
+              onLookupClick: () => void onBuscarCodigo(),
+            }}
+          />
 
           <div className="drawer-actions">
             <button type="submit" className="btn primary btn-lg">

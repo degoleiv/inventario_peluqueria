@@ -500,6 +500,19 @@ export function registerHttpRoutes(app: Express) {
 
   api.post("/proveedores", requirePermiso("pedidos"), asyncHandler((req, res) => proveedoresController.create(req, res)));
 
+  api.post(
+    "/proveedores/:id/productos-rapido",
+    requirePermiso("pedidos"),
+    asyncHandler(async (req, res) => {
+      const proveedorId = parseId(req, res);
+      if (proveedorId == null) return;
+      const raw = req.body as Record<string, unknown>;
+      const body = { ...raw, proveedor_id: proveedorId };
+      const row = await productoService.create(body);
+      res.status(201).json(row);
+    })
+  );
+
   api.put("/proveedores/:id", requirePermiso("pedidos"), asyncHandler((req, res) => proveedoresController.update(req, res)));
 
   api.patch(
@@ -509,6 +522,21 @@ export function registerHttpRoutes(app: Express) {
   );
 
   api.delete("/proveedores/:id", requirePermiso("pedidos"), asyncHandler((req, res) => proveedoresController.remove(req, res)));
+
+  api.get(
+    "/proveedores/:id/productos",
+    requirePermiso("pedidos"),
+    asyncHandler(async (req, res) => {
+      const proveedorId = Number(req.params.id);
+      if (!Number.isFinite(proveedorId) || proveedorId <= 0) {
+        res.status(400).json({ error: "id inválido" });
+        return;
+      }
+      const q = typeof req.query.q === "string" ? req.query.q : undefined;
+      const limitRaw = Number(req.query.limit ?? 300);
+      res.json(await pedidoProveedorService.listProductosAsociados(proveedorId, q, limitRaw));
+    })
+  );
 
   api.get(
     "/pedidos-proveedores",

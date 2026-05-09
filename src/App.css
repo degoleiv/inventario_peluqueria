@@ -2248,6 +2248,12 @@ select {
   font-size: clamp(1.45rem, 2.5vw, 1.9rem);
 }
 
+/* Pedidos: aprovechar más ancho disponible del layout */
+.main-pro-content:has(.page-pedidos) {
+  max-width: 1440px;
+  padding: 0.45rem 1.1rem 0.6rem;
+}
+
 /* Pantalla secundaria: solo lo que ve el cliente (subtotal + líneas) */
 .app-root--customer-display {
   padding: clamp(1rem, 3vw, 2.25rem);
@@ -3985,3 +3991,281 @@ select {
       2 18,
     text;
 }
+
+.pedido-wizard-steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-bottom: 0.85rem;
+}
+
+.pedido-wizard-step {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.68rem 0.78rem;
+  border: 1px solid color-mix(in oklab, var(--line) 78%, transparent);
+  border-radius: 12px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--card) 96%, var(--bg)) 0%,
+    color-mix(in oklab, var(--card) 90%, var(--bg)) 100%
+  );
+  cursor: pointer;
+  text-align: left;
+  transition:
+    transform 140ms ease,
+    box-shadow 160ms ease,
+    border-color 140ms ease;
+}
+
+.pedido-wizard-step:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in oklab, var(--acc) 30%, var(--line));
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.08);
+}
+
+.pedido-wizard-step__index {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklab, var(--line) 75%, transparent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: color-mix(in oklab, var(--card) 84%, var(--bg));
+}
+
+.pedido-wizard-step__label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.pedido-wizard-step--active {
+  border-color: color-mix(in oklab, var(--acc) 56%, var(--line));
+  box-shadow:
+    0 0 0 2px color-mix(in oklab, var(--acc) 16%, transparent),
+    0 8px 18px rgba(0, 0, 0, 0.1);
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--acc) 16%, var(--card)) 0%,
+    color-mix(in oklab, var(--acc) 8%, var(--card)) 100%
+  );
+}
+
+.pedido-wizard-step--done .pedido-wizard-step__index {
+  background: color-mix(in oklab, var(--ok) 62%, var(--card));
+  border-color: color-mix(in oklab, var(--ok) 55%, var(--line));
+}
+
+.pedido-wizard-progress {
+  width: 100%;
+  height: 7px;
+  background: color-mix(in oklab, var(--line) 55%, transparent);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 0.85rem;
+}
+
+.pedido-wizard-progress > span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--acc), color-mix(in oklab, var(--ok) 50%, var(--acc)));
+  transition: width 160ms ease;
+}
+
+.pedido-wizard-panel {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.pedido-wizard-actions {
+  justify-content: space-between;
+}
+
+.pedido-productos-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+  gap: 1rem;
+  align-items: start;
+}
+
+.pedido-productos-sidebar {
+  margin: 0;
+  min-height: 320px;
+  max-height: 70vh;
+  overflow: auto;
+}
+
+.pedido-productos-sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.pedido-productos-add-btn {
+  min-width: 2rem;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0;
+}
+
+.pedido-productos-list {
+  display: grid;
+  gap: 0.45rem;
+  min-height: 150px;
+  align-content: start;
+}
+
+.pedido-producto-item {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--card) 92%, var(--bg));
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.6rem;
+  text-align: left;
+}
+
+.pedido-producto-item__name {
+  font-weight: 600;
+}
+
+.pedido-producto-item__meta {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.subnav-link--btn {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.pedido-productos-detail .table td input {
+  min-width: 90px;
+}
+
+.pedido-productos-detail .table-wrap {
+  min-height: 220px;
+}
+
+.pedido-descuento-field {
+  align-self: end;
+}
+
+.pedido-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.pedido-toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.pedido-toggle__track {
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  background: #d5d2de;
+  border: 1px solid #cac5d8;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+
+.pedido-toggle__thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(36, 30, 48, 0.25);
+  transform: translateX(0);
+  transition: transform 140ms ease;
+}
+
+.pedido-toggle__text {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.pedido-toggle input:checked + .pedido-toggle__track {
+  background: #9b93e6;
+  border-color: #8b82dd;
+}
+
+.pedido-toggle input:checked + .pedido-toggle__track .pedido-toggle__thumb {
+  transform: translateX(16px);
+}
+
+.pedido-toggle input:focus-visible + .pedido-toggle__track {
+  outline: 2px solid #b6afe8;
+  outline-offset: 2px;
+}
+
+.pedido-rapido-modal {
+  padding: 1rem 1.05rem;
+}
+
+.pedido-rapido-modal .card-head {
+  margin-bottom: 0.45rem;
+}
+
+.pedido-rapido-form {
+  gap: 0.65rem;
+}
+
+.pedido-rapido-modal .inner-line {
+  padding: 0.65rem 0.8rem;
+  margin-bottom: 0.45rem;
+}
+
+.pedido-rapido-modal textarea {
+  min-height: 58px;
+}
+
+.pedido-total-box {
+  margin-top: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--acc) 8%, var(--card));
+}
+
+@media (max-width: 900px) {
+  .pedido-wizard-steps {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .pedido-wizard-steps {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 980px) {
+  .pedido-productos-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .pedido-productos-sidebar {
+    min-height: 260px;
+  }
+}
+

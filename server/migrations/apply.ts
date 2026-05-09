@@ -264,6 +264,16 @@ export async function applyMigrations(database: SqliteDb) {
     if (!prNames.has("icono_url")) {
       await database.exec(`ALTER TABLE proveedores ADD COLUMN icono_url TEXT`);
     }
+
+    const prodProvCols = (await database.prepare(`PRAGMA table_info(productos)`).all()) as {
+      name: string;
+    }[];
+    const prodProvNames = new Set(prodProvCols.map((c) => c.name));
+    if (!prodProvNames.has("proveedor_id")) {
+      await database.exec(
+        `ALTER TABLE productos ADD COLUMN proveedor_id INTEGER REFERENCES proveedores(id) ON DELETE SET NULL`
+      );
+    }
   }
 
   const movCols = (await database.prepare(`PRAGMA table_info(movimientos_inventario)`).all()) as {

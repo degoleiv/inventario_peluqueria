@@ -19,9 +19,10 @@ export const clienteService = {
               OR IFNULL(telefono,'') LIKE ?
               OR IFNULL(email,'') LIKE ? ESCAPE '\\'
               OR IFNULL(numero_documento,'') LIKE ? ESCAPE '\\'
+              OR IFNULL(cedula,'') LIKE ?
            ORDER BY nombre COLLATE NOCASE`
         )
-        .all(term, term, term, term);
+        .all(term, term, term, term, term);
     }
     return await db.prepare(`SELECT * FROM clientes ORDER BY nombre COLLATE NOCASE`).all();
   },
@@ -97,13 +98,45 @@ export const clienteService = {
     const now = new Date().toISOString();
     const info = await db
       .prepare(
-        `INSERT INTO clientes (nombre, telefono, email, notas, created_at, updated_at, tipo_cliente, activo)
-         VALUES (?, ?, NULL, NULL, ?, ?, ?, 1)`
+        `INSERT INTO clientes (nombre, telefono, email, notas, created_at, updated_at, tipo_cliente, activo, cedula)
+         VALUES (?, ?, NULL, NULL, ?, ?, ?, 1, NULL)`
       )
       .run(nombre, telefono, now, now, TIPO_TEMPORAL);
     const row = await db.prepare(`SELECT * FROM clientes WHERE id = ?`).get(info.lastInsertRowid);
     await recordSyncEvent("cliente", "creado_temporal", row);
     return { cliente: row, reutilizado: false as const };
+  },
+
+  /**
+   * Cliente temporal para una cita nueva: exige nombre, teléfono y cédula (no hace falta estar registrado antes).
+   * Si el teléfono ya existe, reutiliza ese cliente (misma lógica que createTemporal).
+   */
+  async createTemporalParaCita(body: Record<string, unknown>): Promise<number> {
+    const nombre = typeof body.nombre === "string" ? body.nombre.trim() : "";
+    const telefonoRaw = typeof body.telefono === "string" ? body.telefono.trim() : "";
+    const cedula = typeof body.cedula === "string" ? body.cedula.trim() : "";
+    if (!nombre) throw new AppError("El nombre del cliente es obligatorio para la cita.");
+    if (!telefonoRaw) throw new AppError("El teléfono del cliente es obligatorio para la cita.");
+    if (!cedula) throw new AppError("La cédula del cliente es obligatoria para la cita.");
+    const telefono = telefonoRaw || null;
+    if (telefono) {
+      const ex = (await db
+        .prepare(`SELECT * FROM clientes WHERE telefono = ? AND IFNULL(telefono,'') != ''`)
+        .get(telefono)) as Record<string, unknown> | undefined;
+      if (ex) {
+        return Number(ex.id);
+      }
+    }
+    const now = new Date().toISOString();
+    const info = await db
+      .prepare(
+        `INSERT INTO clientes (nombre, telefono, email, notas, created_at, updated_at, tipo_cliente, activo, cedula)
+         VALUES (?, ?, NULL, NULL, ?, ?, ?, 1, ?)`
+      )
+      .run(nombre, telefono, now, now, TIPO_TEMPORAL, cedula);
+    const row = await db.prepare(`SELECT * FROM clientes WHERE id = ?`).get(info.lastInsertRowid);
+    await recordSyncEvent("cliente", "creado_temporal", row);
+    return Number(info.lastInsertRowid);
   },
 
   async convertirARegistrado(id: number, body: Record<string, unknown>) {
@@ -216,5 +249,24 @@ export const clienteService = {
     const info = await db.prepare(`DELETE FROM clientes WHERE id = ?`).run(id);
     if (info.changes === 0) throw new AppError("no encontrado", 404);
     await recordSyncEvent("cliente", "eliminado", row);
+  },
+
+  /**
+   * Cliente genérico para citas sin contacto (un solo registro por base, nombre fijo).
+   */
+  async getOrCreateIdParaCitaSinCliente(): Promise<number> {
+    const nombreMarca = "Cita sin cliente";
+    const row = (await db.prepare(`SELECT id FROM clientes WHERE nombre = ? LIMIT 1`).get(nombreMarca)) as
+      | { id: number }
+      | undefined;
+    if (row) return row.id;
+    const now = new Date().toISOString();
+    const info = await db
+      .prepare(
+        `INSERT INTO clientes (nombre, telefono, email, notas, created_at, updated_at, tipo_cliente, activo)
+         VALUES (?, NULL, NULL, NULL, ?, ?, ?, 1)`
+      )
+      .run(nombreMarca, now, now, TIPO_TEMPORAL);
+    return Number(info.lastInsertRowid);
   },
 };

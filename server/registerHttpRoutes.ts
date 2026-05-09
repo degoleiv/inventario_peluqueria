@@ -32,6 +32,8 @@ import { turnoService } from "./services/turno.service.js";
 import { empleadoMovimientoService } from "./services/empleadoMovimiento.service.js";
 import { certificadoController } from "./controllers/certificado.controller.js";
 import { proveedoresController } from "./controllers/proveedores.controller.js";
+import { AppError } from "./lib/AppError.js";
+import { businessHours } from "./config.js";
 
 function parseId(req: Request, res: Response): number | null {
   const id = Number(req.params.id);
@@ -425,7 +427,124 @@ export function registerHttpRoutes(app: Express) {
   api.get(
     "/citas",
     requirePermiso("citas"),
-    asyncHandler(async (_req, res) => res.json(await citaService.list()))
+    asyncHandler(async (req, res) => {
+      const desde = typeof req.query.desde === "string" ? req.query.desde : undefined;
+      const hasta = typeof req.query.hasta === "string" ? req.query.hasta : undefined;
+      const uq = req.query.usuario_id;
+      let usuario_id: number | undefined;
+      if (uq != null && String(uq).trim() !== "") {
+        const n = Number(uq);
+        if (Number.isFinite(n)) usuario_id = Math.floor(n);
+      }
+      res.json(await citaService.list({ desde, hasta, usuario_id }));
+    })
+  );
+
+  api.get(
+    "/citas/solape",
+    requirePermiso("citas"),
+    asyncHandler(async (req, res) => {
+      const inicio = typeof req.query.inicio === "string" ? req.query.inicio.trim() : "";
+      const dur = Math.max(1, Math.floor(Number(req.query.duracion_min ?? 60)));
+      const uid = Number(req.query.usuario_id);
+      const excRaw = req.query.exclude_cita_id;
+      let exclude: number | null = null;
+      if (excRaw != null && String(excRaw).trim() !== "") {
+        const n = Number(excRaw);
+        if (Number.isFinite(n)) exclude = Math.floor(n);
+      }
+      if (!inicio || !Number.isFinite(uid)) {
+        throw new AppError("Parámetros inicio (ISO) y usuario_id requeridos", 400);
+      }
+      const cita = await citaService.findSolape(inicio, dur, uid, exclude);
+      res.json({ solapa: cita != null, cita: cita ?? null });
+    })
+  );
+
+  api.get(
+    "/citas/config-agenda",
+    requirePermiso("citas"),
+    asyncHandler(async (_req, res) => {
+      const { open, close } = businessHours();
+      res.json({ open, close });
+    })
+  );
+
+  api.get(
+    "/citas/empleado-agenda-dia",
+    requirePermiso("citas"),
+    asyncHandler(async (req, res) => {
+      const fecha = typeof req.query.fecha === "string" ? req.query.fecha.trim() : "";
+      const uid = Number(req.query.usuario_id);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha) || !Number.isFinite(uid)) {
+        throw new AppError("fecha (YYYY-MM-DD) y usuario_id requeridos", 400);
+      }
+      const rows = (await turnoService.list(fecha, fecha, uid)) as Array<{
+        hora_inicio: string;
+        hora_fin: string;
+        estado: string;
+      }>;
+      const activos = rows.filter((r) => String(r.estado) !== "finalizado");
+      res.json({
+        fecha,
+        usuario_id: uid,
+        segmentos: activos.map((r) => ({
+          hora_inicio: String(r.hora_inicio).trim(),
+          hora_fin: String(r.hora_fin).trim(),
+        })),
+      });
+    })
+  );
+
+  /** Turnos de trabajo en un rango (misma fuente que Empleados → Turnos; permiso citas). */
+  api.get(
+    "/citas/empleado-turnos-rango",
+    requirePermiso("citas"),
+    asyncHandler(async (req, res) => {
+      const desde = typeof req.query.desde === "string" ? req.query.desde.trim().slice(0, 10) : "";
+      const hasta = typeof req.query.hasta === "string" ? req.query.hasta.trim().slice(0, 10) : "";
+      const uid = Number(req.query.usuario_id);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(desde) || !/^\d{4}-\d{2}-\d{2}$/.test(hasta) || !Number.isFinite(uid)) {
+        throw new AppError("desde, hasta (YYYY-MM-DD) y usuario_id requeridos", 400);
+      }
+      res.json(await turnoService.list(desde, hasta, Math.floor(uid)));
+    })
+  );
+
+  /** Crea un turno de trabajo para un día (franja del negocio por defecto); permiso citas. */
+  api.post(
+    "/citas/empleado-turno-dia",
+    requirePermiso("citas"),
+    asyncHandler(async (req, res) => {
+      const b = req.body as Record<string, unknown>;
+      const uid = Number(b.usuario_id);
+      const fecha = typeof b.fecha === "string" ? b.fecha.trim().slice(0, 10) : "";
+      if (!Number.isFinite(uid) || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+        throw new AppError("usuario_id y fecha (YYYY-MM-DD) requeridos", 400);
+      }
+      const { open, close } = businessHours();
+      const negocioFloatAHm = (n: number) => {
+        let h = Math.floor(n);
+        let m = Math.round((n - h) * 60);
+        if (m >= 60) {
+          h += Math.floor(m / 60);
+          m = m % 60;
+        }
+        return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+      };
+      let hora_inicio = typeof b.hora_inicio === "string" ? b.hora_inicio.trim() : "";
+      let hora_fin = typeof b.hora_fin === "string" ? b.hora_fin.trim() : "";
+      if (!hora_inicio) hora_inicio = negocioFloatAHm(open);
+      if (!hora_fin) hora_fin = negocioFloatAHm(close);
+      const row = await turnoService.create({
+        empleado_id: Math.floor(uid),
+        fecha,
+        hora_inicio,
+        hora_fin,
+        estado: "activo",
+      });
+      res.status(201).json(row);
+    })
   );
 
   api.post(
@@ -1218,6 +1337,7 @@ export function registerHttpRoutes(app: Express) {
           b.valor_comision != null && Number.isFinite(Number(b.valor_comision))
             ? Number(b.valor_comision)
             : undefined,
+        turno_inicial: b.turno_inicial,
       });
       res.status(201).json(row);
     })

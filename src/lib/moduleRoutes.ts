@@ -2,7 +2,7 @@ import type { NavKey } from "../nav";
 
 const STORAGE_PREFIX = "peluqueria_subnav_";
 
-export const CITAS_TABS = ["calendario", "agenda", "nueva"] as const;
+export const CITAS_TABS = ["calendario", "buscar"] as const;
 export type CitasTab = (typeof CITAS_TABS)[number];
 
 export const INVENTARIO_TABS = ["productos", "alertas"] as const;
@@ -78,10 +78,11 @@ export function readLastTab(moduleId: string, fallback: string): string {
   }
 }
 
-/** Migra pestaña antigua `lista` → `agenda`. */
+/** Migra rutas antiguas (`agenda`, `lista`, `nueva`) → calendario. */
 export function readCitasTab(): CitasTab {
-  let t = readLastTab("citas", "calendario");
-  if (t === "lista") return "agenda";
+  const t = readLastTab("citas", "calendario");
+  if (t === "lista" || t === "nueva" || t === "agenda") return "calendario";
+  if (t === "busqueda") return "buscar";
   if (CITAS_TABS.includes(t as CitasTab)) return t as CitasTab;
   return "calendario";
 }

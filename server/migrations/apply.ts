@@ -569,6 +569,7 @@ export async function applyMigrations(database: SqliteDb) {
     { col: "tipo_documento", ddl: `ALTER TABLE clientes ADD COLUMN tipo_documento TEXT` },
     { col: "numero_documento", ddl: `ALTER TABLE clientes ADD COLUMN numero_documento TEXT` },
     { col: "direccion", ddl: `ALTER TABLE clientes ADD COLUMN direccion TEXT` },
+    { col: "cedula", ddl: `ALTER TABLE clientes ADD COLUMN cedula TEXT` },
   ] as const) {
     const cliExtra = (await database.prepare(`PRAGMA table_info(clientes)`).all()) as {
       name: string;

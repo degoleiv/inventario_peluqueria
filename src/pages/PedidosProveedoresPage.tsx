@@ -909,15 +909,19 @@ export function PedidosProveedoresPage() {
         <form className="form" onSubmit={onPedidoSubmit}>
           {wizardStep === 0 ? (
             <div className="pedido-wizard-panel">
-              <div className="field" style={{ marginBottom: "0.4rem" }}>
-                <span style={{ display: "block", marginBottom: "0.3rem" }}>Buscar proveedor</span>
-                <input
-                  type="search"
-                  aria-label="Buscar proveedor"
-                  placeholder="Nombre, NIT, teléfono o email"
-                  value={proveedorSearch}
-                  onChange={(e) => setProveedorSearch(e.target.value)}
-                />
+              <div className="module-filters-bar" style={{ marginBottom: "0.35rem" }}>
+                <label className="field" style={{ flex: "1 1 100%", minWidth: 0 }}>
+                  <span id="ped-prov-search-label">Búsqueda</span>
+                  <input
+                    id="ped-prov-search-input"
+                    type="search"
+                    autoComplete="off"
+                    aria-labelledby="ped-prov-search-label"
+                    placeholder="Nombre, NIT, teléfono o email…"
+                    value={proveedorSearch}
+                    onChange={(e) => setProveedorSearch(e.target.value)}
+                  />
+                </label>
               </div>
               {proveedoresActivosFiltrados.length === 0 ? (
                 <div className="banner banner-info">No hay proveedores activos que coincidan con la búsqueda.</div>

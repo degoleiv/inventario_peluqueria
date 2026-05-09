@@ -11,7 +11,38 @@ function validatePrecios(precio_compra: number | null, precio_venta: number | nu
   }
 }
 
+async function resolveProveedorActivo(id: number): Promise<{ nombre: string }> {
+  const row = (await db
+    .prepare(`SELECT nombre, estado FROM proveedores WHERE id = ?`)
+    .get(id)) as { nombre: string; estado: string } | undefined;
+  if (!row) throw new AppError("Proveedor no encontrado");
+  if (row.estado !== "activo") throw new AppError("El proveedor seleccionado no está activo");
+  return { nombre: row.nombre };
+}
+
+async function resolveCategoriaActivaNombre(input: string): Promise<string> {
+  const t = input.trim();
+  if (!t) throw new AppError("Debés seleccionar una categoría activa");
+  const row = (await db
+    .prepare(
+      `SELECT nombre_categoria FROM categorias_producto
+       WHERE estado = 'activo' AND LOWER(TRIM(nombre_categoria)) = LOWER(?)`
+    )
+    .get(t)) as { nombre_categoria: string } | undefined;
+  if (!row) {
+    throw new AppError(
+      "La categoría no existe o no está activa. Creala o activala en Configuración → Parámetros generales."
+    );
+  }
+  return row.nombre_categoria;
+}
+
 export type ProductoDTO = Record<string, unknown>;
+
+export type ProductoCreateOptions = {
+  /** Alta rápida desde pedidos: categoría/marca libres, proveedor solo debe existir. */
+  relaxCatalog?: boolean;
+};
 
 export const productoService = {
   async list() {
@@ -19,13 +50,30 @@ export const productoService = {
       .prepare(
         `SELECT id, codigo_barras, nombre, marca, categoria, descripcion, imagen_url,
                 stock, precio, precio_compra, precio_venta, stock_minimo, fecha_vencimiento,
-                proveedor_id, created_at, updated_at
+                proveedor_id, estado, created_at, updated_at
          FROM productos ORDER BY updated_at DESC`
       )
       .all();
   },
 
-  async create(body: Record<string, unknown>) {
+  async setEstado(id: number, estado: "activo" | "inactivo") {
+    if (estado !== "activo" && estado !== "inactivo") {
+      throw new AppError("estado inválido");
+    }
+    const existing = await db.prepare(`SELECT id FROM productos WHERE id = ?`).get(id);
+    if (!existing) throw new AppError("no encontrado", 404);
+    const now = new Date().toISOString();
+    await db
+      .prepare(`UPDATE productos SET estado = ?, updated_at = ? WHERE id = ?`)
+      .run(estado, now, id);
+    const row = await db.prepare(`SELECT * FROM productos WHERE id = ?`).get(id);
+    await recordSyncEvent("producto", estado === "activo" ? "activado" : "desactivado", row);
+    return row;
+  },
+
+  async create(body: Record<string, unknown>, opts?: ProductoCreateOptions) {
+    const relax = opts?.relaxCatalog === true;
+
     const nombre = typeof body.nombre === "string" ? body.nombre.trim() : "";
     if (!nombre) throw new AppError("nombre requerido");
 
@@ -60,12 +108,34 @@ export const productoService = {
     }
 
     let proveedor_id: number | null = null;
-    if (body.proveedor_id != null && body.proveedor_id !== "") {
+    let marcaPersist: string | null = null;
+    let categoriaPersist: string | null = null;
+
+    if (relax) {
+      if (body.proveedor_id != null && body.proveedor_id !== "") {
+        const pid = Number(body.proveedor_id);
+        if (!Number.isFinite(pid) || pid <= 0) throw new AppError("proveedor_id inválido");
+        const pr = await db.prepare(`SELECT id, nombre FROM proveedores WHERE id = ?`).get(pid) as
+          | { id: number; nombre: string }
+          | undefined;
+        if (!pr) throw new AppError("Proveedor no encontrado");
+        proveedor_id = pid;
+        const marcaBody = typeof body.marca === "string" ? body.marca.trim() : "";
+        marcaPersist = marcaBody || pr.nombre;
+      }
+      categoriaPersist =
+        typeof body.categoria === "string" && body.categoria.trim() ? body.categoria.trim() : null;
+    } else {
+      if (body.proveedor_id == null || body.proveedor_id === "") {
+        throw new AppError("Debés seleccionar un proveedor (marca) activo");
+      }
       const pid = Number(body.proveedor_id);
       if (!Number.isFinite(pid) || pid <= 0) throw new AppError("proveedor_id inválido");
-      const pr = await db.prepare(`SELECT id FROM proveedores WHERE id = ?`).get(pid);
-      if (!pr) throw new AppError("Proveedor no encontrado");
+      const prov = await resolveProveedorActivo(pid);
       proveedor_id = pid;
+      marcaPersist = prov.nombre;
+      const catRaw = typeof body.categoria === "string" ? body.categoria : "";
+      categoriaPersist = await resolveCategoriaActivaNombre(catRaw);
     }
 
     const info = await db
@@ -79,8 +149,8 @@ export const productoService = {
       .run(
         codigo,
         nombre,
-        typeof body.marca === "string" ? body.marca || null : null,
-        typeof body.categoria === "string" ? body.categoria || null : null,
+        marcaPersist,
+        categoriaPersist,
         typeof body.descripcion === "string" ? body.descripcion || null : null,
         typeof body.imagen_url === "string" ? body.imagen_url || null : null,
         stock,
@@ -153,7 +223,29 @@ export const productoService = {
           ? null
           : Number(body.proveedor_id)
         : (existing.proveedor_id as number | null | undefined) ?? null;
-    if (body.proveedor_id !== undefined && proveedor_id != null) {
+
+    const touchesCatalog =
+      Object.prototype.hasOwnProperty.call(body, "categoria") ||
+      Object.prototype.hasOwnProperty.call(body, "proveedor_id") ||
+      Object.prototype.hasOwnProperty.call(body, "marca");
+
+    let marcaFinal =
+      typeof body.marca === "string" ? body.marca || null : (existing.marca as string | null);
+    let categoriaFinal =
+      typeof body.categoria === "string"
+        ? body.categoria || null
+        : (existing.categoria as string | null);
+
+    if (touchesCatalog) {
+      if (proveedor_id == null || !Number.isFinite(proveedor_id) || proveedor_id <= 0) {
+        throw new AppError("Debés seleccionar un proveedor (marca) activo");
+      }
+      const prov = await resolveProveedorActivo(proveedor_id);
+      marcaFinal = prov.nombre;
+      const catSource =
+        typeof body.categoria === "string" ? body.categoria : String(categoriaFinal ?? "");
+      categoriaFinal = await resolveCategoriaActivaNombre(catSource);
+    } else if (body.proveedor_id !== undefined && proveedor_id != null) {
       if (!Number.isFinite(proveedor_id) || proveedor_id <= 0) {
         throw new AppError("proveedor_id inválido");
       }
@@ -173,8 +265,8 @@ export const productoService = {
       .run(
         codigo_barras,
         nombre,
-        typeof body.marca === "string" ? body.marca || null : existing.marca,
-        typeof body.categoria === "string" ? body.categoria || null : existing.categoria,
+        marcaFinal,
+        categoriaFinal,
         typeof body.descripcion === "string" ? body.descripcion || null : existing.descripcion,
         typeof body.imagen_url === "string" ? body.imagen_url || null : existing.imagen_url,
         stock,
@@ -196,8 +288,44 @@ export const productoService = {
 
   async delete(id: number) {
     const row = await db.prepare(`SELECT * FROM productos WHERE id = ?`).get(id);
-    const info = await db.prepare(`DELETE FROM productos WHERE id = ?`).run(id);
-    if (info.changes === 0) throw new AppError("no encontrado", 404);
+    if (!row) throw new AppError("no encontrado", 404);
+
+    const ventas = (await db
+      .prepare(`SELECT COUNT(*) AS n FROM venta_lineas WHERE producto_id = ?`)
+      .get(id)) as { n: number } | undefined;
+    if ((ventas?.n ?? 0) > 0) {
+      throw new AppError(
+        "No se puede eliminar: el producto está vinculado a ventas registradas. Marcalo como inactivo o anulá las ventas asociadas."
+      );
+    }
+
+    const pedidos = (await db
+      .prepare(`SELECT COUNT(*) AS n FROM pedido_proveedor_lineas WHERE producto_id = ?`)
+      .get(id)) as { n: number } | undefined;
+    if ((pedidos?.n ?? 0) > 0) {
+      throw new AppError(
+        "No se puede eliminar: el producto aparece en pedidos a proveedor. Eliminá esos pedidos antes."
+      );
+    }
+
+    try {
+      await db.transaction(async () => {
+        await db.prepare(`DELETE FROM movimientos_inventario WHERE producto_id = ?`).run(id);
+        await db.prepare(`DELETE FROM ajustes_inventario WHERE producto_id = ?`).run(id);
+        const info = await db.prepare(`DELETE FROM productos WHERE id = ?`).run(id);
+        if (info.changes === 0) throw new AppError("no encontrado", 404);
+      });
+    } catch (err) {
+      if (err instanceof AppError) throw err;
+      const code = (err as { code?: string } | null)?.code;
+      if (code === "SQLITE_CONSTRAINT") {
+        throw new AppError(
+          "No se puede eliminar: el producto tiene registros relacionados que impiden borrarlo."
+        );
+      }
+      throw err;
+    }
+
     await recordSyncEvent("producto", "eliminado", row);
   },
 };

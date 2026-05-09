@@ -8,6 +8,10 @@ import {
   type BrandingConfig,
   type SistemaPrefs,
 } from "../api";
+import {
+  CategoriasProductoPanel,
+  CategoriasServicioPanel,
+} from "../components/config/CategoriasProductoPanel";
 import { SubNav } from "../components/SubNav";
 import { applyBrandingToDocument } from "../lib/brandingDocument";
 import { CONFIG_TABS, readConfigTab, type ConfigTab } from "../lib/moduleRoutes";
@@ -177,6 +181,10 @@ export function ConfiguracionPage() {
             <button type="button" className="btn secondary" onClick={() => void load()}>
               Recargar valores
             </button>
+          </div>
+          <div className="config-cat-board-wrap">
+            <CategoriasProductoPanel />
+            <CategoriasServicioPanel />
           </div>
         </section>
       ) : null}

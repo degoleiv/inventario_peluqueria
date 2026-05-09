@@ -1,19 +1,10 @@
 import { lazy, Suspense, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import data from "@emoji-mart/data";
+import { readDataTheme, subscribeDataTheme } from "../lib/emojiMartTheme";
 
 const EmojiPicker = lazy(() => import("@emoji-mart/react"));
 
 type EmojiSelectPayload = { native: string };
-
-function readDataTheme(): "light" | "dark" {
-  return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
-}
-
-function subscribeDataTheme(onStoreChange: () => void) {
-  const mo = new MutationObserver(onStoreChange);
-  mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-  return () => mo.disconnect();
-}
 
 type Props = {
   onPick: (emojiNative: string) => void;

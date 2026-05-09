@@ -13,6 +13,8 @@ import { ventaService } from "./services/venta.service.js";
 import { pedidoProveedorService } from "./services/pedidoProveedor.service.js";
 import { facturaElectronicaService } from "./services/facturaElectronica.service.js";
 import { configuracionService } from "./services/configuracion.service.js";
+import { categoriaProductoService } from "./services/categoriaProducto.service.js";
+import { categoriaServicioService } from "./services/categoriaServicio.service.js";
 import { smtpService } from "./services/smtp.service.js";
 import { reporteService } from "./services/reporte.service.js";
 import { notificacionService } from "./services/notificacion.service.js";
@@ -23,6 +25,7 @@ import { auditService } from "./services/audit.service.js";
 import { finanzaService } from "./services/finanza.service.js";
 import { cobranzaService } from "./services/cobranza.service.js";
 import { inventarioAjusteService } from "./services/inventarioAjuste.service.js";
+import { inventarioCatalogoService } from "./services/inventarioCatalogo.service.js";
 import { promocionesService } from "./services/promociones.service.js";
 import { commissionService } from "./services/commission.service.js";
 import { turnoService } from "./services/turno.service.js";
@@ -200,6 +203,112 @@ export function registerHttpRoutes(app: Express) {
   );
 
   api.get(
+    "/configuracion/categorias-producto",
+    requireAdmin,
+    asyncHandler(async (req, res) => {
+      const q = typeof req.query.q === "string" ? req.query.q : undefined;
+      const rawEst = req.query.estado;
+      const estado =
+        rawEst === "activo" || rawEst === "inactivo" || rawEst === "todos" ? rawEst : "todos";
+      const page = typeof req.query.page === "string" ? Number(req.query.page) : undefined;
+      const page_size =
+        typeof req.query.page_size === "string" ? Number(req.query.page_size) : undefined;
+      res.json(
+        await categoriaProductoService.list({
+          q,
+          estado,
+          page,
+          page_size,
+        })
+      );
+    })
+  );
+
+  api.post(
+    "/configuracion/categorias-producto",
+    requireAdmin,
+    asyncHandler(async (req, res) => {
+      const row = await categoriaProductoService.create(req.body as Record<string, unknown>);
+      res.status(201).json(row);
+    })
+  );
+
+  api.patch(
+    "/configuracion/categorias-producto/:id",
+    requireAdmin,
+    asyncHandler(async (req, res) => {
+      const id = parseId(req, res);
+      if (id == null) return;
+      const row = await categoriaProductoService.update(id, req.body as Record<string, unknown>);
+      res.json(row);
+    })
+  );
+
+  api.delete(
+    "/configuracion/categorias-producto/:id",
+    requireAdmin,
+    asyncHandler(async (req, res) => {
+      const id = parseId(req, res);
+      if (id == null) return;
+      await categoriaProductoService.delete(id);
+      res.status(204).send();
+    })
+  );
+
+  api.get(
+    "/configuracion/categorias-servicio",
+    requireAdmin,
+    asyncHandler(async (req, res) => {
+      const q = typeof req.query.q === "string" ? req.query.q : undefined;
+      const rawEst = req.query.estado;
+      const estado =
+        rawEst === "activo" || rawEst === "inactivo" || rawEst === "todos" ? rawEst : "todos";
+      const page = typeof req.query.page === "string" ? Number(req.query.page) : undefined;
+      const page_size =
+        typeof req.query.page_size === "string" ? Number(req.query.page_size) : undefined;
+      res.json(
+        await categoriaServicioService.list({
+          q,
+          estado,
+          page,
+          page_size,
+        })
+      );
+    })
+  );
+
+  api.post(
+    "/configuracion/categorias-servicio",
+    requireAdmin,
+    asyncHandler(async (req, res) => {
+      const row = await categoriaServicioService.create(req.body as Record<string, unknown>);
+      res.status(201).json(row);
+    })
+  );
+
+  api.patch(
+    "/configuracion/categorias-servicio/:id",
+    requireAdmin,
+    asyncHandler(async (req, res) => {
+      const id = parseId(req, res);
+      if (id == null) return;
+      const row = await categoriaServicioService.update(id, req.body as Record<string, unknown>);
+      res.json(row);
+    })
+  );
+
+  api.delete(
+    "/configuracion/categorias-servicio/:id",
+    requireAdmin,
+    asyncHandler(async (req, res) => {
+      const id = parseId(req, res);
+      if (id == null) return;
+      await categoriaServicioService.delete(id);
+      res.status(204).send();
+    })
+  );
+
+  api.get(
     "/productos",
     requireAlguno("ventas", "inventario"),
     asyncHandler(async (_req, res) => res.json(await productoService.list()))
@@ -228,6 +337,19 @@ export function registerHttpRoutes(app: Express) {
     })
   );
 
+  api.patch(
+    "/productos/:id/estado",
+    requirePermiso("inventario"),
+    asyncHandler(async (req, res) => {
+      const id = parseId(req, res);
+      if (id == null) return;
+      const estado = (req.body as { estado?: string })?.estado;
+      const row = await productoService.setEstado(id, estado as "activo" | "inactivo");
+      await auditService.log(req.user?.sub, "estado", "producto", id, { estado });
+      res.json(row);
+    })
+  );
+
   api.delete(
     "/productos/:id",
     requirePermiso("inventario"),
@@ -241,7 +363,7 @@ export function registerHttpRoutes(app: Express) {
 
   api.get(
     "/clientes",
-    requirePermiso("clientes"),
+    requireAlguno("ventas", "citas", "clientes"),
     asyncHandler(async (req, res) => {
       const q = typeof req.query.q === "string" ? req.query.q : undefined;
       res.json(await clienteService.list(q));
@@ -250,7 +372,7 @@ export function registerHttpRoutes(app: Express) {
 
   api.post(
     "/clientes",
-    requirePermiso("clientes"),
+    requireAlguno("ventas", "citas", "clientes"),
     asyncHandler(async (req, res) => {
       res.status(201).json(await clienteService.create(req.body as Record<string, unknown>));
     })
@@ -508,7 +630,7 @@ export function registerHttpRoutes(app: Express) {
       if (proveedorId == null) return;
       const raw = req.body as Record<string, unknown>;
       const body = { ...raw, proveedor_id: proveedorId };
-      const row = await productoService.create(body);
+      const row = await productoService.create(body, { relaxCatalog: true });
       res.status(201).json(row);
     })
   );
@@ -920,6 +1042,14 @@ export function registerHttpRoutes(app: Express) {
       const desde = typeof req.query.desde === "string" ? req.query.desde : undefined;
       const hasta = typeof req.query.hasta === "string" ? req.query.hasta : undefined;
       res.json(await empleadoMovimientoService.resumen(id, desde, hasta));
+    })
+  );
+
+  api.get(
+    "/inventario/catalogo",
+    requirePermiso("inventario"),
+    asyncHandler(async (_req, res) => {
+      res.json(await inventarioCatalogoService.get());
     })
   );
 

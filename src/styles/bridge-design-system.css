@@ -193,6 +193,26 @@ body.theme-slate .subnav-link--active {
   background: color-mix(in srgb, var(--surface) 92%, var(--primary) 8%);
 }
 
+body.theme-default .subnav--tabs,
+body.theme-neon .subnav--tabs,
+body.theme-girly .subnav--tabs,
+body.theme-purple .subnav--tabs,
+body.theme-ocean .subnav--tabs,
+body.theme-slate .subnav--tabs {
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface) 90%);
+  border-color: var(--border);
+}
+
+body.theme-default .subnav-link:hover,
+body.theme-neon .subnav-link:hover,
+body.theme-girly .subnav-link:hover,
+body.theme-purple .subnav-link:hover,
+body.theme-ocean .subnav-link:hover,
+body.theme-slate .subnav-link:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface) 88%, var(--primary) 12%);
+}
+
 /* —— Cards / estadísticas (clay) —— */
 body.theme-default .card,
 body.theme-neon .card,

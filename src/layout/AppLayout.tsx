@@ -141,6 +141,8 @@ type Props = {
   onQuickCita: () => void;
   /** Migas de pan opcionales (módulo activo). */
   breadcrumb?: BreadcrumbItem[];
+  /** Si true, no se muestra el bloque superior (migas + título del módulo). */
+  hideModuleHeader?: boolean;
   /** Permisos del usuario (`*` = acceso total). Filtra ítems del menú lateral. */
   permisos: string[];
   /** Texto de marca (configuración / branding). */
@@ -166,6 +168,7 @@ export function AppLayout({
   onQuickSale,
   onQuickCita,
   breadcrumb,
+  hideModuleHeader,
   permisos,
   brandTitle,
   brandLogoSrc,
@@ -304,26 +307,28 @@ export function AppLayout({
           </div>
         </aside>
 
-        <main className="main-pro">
-          <header className="main-pro-header">
-            {breadcrumb && breadcrumb.length > 0 ? (
-              <nav className="breadcrumb" aria-label="Ubicación">
-                {breadcrumb.map((c, i) => (
-                  <span key={`${c.label}-${i}`} className="breadcrumb-item">
-                    {i > 0 ? <span className="breadcrumb-sep">/</span> : null}
-                    {c.onClick ? (
-                      <button type="button" className="breadcrumb-link" onClick={c.onClick}>
-                        {c.label}
-                      </button>
-                    ) : (
-                      <span className="breadcrumb-current">{c.label}</span>
-                    )}
-                  </span>
-                ))}
-              </nav>
-            ) : null}
-            <h1 className="main-pro-title">{pageTitle}</h1>
-          </header>
+        <main className={`main-pro${hideModuleHeader ? " main-pro--no-module-header" : ""}`}>
+          {!hideModuleHeader ? (
+            <header className="main-pro-header">
+              {breadcrumb && breadcrumb.length > 0 ? (
+                <nav className="breadcrumb" aria-label="Ubicación">
+                  {breadcrumb.map((c, i) => (
+                    <span key={`${c.label}-${i}`} className="breadcrumb-item">
+                      {i > 0 ? <span className="breadcrumb-sep">/</span> : null}
+                      {c.onClick ? (
+                        <button type="button" className="breadcrumb-link" onClick={c.onClick}>
+                          {c.label}
+                        </button>
+                      ) : (
+                        <span className="breadcrumb-current">{c.label}</span>
+                      )}
+                    </span>
+                  ))}
+                </nav>
+              ) : null}
+              <h1 className="main-pro-title">{pageTitle}</h1>
+            </header>
+          ) : null}
           <div className="main-pro-content">{children}</div>
         </main>
       </div>

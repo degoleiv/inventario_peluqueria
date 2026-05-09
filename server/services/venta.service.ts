@@ -101,7 +101,7 @@ export const ventaService = {
         }
         const prod = (await db
           .prepare(
-            `SELECT stock, precio, precio_venta, nombre, fecha_vencimiento FROM productos WHERE id = ?`
+            `SELECT stock, precio, precio_venta, nombre, fecha_vencimiento, estado FROM productos WHERE id = ?`
           )
           .get(producto_id)) as
           | {
@@ -110,9 +110,13 @@ export const ventaService = {
               precio_venta: number | null;
               nombre: string;
               fecha_vencimiento: string | null;
+              estado: string | null;
             }
           | undefined;
         if (!prod) throw new AppError(`Producto ${producto_id} no existe`);
+        if (prod.estado === "inactivo") {
+          throw new AppError(`El producto «${prod.nombre}» está inactivo y no puede venderse`);
+        }
         if (prod.stock < cantidad) {
           throw new AppError(`Stock insuficiente para «${prod.nombre}» (${prod.stock} disponible)`);
         }

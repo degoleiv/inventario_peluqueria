@@ -5,14 +5,27 @@ const STORAGE_PREFIX = "peluqueria_subnav_";
 export const CITAS_TABS = ["calendario", "agenda", "nueva"] as const;
 export type CitasTab = (typeof CITAS_TABS)[number];
 
-export const INVENTARIO_TABS = ["productos", "movimientos", "alertas"] as const;
+export const INVENTARIO_TABS = ["productos", "alertas"] as const;
 export type InventarioTab = (typeof INVENTARIO_TABS)[number];
 
-export const CLIENTES_TABS = ["lista", "nuevo", "historial"] as const;
-export type ClientesTab = (typeof CLIENTES_TABS)[number];
+/** Migra pestaña antigua `movimientos` → `productos`. */
+export function readInventarioTab(): InventarioTab {
+  const t = readLastTab("inventario", "productos");
+  if (t === "movimientos") return "productos";
+  if (INVENTARIO_TABS.includes(t as InventarioTab)) return t as InventarioTab;
+  return "productos";
+}
 
-export const VENTAS_TABS = ["pos", "historial", "devoluciones"] as const;
+export const VENTAS_TABS = ["ventas", "historial", "devoluciones"] as const;
 export type VentasTab = (typeof VENTAS_TABS)[number];
+
+/** Migra ruta/pestaña antigua `pos` → `ventas`. */
+export function readVentasTab(): VentasTab {
+  let t = readLastTab("ventas", "ventas");
+  if (t === "pos") return "ventas";
+  if (VENTAS_TABS.includes(t as VentasTab)) return t as VentasTab;
+  return "ventas";
+}
 
 export const PEDIDOS_TABS = ["pedidos-proveedores"] as const;
 export type PedidosTab = (typeof PEDIDOS_TABS)[number];
@@ -81,11 +94,11 @@ export function getModuleEntryPath(key: NavKey): string {
     case "citas":
       return `/citas/${readCitasTab()}`;
     case "ventas":
-      return `/ventas/${readLastTab("ventas", "pos")}`;
+      return `/ventas/${readVentasTab()}`;
     case "inventario":
-      return `/inventario/${readLastTab("inventario", "productos")}`;
+      return `/inventario/${readInventarioTab()}`;
     case "clientes":
-      return `/clientes/${readLastTab("clientes", "lista")}`;
+      return "/clientes";
     case "pedidos":
       return "/pedidos";
     case "finanzas":

@@ -3,10 +3,12 @@ import { Navigate, useParams } from "react-router-dom";
 import {
   createProducto,
   deleteProducto,
+  fetchInventarioCatalogo,
   fetchProductos,
   lookupBarcode,
-  registrarAjusteStock,
+  patchProductoEstado,
   updateProducto,
+  type InventarioCatalogo,
   type LookupManual,
   type LookupOk,
   type Producto,
@@ -18,9 +20,16 @@ import {
   type ProductoCatalogoFields,
 } from "../components/ProductoCatalogoForm";
 import { Drawer } from "../components/Drawer";
+import { SkeletonCard } from "../components/Skeleton";
 import { useToast } from "../context/ToastContext";
 import { SubNav } from "../components/SubNav";
-import { INVENTARIO_TABS, readLastTab, type InventarioTab } from "../lib/moduleRoutes";
+import { INVENTARIO_TABS, readInventarioTab, type InventarioTab } from "../lib/moduleRoutes";
+
+function productoStockBadgeClass(p: Producto): string {
+  if (p.stock === 0) return "stock-badge stock-badge--out";
+  if (p.stock_minimo != null && p.stock <= p.stock_minimo) return "stock-badge stock-badge--low";
+  return "stock-badge";
+}
 
 function labelFuenteLookup(fuente: string) {
   if (fuente === "inventario") return "Datos desde tu inventario local";
@@ -49,37 +58,80 @@ export function InventarioPage() {
   const [precioVenta, setPrecioVenta] = useState<number | "">("");
   const [stockMinimo, setStockMinimo] = useState<number | "">("");
   const [fechaVencimiento, setFechaVencimiento] = useState("");
+  const [proveedorId, setProveedorId] = useState<number | "">("");
+
+  const [inventarioCatalogo, setInventarioCatalogo] = useState<InventarioCatalogo | null>(null);
+  const [catalogoLoading, setCatalogoLoading] = useState(false);
+  const [catalogoError, setCatalogoError] = useState<string | null>(null);
 
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupHint, setLookupHint] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [creatingNew, setCreatingNew] = useState(false);
-  const [ajustePid, setAjustePid] = useState(0);
-  const [ajusteReal, setAjusteReal] = useState<number | "">("");
-  const [ajusteMotivo, setAjusteMotivo] = useState("");
-  const [ajusteMsg, setAjusteMsg] = useState<string | null>(null);
-  const [priceEdit, setPriceEdit] = useState<{ id: number; draft: string } | null>(null);
+  const [viewingProduct, setViewingProduct] = useState<Producto | null>(null);
+  const [estadoSavingId, setEstadoSavingId] = useState<number | null>(null);
+  const [filtroBusqueda, setFiltroBusqueda] = useState("");
+  const [filtroEstado, setFiltroEstado] = useState<"todos" | "activo" | "inactivo">("todos");
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; p: Producto } | null>(null);
   const formDrawerRef = useRef<HTMLFormElement>(null);
   const codigoRef = useRef(codigo);
+  const inventarioCatalogoRef = useRef(inventarioCatalogo);
+  inventarioCatalogoRef.current = inventarioCatalogo;
 
   codigoRef.current = codigo;
 
-  const aplicarRespuestaBarcode = useCallback((res: LookupOk | LookupManual) => {
-    if (res.ok) {
-      const d = res.data;
-      setNombre(d.nombre);
-      setMarca(d.marca ?? "");
-      setCategoria(d.categoria ?? "");
-      setDescripcion(d.descripcion ?? "");
-      setImagenUrl(d.imagen_url ?? "");
-      setLookupHint(labelFuenteLookup(d.fuente));
-    } else {
-      setLookupHint(
-        "Sin datos automáticos (ni en Open Food Facts, Open Beauty Facts ni EAN-Search). Completá el producto a mano; opcional: variable EAN_SEARCH_ORG_TOKEN en el servidor."
-      );
-    }
-  }, []);
+  const loadInventarioCatalogo = useCallback(
+    async (mode: "initial" | "silent" = "initial") => {
+      const silent = mode === "silent";
+      setCatalogoError(null);
+      if (!silent) setCatalogoLoading(true);
+      try {
+        const data = await fetchInventarioCatalogo();
+        setInventarioCatalogo(data);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Error al cargar catálogo";
+        setCatalogoError(msg);
+        toast(msg, "error");
+      } finally {
+        if (!silent) setCatalogoLoading(false);
+      }
+    },
+    [toast]
+  );
+
+  const aplicarRespuestaBarcode = useCallback(
+    (res: LookupOk | LookupManual) => {
+      if (res.ok) {
+        const d = res.data;
+        setNombre(d.nombre);
+        setMarca(d.marca ?? "");
+        setCategoria(d.categoria ?? "");
+        setDescripcion(d.descripcion ?? "");
+        setImagenUrl(d.imagen_url ?? "");
+        setLookupHint(labelFuenteLookup(d.fuente));
+
+        const cat = inventarioCatalogoRef.current;
+        if (cat) {
+          const mar = (d.marca ?? "").trim().toLowerCase();
+          const hitP = cat.proveedores.find((p) => p.nombre.trim().toLowerCase() === mar);
+          if (hitP) {
+            setProveedorId(hitP.id);
+            setMarca(hitP.nombre);
+          } else {
+            setProveedorId("");
+          }
+          const cNom = (d.categoria ?? "").trim().toLowerCase();
+          const hitC = cat.categorias.find((c) => c.nombre_categoria.trim().toLowerCase() === cNom);
+          if (hitC) setCategoria(hitC.nombre_categoria);
+        }
+      } else {
+        setLookupHint(
+          "No se encontró producto en base de datos."
+        );
+      }
+    },
+    []
+  );
 
   const load = useCallback(async () => {
     setError(null);
@@ -156,12 +208,18 @@ export function InventarioPage() {
     setPrecioVenta("");
     setStockMinimo("");
     setFechaVencimiento("");
+    setProveedorId("");
     setLookupHint(null);
     setEditingId(null);
     setCreatingNew(false);
   }
 
   const drawerOpen = editingId !== null || creatingNew;
+
+  useEffect(() => {
+    if (!drawerOpen) return;
+    void loadInventarioCatalogo("initial");
+  }, [drawerOpen, loadInventarioCatalogo]);
 
   function openNuevoProducto() {
     resetForm();
@@ -189,6 +247,7 @@ export function InventarioPage() {
     nombre,
     marca,
     categoria,
+    proveedorId,
     descripcion,
     imagenUrl,
     stock,
@@ -203,6 +262,7 @@ export function InventarioPage() {
     if (patch.nombre !== undefined) setNombre(patch.nombre);
     if (patch.marca !== undefined) setMarca(patch.marca);
     if (patch.categoria !== undefined) setCategoria(patch.categoria);
+    if (patch.proveedorId !== undefined) setProveedorId(patch.proveedorId);
     if (patch.descripcion !== undefined) setDescripcion(patch.descripcion);
     if (patch.imagenUrl !== undefined) setImagenUrl(patch.imagenUrl);
     if (patch.stock !== undefined) setStock(patch.stock);
@@ -215,6 +275,10 @@ export function InventarioPage() {
   async function onGuardar(e: React.FormEvent) {
     e.preventDefault();
     if (!nombre.trim()) return;
+    if (!categoria.trim() || proveedorId === "") {
+      toast("Seleccioná categoría y marca (proveedor activo)", "warning");
+      return;
+    }
     const body = catalogoFieldsToCreateBody(catalogoValues);
     setError(null);
     try {
@@ -232,13 +296,27 @@ export function InventarioPage() {
     }
   }
 
+  function onVisualizar(p: Producto) {
+    setViewingProduct(p);
+  }
+
+  function cerrarVisualizar() {
+    setViewingProduct(null);
+  }
+
   function onEditar(p: Producto) {
+    setViewingProduct(null);
     setCreatingNew(false);
     setEditingId(p.id);
     setCodigo(p.codigo_barras ?? "");
     setNombre(p.nombre);
     setMarca(p.marca ?? "");
     setCategoria(p.categoria ?? "");
+    setProveedorId(
+      p.proveedor_id != null && Number.isFinite(Number(p.proveedor_id)) && Number(p.proveedor_id) > 0
+        ? Number(p.proveedor_id)
+        : ""
+    );
     setDescripcion(p.descripcion ?? "");
     setImagenUrl(p.imagen_url ?? "");
     setStock(p.stock);
@@ -249,34 +327,22 @@ export function InventarioPage() {
     setLookupHint(null);
   }
 
-  async function onAjusteFisico(e: React.FormEvent) {
-    e.preventDefault();
-    if (ajustePid <= 0 || ajusteReal === "") return;
-    setAjusteMsg(null);
-    setError(null);
-    try {
-      await registrarAjusteStock({
-        producto_id: ajustePid,
-        stock_real: Number(ajusteReal),
-        motivo: ajusteMotivo.trim() || null,
-      });
-      setAjusteMsg("Ajuste registrado.");
-      setAjusteReal("");
-      setAjusteMotivo("");
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error en ajuste");
-    }
-  }
-
   async function duplicarProducto(p: Producto) {
     setError(null);
+    if (p.proveedor_id == null || !Number.isFinite(Number(p.proveedor_id)) || Number(p.proveedor_id) <= 0) {
+      toast(
+        "Este producto no tiene proveedor (marca) asignado. Editá el original, elegí un proveedor activo y volvé a duplicar.",
+        "warning"
+      );
+      return;
+    }
     try {
       await createProducto({
         codigo_barras: null,
         nombre: `${p.nombre} (copia)`,
         marca: p.marca,
         categoria: p.categoria,
+        proveedor_id: p.proveedor_id!,
         descripcion: p.descripcion,
         imagen_url: p.imagen_url,
         stock: 0,
@@ -290,43 +356,6 @@ export function InventarioPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al duplicar");
       toast(err instanceof Error ? err.message : "Error", "error");
-    }
-  }
-
-  function startPriceEdit(p: Producto) {
-    const v = p.precio_venta ?? p.precio;
-    setPriceEdit({ id: p.id, draft: v != null ? String(v) : "" });
-  }
-
-  async function commitPrice(p: Producto) {
-    const pe = priceEdit;
-    if (!pe || pe.id !== p.id) return;
-    const num = pe.draft.trim() === "" ? null : Number(pe.draft);
-    if (num != null && (Number.isNaN(num) || num < 0)) {
-      toast("Precio inválido", "warning");
-      return;
-    }
-    setPriceEdit(null);
-    const prevVenta = p.precio_venta;
-    const prevPrecio = p.precio;
-    setProductos((rows) =>
-      rows.map((x) =>
-        x.id === p.id
-          ? { ...x, precio_venta: num, precio: num != null ? num : x.precio }
-          : x
-      )
-    );
-    try {
-      await updateProducto(p.id, { precio_venta: num, precio: num });
-      toast("Precio actualizado", "success");
-    } catch (err) {
-      setProductos((rows) =>
-        rows.map((x) =>
-          x.id === p.id ? { ...x, precio_venta: prevVenta, precio: prevPrecio } : x
-        )
-      );
-      await load();
-      toast(err instanceof Error ? err.message : "Error al guardar precio", "error");
     }
   }
 
@@ -348,6 +377,7 @@ export function InventarioPage() {
                 nombre: snapshot.nombre,
                 marca: snapshot.marca,
                 categoria: snapshot.categoria,
+                proveedor_id: snapshot.proveedor_id ?? undefined,
                 descripcion: snapshot.descripcion,
                 imagen_url: snapshot.imagen_url,
                 stock: snapshot.stock,
@@ -373,8 +403,33 @@ export function InventarioPage() {
     }
   }
 
+  async function setProductoEstado(p: Producto, proximo: "activo" | "inactivo") {
+    const actual = p.estado === "inactivo" ? "inactivo" : "activo";
+    if (actual === proximo) return;
+    setEstadoSavingId(p.id);
+    setProductos((rows) => rows.map((x) => (x.id === p.id ? { ...x, estado: proximo } : x)));
+    setViewingProduct((curr) =>
+      curr && curr.id === p.id ? { ...curr, estado: proximo } : curr
+    );
+    try {
+      const upd = await patchProductoEstado(p.id, proximo);
+      setProductos((rows) => rows.map((x) => (x.id === p.id ? { ...x, ...upd } : x)));
+      setViewingProduct((curr) => (curr && curr.id === p.id ? { ...curr, ...upd } : curr));
+      toast(proximo === "activo" ? "Producto activado" : "Producto inactivado", "success");
+    } catch (err) {
+      setProductos((rows) => rows.map((x) => (x.id === p.id ? { ...x, estado: actual } : x)));
+      setViewingProduct((curr) =>
+        curr && curr.id === p.id ? { ...curr, estado: actual } : curr
+      );
+      toast(err instanceof Error ? err.message : "No se pudo cambiar el estado", "error");
+    } finally {
+      setEstadoSavingId((cur) => (cur === p.id ? null : cur));
+    }
+  }
+
   function buildCtxItems(p: Producto): ContextMenuItem[] {
     return [
+      { label: "Visualizar", onSelect: () => onVisualizar(p) },
       { label: "Editar", onSelect: () => onEditar(p) },
       { label: "Duplicar", onSelect: () => void duplicarProducto(p) },
       {
@@ -384,6 +439,36 @@ export function InventarioPage() {
       },
     ];
   }
+
+  async function onEliminarDesdeVisualizar() {
+    const p = viewingProduct;
+    if (!p) return;
+    cerrarVisualizar();
+    await onEliminarProducto(p);
+  }
+
+  const productosFiltrados = useMemo(() => {
+    const q = filtroBusqueda.trim().toLowerCase();
+    return productos.filter((p) => {
+      if (filtroEstado === "activo" && p.estado === "inactivo") return false;
+      if (filtroEstado === "inactivo" && p.estado !== "inactivo") return false;
+      if (!q) return true;
+      const nombre = p.nombre?.toLowerCase() ?? "";
+      const codigo = p.codigo_barras?.toLowerCase() ?? "";
+      return nombre.includes(q) || codigo.includes(q);
+    });
+  }, [productos, filtroBusqueda, filtroEstado]);
+
+  const productosOrdenados = useMemo(() => {
+    return [...productosFiltrados].sort((a, b) => {
+      const aInactivo = a.estado === "inactivo" ? 1 : 0;
+      const bInactivo = b.estado === "inactivo" ? 1 : 0;
+      if (aInactivo !== bInactivo) return aInactivo - bInactivo;
+      const ua = a.updated_at ?? "";
+      const ub = b.updated_at ?? "";
+      return ub.localeCompare(ua);
+    });
+  }, [productosFiltrados]);
 
   const alertasProductos = useMemo(() => {
     return productos.filter((p) => {
@@ -395,7 +480,7 @@ export function InventarioPage() {
 
   const tabOk = tabParam != null && INVENTARIO_TABS.includes(tabParam as InventarioTab);
   if (!tabOk) {
-    return <Navigate to={`/inventario/${readLastTab("inventario", "productos")}`} replace />;
+    return <Navigate to={`/inventario/${readInventarioTab()}`} replace />;
   }
   const tab = tabParam as InventarioTab;
 
@@ -411,7 +496,6 @@ export function InventarioPage() {
         moduleId="inventario"
         items={[
           { id: "productos", label: "Productos", to: "/inventario/productos" },
-          { id: "movimientos", label: "Movimientos", to: "/inventario/movimientos" },
           { id: "alertas", label: "Alertas", to: "/inventario/alertas" },
         ]}
         quickActions={
@@ -442,70 +526,58 @@ export function InventarioPage() {
               hint: lookupHint,
               onLookupClick: () => void onBuscarCodigo(),
             }}
+            inventarioCatalogo={{
+              loading: catalogoLoading,
+              error: catalogoError,
+              categorias: inventarioCatalogo?.categorias ?? [],
+              proveedores: inventarioCatalogo?.proveedores ?? [],
+              onCatalogPanelOpen: () => void loadInventarioCatalogo("silent"),
+            }}
           />
+
+          {(() => {
+            if (editingId == null) return null;
+            const editado = productos.find((x) => x.id === editingId);
+            if (!editado) return null;
+            const activo = editado.estado !== "inactivo";
+            return (
+              <div className="field producto-estado-field">
+                <span>Estado</span>
+                <label
+                  className="ui-switch producto-estado-switch"
+                  title={activo ? "Activo" : "Inactivo"}
+                >
+                  <input
+                    type="checkbox"
+                    className="ui-switch__input"
+                    checked={activo}
+                    disabled={estadoSavingId === editado.id}
+                    onChange={(e) =>
+                      void setProductoEstado(editado, e.target.checked ? "activo" : "inactivo")
+                    }
+                  />
+                  <span className="ui-switch__track" aria-hidden />
+                  <span className="producto-estado-switch__text muted small">
+                    {activo ? "Activo" : "Inactivo"}
+                  </span>
+                </label>
+                <p className="muted small" style={{ margin: "0.25rem 0 0" }}>
+                  Los productos inactivos no aparecen en ventas pero conservan su historial.
+                </p>
+              </div>
+            );
+          })()}
 
           <div className="drawer-actions">
             <button type="submit" className="btn primary btn-lg">
-              {editingId ? "Guardar cambios" : "Añadir al inventario"}
+              {editingId ? "Guardar" : "Añadir al inventario"}
             </button>
-            <span className="muted shortcut-hint">
-              <kbd className="kbd-mini">Ctrl</kbd>
-              <kbd className="kbd-mini">S</kbd> guardar
-            </span>
             <button type="button" className="btn ghost" onClick={cerrarDrawer}>
               Cancelar
             </button>
           </div>
         </form>
       </Drawer>
-
-      {tab === "movimientos" ? (
-      <section className="card">
-        <h2 className="card-title">Ajuste de stock (conteo físico)</h2>
-        <p className="muted">
-          Registra diferencias entre stock real y sistema. Queda trazado en auditoría (admin).
-        </p>
-        {ajusteMsg ? <div className="banner banner-info">{ajusteMsg}</div> : null}
-        <form className="form" onSubmit={onAjusteFisico}>
-          <div className="grid-2">
-            <label className="field">
-              <span>Producto</span>
-              <select
-                value={ajustePid || ""}
-                onChange={(e) => setAjustePid(Number(e.target.value) || 0)}
-                required
-              >
-                <option value={0}>—</option>
-                {productos.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombre} (sist. {p.stock})
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="field">
-              <span>Stock real contado</span>
-              <input
-                type="number"
-                min={0}
-                value={ajusteReal}
-                onChange={(e) =>
-                  setAjusteReal(e.target.value === "" ? "" : Number(e.target.value))
-                }
-                required
-              />
-            </label>
-          </div>
-          <label className="field">
-            <span>Motivo (opcional)</span>
-            <input value={ajusteMotivo} onChange={(e) => setAjusteMotivo(e.target.value)} />
-          </label>
-          <button type="submit" className="btn secondary">
-            Registrar ajuste
-          </button>
-        </form>
-      </section>
-      ) : null}
 
       {tab === "productos" ? (
       <section className="card">
@@ -520,8 +592,54 @@ export function InventarioPage() {
             </button>
           </div>
         </div>
+        <div className="inventario-filtros">
+          <label className="field inventario-filtros__buscar">
+            <span>Buscar</span>
+            <input
+              type="search"
+              value={filtroBusqueda}
+              onChange={(e) => setFiltroBusqueda(e.target.value)}
+              placeholder="Nombre o código de barras…"
+              autoComplete="off"
+            />
+          </label>
+          <label className="field inventario-filtros__estado">
+            <span>Estado</span>
+            <select
+              value={filtroEstado}
+              onChange={(e) =>
+                setFiltroEstado(e.target.value as "todos" | "activo" | "inactivo")
+              }
+            >
+              <option value="todos">Todos</option>
+              <option value="activo">Activos</option>
+              <option value="inactivo">Inactivos</option>
+            </select>
+          </label>
+          {(filtroBusqueda || filtroEstado !== "todos") && !loading ? (
+            <span className="muted small inventario-filtros__count">
+              {productosFiltrados.length} de {productos.length}
+            </span>
+          ) : null}
+          {filtroBusqueda || filtroEstado !== "todos" ? (
+            <button
+              type="button"
+              className="btn ghost small"
+              onClick={() => {
+                setFiltroBusqueda("");
+                setFiltroEstado("todos");
+              }}
+            >
+              Limpiar
+            </button>
+          ) : null}
+        </div>
         {loading ? (
-          <p className="muted">Cargando…</p>
+          <div className="proveedores-grid inventario-productos-grid" aria-busy="true">
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
         ) : productos.length === 0 ? (
           <div className="empty-state empty-state--compact card-pro">
             <p>No hay productos todavía.</p>
@@ -530,127 +648,76 @@ export function InventarioPage() {
               Crear producto
             </button>
           </div>
+        ) : productosOrdenados.length === 0 ? (
+          <div className="empty-state empty-state--compact card-pro">
+            <p>No hay productos que coincidan con los filtros.</p>
+            <button
+              type="button"
+              className="btn ghost small"
+              onClick={() => {
+                setFiltroBusqueda("");
+                setFiltroEstado("todos");
+              }}
+            >
+              Limpiar filtros
+            </button>
+          </div>
         ) : (
-          <div className="table-wrap table--cards-sm">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Producto</th>
-                  <th>Código</th>
-                  <th>Stock</th>
-                  <th>P. venta</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {productos.map((p) => (
-                  <tr
-                    key={p.id}
-                    className="table-row-click table-row-pro"
-                    onClick={() => onEditar(p)}
-                    onContextMenu={(e) => {
-                      e.preventDefault();
-                      setCtxMenu({ x: e.clientX, y: e.clientY, p });
-                    }}
-                    title="Clic: editar · Clic derecho: menú"
-                  >
-                    <td data-label="Producto">
-                      <div className="cell-with-meta">
-                        <div>
-                          <div className="cell-main">{p.nombre}</div>
-                          {p.marca ? <div className="cell-sub">{p.marca}</div> : null}
-                        </div>
-                        <div
-                          className="row-quick-actions"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <button
-                            type="button"
-                            className="btn-xxs"
-                            onClick={() => onEditar(p)}
-                          >
-                            Editar
-                          </button>
-                          <button
-                            type="button"
-                            className="btn-xxs"
-                            onClick={() => void duplicarProducto(p)}
-                          >
-                            Duplicar
-                          </button>
-                          <button
-                            type="button"
-                            className="btn-xxs danger-ghost"
-                            onClick={() => void onEliminarProducto(p)}
-                          >
-                            Borrar
-                          </button>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="mono" data-label="Código">
-                      {p.codigo_barras ?? "—"}
-                    </td>
-                    <td data-label="Stock">
-                      <span
-                        className={
-                          p.stock === 0
-                            ? "stock-badge stock-badge--out"
-                            : p.stock_minimo != null && p.stock <= p.stock_minimo
-                              ? "stock-badge stock-badge--low"
-                              : "stock-badge"
-                        }
-                      >
-                        {p.stock}
+          <div className="proveedores-grid inventario-productos-grid" role="list">
+            {productosOrdenados.map((p) => (
+              <article
+                key={p.id}
+                className={
+                  "prov-card prov-card--stacked prov-card--clickable inventario-producto-card" +
+                  (p.estado === "inactivo" ? " inventario-producto-card--inactivo" : "")
+                }
+                role="listitem"
+                tabIndex={0}
+                title="Clic: visualizar · Clic derecho: menú"
+                onClick={() => onVisualizar(p)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setCtxMenu({ x: e.clientX, y: e.clientY, p });
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onVisualizar(p);
+                  }
+                }}
+              >
+                <div className="prov-card__media-wrap">
+                  {p.imagen_url ? (
+                    <img
+                      src={p.imagen_url}
+                      alt=""
+                      className="prov-card__img"
+                      width={112}
+                      height={112}
+                    />
+                  ) : (
+                    <div className="prov-card__avatar prov-card__avatar--ph" aria-hidden>
+                      {p.nombre.trim().slice(0, 1).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                <h3 className="prov-card__nombre-text">{p.nombre}</h3>
+                <p className="cliente-card-meta inventario-producto-card__meta">
+                  <span className="inventario-producto-card__stats">
+                    <span className="inventario-producto-card__stat">
+                      <span className={productoStockBadgeClass(p)}>{p.stock}</span>
+                    </span>
+                    <span className="inventario-producto-card__stat">
+                      <span className="inventario-producto-card__precio">
+                        {(p.precio_venta ?? p.precio) != null
+                          ? `$${Math.round(p.precio_venta ?? p.precio ?? 0).toLocaleString("es-CO")}`
+                          : "—"}
                       </span>
-                    </td>
-                    <td data-label="P. venta" onClick={(e) => e.stopPropagation()}>
-                      {priceEdit?.id === p.id ? (
-                        <input
-                          className="input-inline-price"
-                          autoFocus
-                          value={priceEdit.draft}
-                          onChange={(e) =>
-                            setPriceEdit({ id: p.id, draft: e.target.value })
-                          }
-                          onBlur={() => void commitPrice(p)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                            if (e.key === "Escape") setPriceEdit(null);
-                          }}
-                        />
-                      ) : (
-                        <button
-                          type="button"
-                          className="link-inline-price"
-                          onClick={() => startPriceEdit(p)}
-                        >
-                          {(p.precio_venta ?? p.precio) != null
-                            ? (p.precio_venta ?? p.precio)!.toFixed(2)
-                            : "—"}
-                        </button>
-                      )}
-                    </td>
-                    <td
-                      className="row-actions"
-                      data-label="Acciones"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <button type="button" className="link" onClick={() => onEditar(p)}>
-                        Editar
-                      </button>
-                      <button
-                        type="button"
-                        className="link danger"
-                        onClick={() => void onEliminarProducto(p)}
-                      >
-                        Eliminar
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </span>
+                  </span>
+                </p>
+              </article>
+            ))}
           </div>
         )}
       </section>
@@ -704,6 +771,123 @@ export function InventarioPage() {
           )}
         </section>
       ) : null}
+
+      <Drawer
+        open={viewingProduct != null}
+        onClose={cerrarVisualizar}
+        title={viewingProduct ? viewingProduct.nombre : "Producto"}
+      >
+        {viewingProduct ? (
+          <div className="form drawer-form">
+            <div
+              style={{
+                display: "flex",
+                gap: "1rem",
+                alignItems: "flex-start",
+                marginBottom: "0.5rem",
+              }}
+            >
+              <div
+                style={{
+                  width: 96,
+                  height: 96,
+                  borderRadius: 12,
+                  overflow: "hidden",
+                  background: "var(--surface-2, #f1f3f5)",
+                  border: "1px solid var(--border, rgba(0,0,0,0.08))",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flex: "0 0 auto",
+                }}
+              >
+                {viewingProduct.imagen_url ? (
+                  <img
+                    src={viewingProduct.imagen_url}
+                    alt=""
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                ) : (
+                  <span aria-hidden style={{ fontSize: "2rem" }}>
+                    📦
+                  </span>
+                )}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                <strong style={{ fontSize: "1.05rem" }}>{viewingProduct.nombre}</strong>
+                {viewingProduct.marca ? (
+                  <span className="muted small">{viewingProduct.marca}</span>
+                ) : null}
+                <span className={productoStockBadgeClass(viewingProduct)} style={{ alignSelf: "flex-start" }}>
+                  Cantidad: {viewingProduct.stock}
+                </span>
+              </div>
+            </div>
+
+            <dl
+              style={{
+                display: "grid",
+                gridTemplateColumns: "max-content 1fr",
+                rowGap: "0.5rem",
+                columnGap: "1rem",
+                margin: 0,
+              }}
+            >
+              <dt className="muted small">Estado</dt>
+              <dd style={{ margin: 0 }}>
+                {viewingProduct.estado === "inactivo" ? "Inactivo" : "Activo"}
+              </dd>
+
+              <dt className="muted small">Categoría</dt>
+              <dd style={{ margin: 0 }}>{viewingProduct.categoria || "—"}</dd>
+
+              <dt className="muted small">Código de barras</dt>
+              <dd className="mono" style={{ margin: 0 }}>
+                {viewingProduct.codigo_barras?.trim() || "—"}
+              </dd>
+
+              <dt className="muted small">Stock mínimo</dt>
+              <dd style={{ margin: 0 }}>
+                {viewingProduct.stock_minimo != null ? viewingProduct.stock_minimo : "—"}
+              </dd>
+
+              <dt className="muted small">Precio venta</dt>
+              <dd style={{ margin: 0 }}>
+                {(viewingProduct.precio_venta ?? viewingProduct.precio) != null
+                  ? (viewingProduct.precio_venta ?? viewingProduct.precio)!.toFixed(2)
+                  : "—"}
+              </dd>
+
+              {viewingProduct.descripcion?.trim() ? (
+                <>
+                  <dt className="muted small">Descripción</dt>
+                  <dd style={{ margin: 0, whiteSpace: "pre-wrap" }}>{viewingProduct.descripcion}</dd>
+                </>
+              ) : null}
+            </dl>
+
+              <div className="drawer-actions">
+              <button
+                type="button"
+                className="btn primary"
+                onClick={() => onEditar(viewingProduct)}
+              >
+                Editar
+              </button>
+              <button
+                type="button"
+                className="btn ghost danger-ghost"
+                onClick={() => void onEliminarDesdeVisualizar()}
+              >
+                Eliminar
+              </button>
+              <button type="button" className="btn ghost" onClick={cerrarVisualizar}>
+                Cerrar
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </Drawer>
 
       <ContextMenu
         open={ctxMenu != null}

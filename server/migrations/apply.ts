@@ -97,6 +97,11 @@ export async function applyMigrations(database: SqliteDb) {
   if (!pNames.has("fecha_vencimiento")) {
     await database.exec(`ALTER TABLE productos ADD COLUMN fecha_vencimiento TEXT`);
   }
+  if (!pNames.has("estado")) {
+    await database.exec(
+      `ALTER TABLE productos ADD COLUMN estado TEXT NOT NULL DEFAULT 'activo'`
+    );
+  }
 
   if (pNames.has("precio")) {
     await database.exec(
@@ -560,5 +565,52 @@ export async function applyMigrations(database: SqliteDb) {
   if (!cliGuestNames.has("activo")) {
     await database.exec(`ALTER TABLE clientes ADD COLUMN activo INTEGER NOT NULL DEFAULT 1`);
   }
+  for (const { col, ddl } of [
+    { col: "tipo_documento", ddl: `ALTER TABLE clientes ADD COLUMN tipo_documento TEXT` },
+    { col: "numero_documento", ddl: `ALTER TABLE clientes ADD COLUMN numero_documento TEXT` },
+    { col: "direccion", ddl: `ALTER TABLE clientes ADD COLUMN direccion TEXT` },
+  ] as const) {
+    const cliExtra = (await database.prepare(`PRAGMA table_info(clientes)`).all()) as {
+      name: string;
+    }[];
+    if (!cliExtra.some((c) => c.name === col)) {
+      await database.exec(ddl);
+    }
+  }
   await migrateRolesModuloPedidosUnificado(database);
+
+  await database.exec(`
+    CREATE TABLE IF NOT EXISTS categorias_producto (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre_categoria TEXT NOT NULL,
+      descripcion TEXT,
+      emoji TEXT,
+      estado TEXT NOT NULL DEFAULT 'activo',
+      fecha_creacion TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_cat_producto_nombre_ci
+      ON categorias_producto (nombre_categoria COLLATE NOCASE);
+  `);
+
+  const catCols = (await database.prepare(`PRAGMA table_info(categorias_producto)`).all()) as {
+    name: string;
+  }[];
+  if (!catCols.some((c) => c.name === "emoji")) {
+    await database.exec(`ALTER TABLE categorias_producto ADD COLUMN emoji TEXT`);
+  }
+
+  await database.exec(`
+    CREATE TABLE IF NOT EXISTS categorias_servicio (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre_categoria TEXT NOT NULL,
+      descripcion TEXT,
+      emoji TEXT,
+      estado TEXT NOT NULL DEFAULT 'activo',
+      fecha_creacion TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_cat_servicio_nombre_ci
+      ON categorias_servicio (nombre_categoria COLLATE NOCASE);
+  `);
 }

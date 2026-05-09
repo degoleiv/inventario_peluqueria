@@ -12,6 +12,7 @@
     "build:server": "tsc -p server/tsconfig.json",
     "reset:bootstrap": "tsx scripts/reset-usuarios-bootstrap.ts",
     "reset:total": "tsx scripts/reset-total-db.ts",
+    "reset:ventas": "tsx scripts/reset-ventas.ts",
     "preview": "vite preview",
     "tauri": "tauri"
   },

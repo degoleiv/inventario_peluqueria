@@ -1156,6 +1156,10 @@ select {
   padding: 0.35rem 1.25rem 0;
 }
 
+.main-pro--no-module-header .main-pro-content {
+  padding-top: 0.65rem;
+}
+
 .main-pro-title {
   margin: 0;
   font-size: 1.25rem;
@@ -1695,17 +1699,6 @@ select {
   font-size: 0.72rem;
 }
 
-.pos-shortcuts-hint {
-  margin: 0 0 0.85rem;
-  font-size: 0.76rem;
-  line-height: 1.55;
-  color: #6b5f58;
-}
-
-.pos-shortcuts-hint .kbd-mini {
-  margin: 0 0.06rem;
-}
-
 .pos-cart-column {
   display: flex;
   flex-direction: column;
@@ -1777,10 +1770,6 @@ select {
   margin-top: 0.35rem;
   padding-top: 0.65rem;
   border-top: 1px dashed #e0d5cb;
-}
-
-[data-theme="dark"] .pos-shortcuts-hint {
-  color: #9a918a;
 }
 
 [data-theme="dark"] .cart-line--selected {
@@ -2111,11 +2100,6 @@ select {
   font-size: 0.85rem;
 }
 
-.page-pos .pos-shortcuts-hint {
-  font-size: 0.88rem;
-  line-height: 1.65;
-}
-
 .page-pos .pos-panel-title {
   font-size: 1.15rem;
 }
@@ -2236,6 +2220,956 @@ select {
   width: 2.15rem;
   height: 2.15rem;
   font-size: 1rem;
+}
+
+/* —— Ventas: layout tipo POS SaaS (2 columnas) —— */
+.page-pos--saas {
+  /* Heredan de la paleta activa (Configuración > Apariencia) vía :root + body.theme-* */
+  --pos-saas-accent: var(--primary);
+  --pos-saas-accent-soft: color-mix(in srgb, var(--primary) 14%, transparent);
+  --pos-saas-accent-border: color-mix(in srgb, var(--primary) 38%, var(--border));
+  --pos-saas-card: var(--surface);
+  --pos-saas-border: var(--border);
+  --pos-saas-muted: var(--text-muted);
+  --pos-saas-text: var(--text);
+  --pos-saas-input-bg: var(--input-bg);
+  --pos-saas-elev: color-mix(in srgb, var(--text) 6%, transparent);
+  --pos-saas-elev-strong: color-mix(in srgb, var(--text) 10%, transparent);
+  gap: 0;
+  background: linear-gradient(
+    180deg,
+    var(--background) 0%,
+    color-mix(in srgb, var(--background) 92%, var(--primary) 8%) 100%
+  );
+  border-radius: 0;
+  padding: 0;
+  overflow: hidden;
+  color: var(--text);
+}
+
+.page-pos--saas .pos-saas-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  flex-shrink: 0;
+  margin-bottom: 0.75rem;
+  padding: 0.15rem 0.1rem 0;
+}
+
+.page-pos--saas .pos-saas-head-title {
+  margin: 0;
+  font-size: clamp(1.35rem, 2.2vw, 1.75rem);
+  font-weight: 700;
+  color: var(--pos-saas-text);
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  letter-spacing: -0.02em;
+}
+
+.page-pos--saas .pos-saas-head-icon {
+  color: var(--pos-saas-accent);
+  flex-shrink: 0;
+}
+
+.page-pos--saas .pos-saas-head-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.page-pos--saas .pos-saas-link-history {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.page-pos--saas .pos-saas-grid {
+  display: grid;
+  grid-template-columns: minmax(340px, 1fr) minmax(260px, 34%);
+  grid-template-rows: 1fr;
+  gap: 1rem;
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+@media (max-width: 1100px) {
+  .page-pos--saas .pos-saas-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+.page-pos--saas .pos-saas-col {
+  min-height: 0;
+}
+
+.page-pos--saas .pos-saas-col--main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  min-width: 0;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.page-pos--saas .pos-saas-col--aside {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Carrito + catálogo: altura acotada, scroll solo en tabla y rejilla de productos */
+.page-pos--saas .pos-saas-col--main > .pos-saas-card:not(.pos-saas-card--catalog) {
+  flex: 3 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.page-pos--saas .pos-saas-col--main > .pos-saas-card:not(.pos-saas-card--catalog) .pos-saas-card-head {
+  flex-shrink: 0;
+}
+
+.page-pos--saas .pos-saas-col--main > .pos-saas-card:not(.pos-saas-card--catalog) .pos-saas-table-wrap {
+  flex: 1 1 0;
+  min-height: 0;
+  max-height: none;
+  margin-bottom: 0.6rem;
+}
+
+.page-pos--saas .pos-saas-col--main > .pos-saas-card:not(.pos-saas-card--catalog) .pos-saas-totals {
+  flex-shrink: 0;
+}
+
+.page-pos--saas .pos-saas-col--aside .pos-saas-card {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.page-pos--saas .pos-saas-card {
+  background: var(--pos-saas-card);
+  border: 1px solid var(--pos-saas-border);
+  border-radius: 14px;
+  padding: 1.1rem 1.2rem;
+  box-shadow: 0 4px 24px var(--pos-saas-elev);
+}
+
+.page-pos--saas .pos-saas-card--muted {
+  background: color-mix(in srgb, var(--surface) 94%, var(--text) 6%);
+  box-shadow: none;
+}
+
+.page-pos--saas .pos-saas-card--catalog {
+  flex: 4 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow: hidden;
+}
+
+.page-pos--saas .pos-saas-card--catalog > .pos-saas-card-head,
+.page-pos--saas .pos-saas-card--catalog > .pos-saas-search-row,
+.page-pos--saas .pos-saas-card--catalog > .pos-saas-chips {
+  flex-shrink: 0;
+}
+
+.page-pos--saas .pos-saas-card--catalog > .pos-saas-more-wrap {
+  flex-shrink: 0;
+}
+
+.page-pos--saas .pos-saas-card--catalog > .pos-saas-pro-grid,
+.page-pos--saas .pos-saas-card--catalog > .pos-saas-empty-catalog,
+.page-pos--saas .pos-saas-card--catalog > .pos-saas-pro-grid--skel {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.page-pos--saas .pos-saas-card--sticky {
+  position: static;
+  top: auto;
+}
+
+.page-pos--saas .pos-saas-card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+.page-pos--saas .pos-saas-card-head--row {
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.page-pos--saas .pos-saas-card-head--stack {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+}
+
+.page-pos--saas .pos-saas-card-head-textblock {
+  flex: 1;
+  min-width: 0;
+}
+
+.page-pos--saas .pos-saas-card-desc {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.page-pos--saas .pos-saas-card-title--plain {
+  font-size: 1.05rem;
+}
+
+.page-pos--saas .pos-saas-card-head-left {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.page-pos--saas .pos-saas-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.65rem;
+  height: 1.65rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--pos-saas-accent);
+  flex-shrink: 0;
+}
+
+.page-pos--saas .pos-saas-card-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--pos-saas-text);
+}
+
+.page-pos--saas .pos-saas-subcard-title {
+  margin: 0 0 0.75rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--pos-saas-muted);
+}
+
+.page-pos--saas .pos-saas-cliente-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: stretch;
+}
+
+.page-pos--saas .pos-saas-cliente-fields {
+  flex: 1;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.page-pos--saas .pos-saas-input,
+.page-pos--saas .pos-saas-select {
+  width: 100%;
+  border: 1px solid var(--pos-saas-border);
+  border-radius: 10px;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.95rem;
+  background: var(--pos-saas-input-bg);
+  color: var(--pos-saas-text);
+}
+
+.page-pos--saas .pos-saas-input:focus,
+.page-pos--saas .pos-saas-select:focus {
+  outline: none;
+  border-color: var(--pos-saas-accent-border);
+  box-shadow: 0 0 0 3px var(--pos-saas-accent-soft);
+}
+
+.page-pos--saas .pos-saas-btn-ocasional {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  white-space: nowrap;
+  align-self: flex-start;
+}
+
+.page-pos--saas .pos-saas-btn-ocasional--full {
+  width: 100%;
+  justify-content: center;
+  align-self: stretch;
+}
+
+.page-pos--saas .pos-saas-aside-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-bottom: 0.15rem;
+}
+
+.page-pos--saas .pos-saas-cliente-actions {
+  display: block;
+}
+
+.page-pos--saas .pos-saas-btn-registrar-cliente {
+  width: 100%;
+  justify-content: center;
+  font-size: 0.88rem;
+}
+
+.create-cliente-drawer-form .create-cliente-drawer-doc {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+  align-items: start;
+}
+
+@media (max-width: 520px) {
+  .create-cliente-drawer-form .create-cliente-drawer-doc {
+    grid-template-columns: 1fr;
+  }
+}
+
+.page-pos--saas .pos-saas-field-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--pos-saas-muted);
+}
+
+.page-pos--saas .pos-saas-field-label--spaced {
+  margin-top: 1rem;
+}
+
+.page-pos--saas .pos-saas-link-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem 0;
+}
+
+.page-pos--saas .pos-saas-table-wrap {
+  border-radius: 10px;
+  border: 1px solid var(--pos-saas-border);
+  overflow: auto;
+  min-height: 0;
+  margin-bottom: 1rem;
+}
+
+.page-pos--saas .pos-saas-empty-cart {
+  padding: 1.5rem 1rem;
+  text-align: center;
+}
+
+.page-pos--saas .pos-saas-empty-cart p {
+  margin: 0.25rem 0;
+}
+
+.page-pos--saas .pos-saas-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.page-pos--saas .pos-saas-table th {
+  text-align: left;
+  padding: 0.55rem 0.65rem;
+  background: color-mix(in srgb, var(--pos-saas-input-bg) 88%, var(--pos-saas-border) 12%);
+  color: var(--pos-saas-muted);
+  font-weight: 600;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--pos-saas-border);
+}
+
+.page-pos--saas .pos-saas-th-thumb {
+  width: 3.25rem;
+}
+
+.page-pos--saas .pos-saas-th-actions {
+  width: 3rem;
+}
+
+.page-pos--saas .pos-saas-table td {
+  padding: 0.5rem 0.6rem;
+  vertical-align: middle;
+  border-bottom: 1px solid color-mix(in srgb, var(--pos-saas-border) 85%, var(--surface) 15%);
+}
+
+.page-pos--saas .pos-saas-tr--selected td {
+  background: var(--pos-saas-accent-soft);
+}
+
+.page-pos--saas .pos-saas-thumb {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 8px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--pos-saas-input-bg) 90%, var(--pos-saas-border) 10%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.page-pos--saas .pos-saas-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.page-pos--saas .pos-saas-thumb-ph {
+  width: 60%;
+  height: 60%;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--text-muted) 28%, var(--border));
+  opacity: 0.7;
+}
+
+.page-pos--saas .pos-saas-td-name {
+  font-weight: 600;
+  color: var(--pos-saas-text);
+  line-height: 1.35;
+}
+
+.page-pos--saas .pos-saas-td-strong {
+  font-weight: 700;
+  color: var(--pos-saas-text);
+}
+
+.page-pos--saas .pos-saas-qty {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  border: 1px solid var(--pos-saas-border);
+  border-radius: 8px;
+  padding: 0.15rem;
+  background: var(--surface);
+}
+
+.page-pos--saas .pos-saas-qty-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: none;
+  border-radius: 6px;
+  background: var(--pos-saas-input-bg);
+  color: var(--pos-saas-text);
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.page-pos--saas .pos-saas-qty-btn:hover {
+  background: var(--pos-saas-accent-soft);
+}
+
+.page-pos--saas .pos-saas-qty-val {
+  min-width: 1.5rem;
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.page-pos--saas .pos-saas-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.page-pos--saas .pos-saas-icon-btn:hover {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
+}
+
+.page-pos--saas .pos-saas-totals {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+  color: var(--pos-saas-muted);
+}
+
+.page-pos--saas .pos-saas-totals--one-line {
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.page-pos--saas .pos-saas-total-pair {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.page-pos--saas .pos-saas-total-pair:last-child {
+  flex-shrink: 0;
+}
+
+.page-pos--saas .pos-saas-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.page-pos--saas .pos-saas-add-discount {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--pos-saas-accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.page-pos--saas .pos-saas-add-discount:hover {
+  opacity: 0.88;
+}
+
+.page-pos--saas .pos-saas-pay-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+@media (min-width: 520px) {
+  .page-pos--saas .pos-saas-pay-grid:not(.pos-saas-pay-grid--aside) {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.page-pos--saas .pos-saas-pay-grid--aside {
+  grid-template-columns: repeat(2, 1fr);
+  margin-bottom: 0;
+}
+
+.page-pos--saas .pos-saas-pay-card {
+  border: 1px solid var(--pos-saas-border);
+  border-radius: 12px;
+  padding: 0.75rem 0.5rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--surface) 92%, var(--pos-saas-input-bg) 8%);
+  color: var(--pos-saas-text);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.page-pos--saas .pos-saas-pay-card:hover {
+  border-color: var(--pos-saas-accent-border);
+  background: var(--surface);
+}
+
+.page-pos--saas .pos-saas-pay-card--on {
+  border-color: var(--pos-saas-accent);
+  background: var(--pos-saas-accent-soft);
+  box-shadow: 0 0 0 1px var(--pos-saas-accent-border);
+  color: var(--pos-saas-text);
+}
+
+.page-pos--saas .pos-saas-pay-summary {
+  margin: 1rem 0 0.85rem;
+  padding: 1rem 1.1rem;
+  border-radius: 12px;
+  background: var(--pos-saas-accent-soft);
+  border: 1px solid var(--pos-saas-accent-border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.page-pos--saas .pos-saas-pay-summary-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--pos-saas-muted);
+}
+
+.page-pos--saas .pos-saas-pay-summary-value {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: var(--pos-saas-accent);
+  letter-spacing: -0.02em;
+}
+
+.page-pos--saas .pos-saas-cobrar {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.95rem 1.2rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  border-radius: 12px;
+  border: none;
+  margin-top: 0;
+}
+
+.page-pos--saas .pos-saas-cobrar:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.page-pos--saas .pos-saas-options-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem 1rem;
+  align-items: start;
+}
+
+.page-pos--saas .pos-saas-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  color: var(--pos-saas-muted);
+}
+
+.page-pos--saas .pos-saas-field--grow {
+  grid-column: 1 / -1;
+}
+
+.page-pos--saas .pos-saas-field select,
+.page-pos--saas .pos-saas-field input {
+  border: 1px solid var(--pos-saas-border);
+  border-radius: 8px;
+  padding: 0.5rem 0.55rem;
+  font-size: 0.92rem;
+}
+
+.page-pos--saas .pos-saas-check {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.88rem;
+  color: var(--pos-saas-text);
+  padding-top: 1.4rem;
+}
+
+.page-pos--saas .pos-saas-search-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.page-pos--saas .pos-saas-search-wrap {
+  flex: 1;
+  min-width: 200px;
+  position: relative;
+}
+
+.page-pos--saas .pos-saas-search-ico {
+  position: absolute;
+  left: 0.85rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.page-pos--saas .pos-saas-search-input {
+  width: 100%;
+  border: 1px solid var(--pos-saas-border);
+  border-radius: 12px;
+  padding: 0.85rem 1rem 0.85rem 2.75rem;
+  font-size: 1rem;
+  background: var(--pos-saas-input-bg);
+  color: var(--pos-saas-text);
+}
+
+.page-pos--saas .pos-saas-search-input:focus {
+  outline: none;
+  border-color: var(--pos-saas-accent-border);
+  box-shadow: 0 0 0 3px var(--pos-saas-accent-soft);
+}
+
+.page-pos--saas .pos-saas-scan-side {
+  flex-shrink: 0;
+  padding: 0.65rem 0.85rem;
+  border-radius: 12px;
+}
+
+.page-pos--saas .pos-saas-busy {
+  width: 100%;
+  font-size: 0.85rem;
+}
+
+.page-pos--saas .pos-saas-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.page-pos--saas .pos-saas-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--pos-saas-border);
+  border-radius: 999px;
+  padding: 0.38rem 0.85rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  background: var(--surface);
+  color: var(--pos-saas-text);
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.page-pos--saas .pos-saas-chip:hover {
+  border-color: color-mix(in srgb, var(--pos-saas-border) 55%, var(--text-muted) 45%);
+}
+
+.page-pos--saas .pos-saas-chip--on {
+  background: var(--pos-saas-accent-soft);
+  border-color: var(--pos-saas-accent);
+  color: var(--pos-saas-text);
+}
+
+.page-pos--saas .pos-saas-chip-count {
+  font-size: 0.72rem;
+  font-weight: 700;
+  opacity: 0.75;
+}
+
+.page-pos--saas .pos-saas-pro-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 0.75rem;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  padding: 0.15rem 0.1rem 0.5rem;
+  align-content: start;
+}
+
+.page-pos--saas .pos-saas-pro-grid--skel {
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+}
+
+.page-pos--saas .pos-saas-empty-catalog {
+  padding: 2rem 1rem;
+  text-align: center;
+}
+
+.page-pos--saas .pos-saas-pro-card {
+  position: relative;
+  border-radius: 14px;
+  border: 1px solid var(--pos-saas-border);
+  background: var(--surface);
+  overflow: hidden;
+  box-shadow: 0 2px 12px var(--pos-saas-elev);
+  transition:
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+
+.page-pos--saas .pos-saas-pro-card:hover:not(.pos-saas-pro-card--disabled) {
+  box-shadow: 0 8px 28px var(--pos-saas-elev-strong);
+  transform: translateY(-2px);
+}
+
+.page-pos--saas .pos-saas-pro-card--disabled {
+  opacity: 0.48;
+}
+
+.page-pos--saas .pos-saas-pro-card--flash {
+  animation: posSaasFlash 0.38s ease;
+}
+
+@keyframes posSaasFlash {
+  from {
+    box-shadow: 0 0 0 0 var(--pos-saas-accent);
+  }
+  to {
+    box-shadow: 0 0 0 6px transparent;
+  }
+}
+
+.page-pos--saas .pos-saas-pro-card-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  width: 100%;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0.75rem 0.65rem 2.1rem;
+  min-height: 8.5rem;
+}
+
+.page-pos--saas .pos-saas-pro-card-main:disabled {
+  cursor: not-allowed;
+}
+
+.page-pos--saas .pos-saas-pro-img-wrap {
+  width: 4.25rem;
+  height: 4.25rem;
+  border-radius: 10px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--pos-saas-input-bg) 88%, var(--border) 12%);
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.page-pos--saas .pos-saas-pro-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.page-pos--saas .pos-saas-pro-img-ph {
+  width: 45%;
+  height: 45%;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--text-muted) 28%, var(--border));
+}
+
+.page-pos--saas .pos-saas-pro-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--pos-saas-text);
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.page-pos--saas .pos-saas-pro-price {
+  margin-top: 0.35rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--pos-saas-text);
+}
+
+.page-pos--saas .pos-saas-pro-stock {
+  margin-top: 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.page-pos--saas .pos-saas-pro-stock--ok {
+  color: var(--stock-ok-fg);
+}
+
+.page-pos--saas .pos-saas-pro-stock--low {
+  color: var(--stock-low-fg);
+}
+
+.page-pos--saas .pos-saas-pro-add {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  border: none;
+  background: var(--pos-saas-accent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--pos-saas-accent) 42%, transparent);
+  transition: transform 0.12s ease;
+}
+
+.page-pos--saas .pos-saas-pro-add:hover:not(:disabled) {
+  transform: scale(1.06);
+}
+
+.page-pos--saas .pos-saas-pro-add:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.page-pos--saas .pos-saas-pro-fav {
+  position: absolute;
+  left: 0.45rem;
+  top: 0.45rem;
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: 8px;
+  border: 1px solid var(--pos-saas-border);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  font-size: 0.85rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+}
+
+.page-pos--saas .pos-saas-pro-fav--on {
+  color: var(--pos-saas-accent);
+  border-color: var(--pos-saas-accent-border);
+  background: var(--pos-saas-accent-soft);
+}
+
+.page-pos--saas .pos-saas-more-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 0.35rem 0 0.15rem;
+}
+
+.main-pro-content:has(.page-pos--saas) {
+  max-width: 1680px;
+  overflow-x: hidden;
+  overflow-y: hidden;
+}
+
+.main-pro-content:has(.page-pos--saas) > .subnav-wrap + *:not(.drawer-root) {
+  overflow: hidden;
 }
 
 /* Título y área principal más amplios cuando la vista es Ventas */
@@ -3195,6 +4129,150 @@ select {
   white-space: nowrap;
 }
 
+.clientes-table .clientes-table-col-actions {
+  width: 6.75rem;
+  text-align: right;
+  vertical-align: middle;
+  padding-left: 0.35rem;
+}
+
+.clientes-row-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+
+.clientes-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.15rem;
+  height: 2.15rem;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  line-height: 0;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.12s ease;
+}
+
+.clientes-icon-btn:hover {
+  transform: translateY(-1px);
+}
+
+.clientes-icon-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.clientes-icon-btn--edit {
+  color: #1d4ed8;
+  background: color-mix(in srgb, #3b82f6 14%, transparent);
+  border-color: color-mix(in srgb, #3b82f6 28%, transparent);
+}
+
+.clientes-icon-btn--edit:hover {
+  background: color-mix(in srgb, #3b82f6 22%, transparent);
+  border-color: color-mix(in srgb, #2563eb 45%, transparent);
+}
+
+.clientes-icon-btn--delete {
+  color: var(--danger, #b91c1c);
+  background: color-mix(in srgb, var(--danger, #dc2626) 12%, transparent);
+  border-color: color-mix(in srgb, var(--danger, #dc2626) 22%, transparent);
+}
+
+.clientes-icon-btn--delete:hover {
+  background: color-mix(in srgb, var(--danger, #dc2626) 18%, transparent);
+  border-color: color-mix(in srgb, var(--danger, #dc2626) 38%, transparent);
+}
+
+[data-theme="dark"] .clientes-icon-btn--edit {
+  color: #93c5fd;
+  background: color-mix(in srgb, #3b82f6 18%, transparent);
+  border-color: color-mix(in srgb, #60a5fa 35%, transparent);
+}
+
+[data-theme="dark"] .clientes-icon-btn--delete {
+  color: #fca5a5;
+  background: color-mix(in srgb, #f87171 14%, transparent);
+  border-color: color-mix(in srgb, #f87171 28%, transparent);
+}
+
+@media (max-width: 520px) {
+  .clientes-table .clientes-table-col-actions {
+    width: auto;
+    min-width: 6.25rem;
+  }
+}
+
+.confirm-dialog-root {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  box-sizing: border-box;
+}
+
+.confirm-dialog-backdrop {
+  position: absolute;
+  inset: 0;
+  border: none;
+  margin: 0;
+  padding: 0;
+  background: rgba(20, 16, 14, 0.5);
+  cursor: pointer;
+}
+
+.confirm-dialog-panel {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 22rem;
+  padding: 1.15rem 1.25rem 1.25rem;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.18);
+}
+
+.confirm-dialog-title {
+  margin: 0 0 0.65rem;
+  font-size: 1.1rem;
+}
+
+.confirm-dialog-body {
+  margin-bottom: 1.1rem;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.confirm-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.confirm-dialog-confirm--danger {
+  background: var(--danger, #dc2626);
+  color: #fff;
+  border: none;
+}
+
+.confirm-dialog-confirm--danger:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.confirm-dialog-confirm--danger:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .cliente-fav-inline {
   display: inline-flex;
   align-items: center;
@@ -3370,6 +4448,183 @@ select {
 .stock-badge--out {
   background: #fde8e8;
   color: #8a1f1f;
+}
+
+.inventario-producto-card__meta {
+  width: 100%;
+}
+
+.inventario-producto-card__stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 0.85rem 1.35rem;
+  margin-top: 0.2rem;
+}
+
+.inventario-producto-card__stat {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.inventario-producto-card__precio {
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.78rem;
+  line-height: 1.2;
+}
+
+/* Inventario — productos: rejilla densa y tarjetas compactas */
+.proveedores-grid.inventario-productos-grid {
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+
+@media (min-width: 520px) {
+  .proveedores-grid.inventario-productos-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  }
+}
+
+@media (min-width: 1100px) {
+  .proveedores-grid.inventario-productos-grid {
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  }
+}
+
+.inventario-producto-card.prov-card {
+  padding: 0.6rem 0.65rem;
+  gap: 0.4rem;
+  border-radius: 12px;
+}
+
+.inventario-producto-card--inactivo {
+  opacity: 0.6;
+  filter: grayscale(0.4);
+}
+
+.inventario-producto-card--inactivo .prov-card__nombre-text {
+  text-decoration: line-through;
+}
+
+.producto-estado-field {
+  margin-top: 0.5rem;
+}
+
+.inventario-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.65rem 0.85rem;
+  margin: 0.65rem 0 0.9rem;
+}
+
+.inventario-filtros .field {
+  margin: 0;
+}
+
+.inventario-filtros__buscar {
+  flex: 1 1 240px;
+  min-width: 200px;
+}
+
+.inventario-filtros__estado {
+  flex: 0 0 auto;
+  min-width: 140px;
+}
+
+.inventario-filtros__count {
+  align-self: center;
+  margin-left: auto;
+}
+
+.producto-estado-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0;
+  cursor: pointer;
+}
+
+.producto-estado-switch__text {
+  font-weight: 600;
+}
+
+.inventario-producto-card .prov-card__media-wrap {
+  margin-bottom: 0;
+}
+
+.inventario-producto-card .prov-card__img {
+  width: 112px;
+  height: 112px;
+  border-radius: 12px;
+}
+
+.inventario-producto-card .prov-card__avatar {
+  width: 112px;
+  height: 112px;
+  font-size: 2rem;
+  border-radius: 12px;
+}
+
+.inventario-producto-card .prov-card__nombre-text {
+  font-size: 0.8rem;
+  font-weight: 650;
+  line-height: 1.25;
+  margin-top: 0.05rem;
+}
+
+.inventario-producto-card__marca {
+  display: block;
+  font-size: 0.68rem;
+  margin-top: -0.25rem;
+  line-height: 1.2;
+}
+
+.inventario-producto-card .cliente-card-meta {
+  font-size: 0.68rem;
+  margin-top: -0.15rem;
+}
+
+.inventario-producto-card .inventario-producto-card__stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  column-gap: 1.5rem;
+  row-gap: 0.45rem;
+  margin-top: 0.15rem;
+}
+
+.inventario-producto-card .prov-card__toolbar {
+  gap: 0.3rem;
+  margin-top: 0.05rem;
+}
+
+.inventario-producto-card .prov-card__icon-btn {
+  min-width: 1.95rem;
+  min-height: 1.95rem;
+  padding: 0.12rem;
+}
+
+.inventario-producto-card .stock-badge {
+  font-size: 0.68rem;
+  min-width: 1.35rem;
+  padding: 0.08rem 0.26rem;
+  border-radius: 6px;
+}
+
+.inventario-producto-card .input-inline-price {
+  width: 4.1rem;
+  font-size: 0.75rem;
+  padding: 0.14rem 0.22rem;
+}
+
+.inventario-producto-card .link-inline-price {
+  font-size: 0.75rem;
 }
 
 .shortcut-hint {
@@ -3567,6 +4822,59 @@ select {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+.prov-card__icon-btn--edit {
+  color: #1d4ed8;
+}
+
+.prov-card__icon-btn--edit:hover:not(:disabled) {
+  color: #1e40af;
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.module-filters-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: flex-end;
+  margin-bottom: 1rem;
+}
+
+.module-filters-bar > .field {
+  margin-bottom: 0;
+}
+
+.cliente-card-meta {
+  margin: -0.35rem 0 0;
+  padding: 0 0.25rem;
+  font-size: 0.82rem;
+  color: var(--text-muted, #6b5f58);
+  text-align: center;
+  max-width: 100%;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.cliente-card-meta-line {
+  display: block;
+}
+
+.cliente-card-pin {
+  color: #a89888;
+}
+
+.cliente-card-pin--on {
+  color: #c9a227 !important;
+}
+
+[data-theme="dark"] .prov-card__icon-btn--edit {
+  color: #93c5fd;
+}
+
+[data-theme="dark"] .prov-card__icon-btn--edit:hover:not(:disabled) {
+  color: #bfdbfe;
+  background: rgba(59, 130, 246, 0.15);
 }
 
 .prov-detail-hero {

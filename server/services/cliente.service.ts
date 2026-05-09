@@ -4,6 +4,10 @@ import { AppError } from "../lib/AppError.js";
 const TIPO_REGISTRADO = "registrado";
 const TIPO_TEMPORAL = "temporal";
 
+function looksLikeEmail(s: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());
+}
+
 export const clienteService = {
   async list(q?: string) {
     if (q && q.trim()) {
@@ -11,10 +15,13 @@ export const clienteService = {
       return await db
         .prepare(
           `SELECT * FROM clientes
-           WHERE nombre LIKE ? ESCAPE '\\' OR IFNULL(telefono,'') LIKE ?
+           WHERE nombre LIKE ? ESCAPE '\\'
+              OR IFNULL(telefono,'') LIKE ?
+              OR IFNULL(email,'') LIKE ? ESCAPE '\\'
+              OR IFNULL(numero_documento,'') LIKE ? ESCAPE '\\'
            ORDER BY nombre COLLATE NOCASE`
         )
-        .all(term, term);
+        .all(term, term, term, term);
     }
     return await db.prepare(`SELECT * FROM clientes ORDER BY nombre COLLATE NOCASE`).all();
   },
@@ -29,17 +36,39 @@ export const clienteService = {
         .get(telefono);
       if (d) throw new AppError("Ya existe un cliente con ese teléfono");
     }
+    const emailRaw = typeof body.email === "string" ? body.email.trim() : "";
+    const email = emailRaw || null;
+    if (email && !looksLikeEmail(email)) {
+      throw new AppError("Correo electrónico no válido");
+    }
+    const tipo_documento =
+      typeof body.tipo_documento === "string" ? body.tipo_documento.trim() || null : null;
+    const numero_documento =
+      typeof body.numero_documento === "string" ? body.numero_documento.trim() || null : null;
+    if (numero_documento) {
+      const dupDoc = await db
+        .prepare(
+          `SELECT id FROM clientes WHERE numero_documento IS NOT NULL AND numero_documento != '' AND numero_documento = ?`
+        )
+        .get(numero_documento);
+      if (dupDoc) throw new AppError("Ya existe un cliente con ese número de documento");
+    }
+    const direccion =
+      typeof body.direccion === "string" ? body.direccion.trim() || null : null;
     const now = new Date().toISOString();
     const info = await db
       .prepare(
-        `INSERT INTO clientes (nombre, telefono, email, notas, created_at, updated_at, tipo_cliente, activo)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 1)`
+        `INSERT INTO clientes (nombre, telefono, email, notas, tipo_documento, numero_documento, direccion, created_at, updated_at, tipo_cliente, activo)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`
       )
       .run(
         nombre,
         telefono,
-        typeof body.email === "string" ? body.email || null : null,
+        email,
         typeof body.notas === "string" ? body.notas || null : null,
+        tipo_documento,
+        numero_documento,
+        direccion,
         now,
         now,
         TIPO_REGISTRADO
@@ -136,16 +165,44 @@ export const clienteService = {
         .get(telefono, id);
       if (d) throw new AppError("Ya existe un cliente con ese teléfono");
     }
+    const emailUp =
+      typeof body.email === "string" ? body.email.trim() || null : (existing.email as string | null);
+    if (emailUp && !looksLikeEmail(emailUp)) {
+      throw new AppError("Correo electrónico no válido");
+    }
+    const tipo_documento =
+      typeof body.tipo_documento === "string"
+        ? body.tipo_documento.trim() || null
+        : (existing.tipo_documento as string | null);
+    const numero_documento =
+      typeof body.numero_documento === "string"
+        ? body.numero_documento.trim() || null
+        : (existing.numero_documento as string | null);
+    if (numero_documento && String(numero_documento) !== String(existing.numero_documento ?? "")) {
+      const dupDoc = await db
+        .prepare(
+          `SELECT id FROM clientes WHERE numero_documento IS NOT NULL AND numero_documento != '' AND numero_documento = ? AND id != ?`
+        )
+        .get(numero_documento, id);
+      if (dupDoc) throw new AppError("Ya existe otro cliente con ese número de documento");
+    }
+    const direccion =
+      typeof body.direccion === "string"
+        ? body.direccion.trim() || null
+        : (existing.direccion as string | null);
     const now = new Date().toISOString();
     await db
       .prepare(
-        `UPDATE clientes SET nombre = ?, telefono = ?, email = ?, notas = ?, updated_at = ? WHERE id = ?`
+        `UPDATE clientes SET nombre = ?, telefono = ?, email = ?, notas = ?, tipo_documento = ?, numero_documento = ?, direccion = ?, updated_at = ? WHERE id = ?`
       )
       .run(
         nombre,
         telefono,
-        typeof body.email === "string" ? body.email || null : existing.email,
+        emailUp,
         typeof body.notas === "string" ? body.notas || null : existing.notas,
+        tipo_documento,
+        numero_documento,
+        direccion,
         now,
         id
       );

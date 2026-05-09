@@ -49,6 +49,7 @@ export type Producto = {
   fecha_vencimiento: string | null;
   /** Proveedor preferente (catálogo / alta desde pedido). */
   proveedor_id?: number | null;
+  estado?: "activo" | "inactivo";
   created_at: string;
   updated_at: string;
 };
@@ -59,6 +60,9 @@ export type Cliente = {
   telefono: string | null;
   email: string | null;
   notas: string | null;
+  tipo_documento?: string | null;
+  numero_documento?: string | null;
+  direccion?: string | null;
   puntos?: number;
   tipo_cliente?: "registrado" | "temporal";
   activo?: number;
@@ -366,6 +370,127 @@ export async function updateSistemaPrefs(body: Partial<SistemaPrefs>): Promise<S
   });
 }
 
+export type CategoriaProducto = {
+  id: number;
+  nombre_categoria: string;
+  descripcion: string | null;
+  /** Emoji guardado para el listado; si es null se usa uno por defecto según el nombre. */
+  emoji: string | null;
+  estado: "activo" | "inactivo";
+  fecha_creacion: string;
+  updated_at: string;
+  /** Cantidad de productos con la misma categoría (texto en inventario). */
+  productos_count: number;
+};
+
+export type CategoriasProductoListResponse = {
+  items: CategoriaProducto[];
+  total: number;
+  page: number;
+  page_size: number;
+};
+
+export async function fetchCategoriasProducto(params?: {
+  q?: string;
+  estado?: "activo" | "inactivo" | "todos";
+  page?: number;
+  page_size?: number;
+}): Promise<CategoriasProductoListResponse> {
+  const sp = new URLSearchParams();
+  if (params?.q?.trim()) sp.set("q", params.q.trim());
+  if (params?.estado) sp.set("estado", params.estado);
+  if (params?.page != null && Number.isFinite(params.page)) sp.set("page", String(Math.floor(params.page)));
+  if (params?.page_size != null && Number.isFinite(params.page_size)) {
+    sp.set("page_size", String(Math.floor(params.page_size)));
+  }
+  const suffix = sp.toString() ? `?${sp.toString()}` : "";
+  return requestJson(`/api/configuracion/categorias-producto${suffix}`);
+}
+
+export async function createCategoriaProducto(body: {
+  nombre_categoria: string;
+  descripcion?: string | null;
+  estado?: "activo" | "inactivo";
+  emoji?: string | null;
+}): Promise<CategoriaProducto> {
+  return requestJson("/api/configuracion/categorias-producto", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function updateCategoriaProducto(
+  id: number,
+  body: Partial<{
+    nombre_categoria: string;
+    descripcion: string | null;
+    estado: "activo" | "inactivo";
+    emoji: string | null;
+  }>
+): Promise<CategoriaProducto> {
+  return requestJson(`/api/configuracion/categorias-producto/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deleteCategoriaProducto(id: number): Promise<void> {
+  await requestJson(`/api/configuracion/categorias-producto/${id}`, { method: "DELETE" });
+}
+
+/** Misma forma que `CategoriaProducto`; `productos_count` = citas con ese `servicio`. */
+export type CategoriaServicio = CategoriaProducto;
+
+export type CategoriasServicioListResponse = CategoriasProductoListResponse;
+
+export async function fetchCategoriasServicio(params?: {
+  q?: string;
+  estado?: "activo" | "inactivo" | "todos";
+  page?: number;
+  page_size?: number;
+}): Promise<CategoriasServicioListResponse> {
+  const sp = new URLSearchParams();
+  if (params?.q?.trim()) sp.set("q", params.q.trim());
+  if (params?.estado) sp.set("estado", params.estado);
+  if (params?.page != null && Number.isFinite(params.page)) sp.set("page", String(Math.floor(params.page)));
+  if (params?.page_size != null && Number.isFinite(params.page_size)) {
+    sp.set("page_size", String(Math.floor(params.page_size)));
+  }
+  const suffix = sp.toString() ? `?${sp.toString()}` : "";
+  return requestJson(`/api/configuracion/categorias-servicio${suffix}`);
+}
+
+export async function createCategoriaServicio(body: {
+  nombre_categoria: string;
+  descripcion?: string | null;
+  estado?: "activo" | "inactivo";
+  emoji?: string | null;
+}): Promise<CategoriaServicio> {
+  return requestJson("/api/configuracion/categorias-servicio", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function updateCategoriaServicio(
+  id: number,
+  body: Partial<{
+    nombre_categoria: string;
+    descripcion: string | null;
+    estado: "activo" | "inactivo";
+    emoji: string | null;
+  }>
+): Promise<CategoriaServicio> {
+  return requestJson(`/api/configuracion/categorias-servicio/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deleteCategoriaServicio(id: number): Promise<void> {
+  await requestJson(`/api/configuracion/categorias-servicio/${id}`, { method: "DELETE" });
+}
+
 export async function deleteUsuario(id: number): Promise<void> {
   await requestJson(`/api/usuarios/${id}`, { method: "DELETE" });
 }
@@ -390,6 +515,17 @@ export async function fetchProductosPorProveedor(
   return requestJson(`/api/proveedores/${proveedorId}/productos${suffix}`);
 }
 
+export type InventarioCatalogoCategoria = { id: number; nombre_categoria: string };
+export type InventarioCatalogoProveedor = { id: number; nombre: string };
+export type InventarioCatalogo = {
+  categorias: InventarioCatalogoCategoria[];
+  proveedores: InventarioCatalogoProveedor[];
+};
+
+export async function fetchInventarioCatalogo(): Promise<InventarioCatalogo> {
+  return requestJson("/api/inventario/catalogo");
+}
+
 export async function createProducto(body: Partial<Producto>): Promise<Producto> {
   return requestJson("/api/productos", { method: "POST", body: JSON.stringify(body) });
 }
@@ -411,6 +547,16 @@ export async function updateProducto(id: number, body: Partial<Producto>): Promi
 
 export async function deleteProducto(id: number): Promise<void> {
   await requestJson(`/api/productos/${id}`, { method: "DELETE" });
+}
+
+export async function patchProductoEstado(
+  id: number,
+  estado: "activo" | "inactivo"
+): Promise<Producto> {
+  return requestJson(`/api/productos/${id}/estado`, {
+    method: "PATCH",
+    body: JSON.stringify({ estado }),
+  });
 }
 
 export async function lookupBarcode(codigo: string): Promise<LookupOk | LookupManual> {

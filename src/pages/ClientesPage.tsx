@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Navigate, useParams } from "react-router-dom";
 import {
   convertirClienteRegistrado,
   createCliente,
@@ -8,7 +7,8 @@ import {
   updateCliente,
   type Cliente,
 } from "../api";
-import { EmojiMartButton } from "../components/EmojiMartButton";
+import { ClienteCardToolbar } from "../components/ClienteCardToolbar";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Drawer } from "../components/Drawer";
 import { SkeletonCard } from "../components/Skeleton";
 import { useToast } from "../context/ToastContext";
@@ -19,47 +19,80 @@ import {
   recordRecentCliente,
   togglePinCliente,
 } from "../lib/recentPins";
-import { SubNav } from "../components/SubNav";
-import { CLIENTES_TABS, readLastTab, type ClientesTab } from "../lib/moduleRoutes";
+const TIPO_DOCUMENTO_OPTS = [
+  { value: "", label: "—" },
+  { value: "CC", label: "CC" },
+  { value: "CE", label: "CE" },
+  { value: "Pasaporte", label: "Pasaporte" },
+  { value: "NIT", label: "NIT" },
+  { value: "Otro", label: "Otro" },
+] as const;
+
+function validEmail(s: string): boolean {
+  const t = s.trim();
+  if (!t) return true;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t);
+}
+
+type TipoClienteFiltro = "todos" | "registrado" | "temporal";
+
+function matchesSearchCliente(c: Cliente, q: string): boolean {
+  const s = q.trim().toLowerCase();
+  if (!s) return true;
+  if (c.nombre.toLowerCase().includes(s)) return true;
+  if (c.telefono?.toLowerCase().includes(s)) return true;
+  if (c.email?.toLowerCase().includes(s)) return true;
+  if (c.numero_documento?.toLowerCase().includes(s)) return true;
+  return false;
+}
+
+function matchesTipoCliente(c: Cliente, f: TipoClienteFiltro): boolean {
+  if (f === "todos") return true;
+  if (f === "registrado") return c.tipo_cliente !== "temporal";
+  return c.tipo_cliente === "temporal";
+}
+
+function ClienteCardAvatar({ nombre }: { nombre: string }) {
+  return (
+    <div className="prov-card__avatar prov-card__avatar--ph prov-card__media-wrap" aria-hidden>
+      {nombre.trim().slice(0, 1).toUpperCase()}
+    </div>
+  );
+}
 
 export function ClientesPage() {
-  const { tab: tabParam } = useParams<{ tab: string }>();
   const toast = useToast();
   const [rows, setRows] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busqueda, setBusqueda] = useState("");
+  const [searchText, setSearchText] = useState("");
+  const [tipoClienteFiltro, setTipoClienteFiltro] = useState<TipoClienteFiltro>("todos");
 
   const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
   const [email, setEmail] = useState("");
-  const [notas, setNotas] = useState("");
+  const [tipoDocumento, setTipoDocumento] = useState("");
+  const [numeroDocumento, setNumeroDocumento] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [confirmDeleteCliente, setConfirmDeleteCliente] = useState<Cliente | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const [pinTick, setPinTick] = useState(0);
   const focusHandled = useRef(false);
 
-  const load = useCallback(
-    async (q?: string) => {
-      setLoading(true);
-      try {
-        setRows(await fetchClientes(q));
-      } catch (e) {
-        toast(e instanceof Error ? e.message : "Error", "error");
-      } finally {
-        setLoading(false);
-      }
-    },
-    [toast]
-  );
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      setRows(await fetchClientes());
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Error", "error");
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
 
   useEffect(() => {
-    const q = busqueda.trim();
-    const delay = q ? 280 : 0;
-    const t = window.setTimeout(() => {
-      void load(q || undefined);
-    }, delay);
-    return () => clearTimeout(t);
-  }, [busqueda, load]);
+    void load();
+  }, [load]);
 
   useEffect(() => {
     if (focusHandled.current || rows.length === 0) return;
@@ -84,7 +117,8 @@ export function ClientesPage() {
     setNombre("");
     setTelefono("");
     setEmail("");
-    setNotas("");
+    setTipoDocumento("");
+    setNumeroDocumento("");
     setDrawerOpen(true);
   }
 
@@ -94,7 +128,8 @@ export function ClientesPage() {
     setNombre(c.nombre);
     setTelefono(c.telefono ?? "");
     setEmail(c.email ?? "");
-    setNotas(c.notas ?? "");
+    setTipoDocumento(c.tipo_documento ?? "");
+    setNumeroDocumento(c.numero_documento ?? "");
     setDrawerOpen(true);
   }
 
@@ -105,26 +140,32 @@ export function ClientesPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!nombre.trim()) return;
+    if (!validEmail(email)) {
+      toast("Revisá el formato del correo electrónico.", "warning");
+      return;
+    }
     try {
       if (editingId != null) {
         await updateCliente(editingId, {
           nombre: nombre.trim(),
           telefono: telefono.trim() || null,
           email: email.trim() || null,
-          notas: notas.trim() || null,
+          tipo_documento: tipoDocumento.trim() || null,
+          numero_documento: numeroDocumento.trim() || null,
         });
-        toast("Cliente actualizado", "success");
+        toast("Cliente actualizado correctamente.", "success");
       } else {
         await createCliente({
           nombre: nombre.trim(),
           telefono: telefono.trim() || null,
           email: email.trim() || null,
-          notas: notas.trim() || null,
+          tipo_documento: tipoDocumento.trim() || null,
+          numero_documento: numeroDocumento.trim() || null,
         });
-        toast("Cliente creado", "success");
+        toast("Cliente creado correctamente.", "success");
       }
       closeDrawer();
-      void load(busqueda.trim() || undefined);
+      void load();
     } catch (err) {
       toast(err instanceof Error ? err.message : "Error al guardar", "error");
     }
@@ -143,12 +184,11 @@ export function ClientesPage() {
     return [...rows].sort((a, b) => score(b) - score(a));
   }, [rows, pinTick]);
 
-  const displayRowsHistorial = useMemo(() => {
-    return [...rows].sort(
-      (a, b) =>
-        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+  const filteredListaRows = useMemo(() => {
+    return displayRows.filter(
+      (c) => matchesSearchCliente(c, searchText) && matchesTipoCliente(c, tipoClienteFiltro)
     );
-  }, [rows]);
+  }, [displayRows, searchText, tipoClienteFiltro]);
 
   const editingTemporal =
     editingId != null &&
@@ -166,227 +206,149 @@ export function ClientesPage() {
         nombre: nombre.trim(),
         telefono: telefono.trim() || null,
         email: email.trim() || null,
-        notas: notas.trim() || null,
       });
       toast("Cliente registrado. Ventas y citas previas siguen vinculadas.", "success");
       closeDrawer();
-      void load(busqueda.trim() || undefined);
+      void load();
     } catch (err) {
       toast(err instanceof Error ? err.message : "Error", "error");
     }
   }
 
-  async function onDelete(id: number) {
-    if (!window.confirm("¿Eliminar cliente y sus citas?")) return;
+  function requestDeleteCliente(c: Cliente) {
+    setConfirmDeleteCliente(c);
+  }
+
+  async function confirmDeleteClienteAction() {
+    const c = confirmDeleteCliente;
+    if (!c) return;
+    setDeleteBusy(true);
     try {
-      await deleteCliente(id);
-      toast("Cliente eliminado", "info");
-      if (editingId === id) closeDrawer();
-      void load(busqueda.trim() || undefined);
+      await deleteCliente(c.id);
+      toast("Cliente eliminado correctamente.", "success");
+      if (editingId === c.id) closeDrawer();
+      setConfirmDeleteCliente(null);
+      void load();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Error", "error");
+      toast(err instanceof Error ? err.message : "No se pudo eliminar el cliente", "error");
+    } finally {
+      setDeleteBusy(false);
     }
   }
-
-  useEffect(() => {
-    if (tabParam === "nuevo") {
-      openNew();
-    }
-  }, [tabParam]);
-
-  const tabOk = tabParam != null && CLIENTES_TABS.includes(tabParam as ClientesTab);
-  if (!tabOk) {
-    return <Navigate to={`/clientes/${readLastTab("clientes", "lista")}`} replace />;
-  }
-  const tab = tabParam as ClientesTab;
 
   return (
     <div className="page-clientes">
-      <SubNav
-        moduleId="clientes"
-        items={[
-          { id: "lista", label: "Lista", to: "/clientes/lista" },
-          { id: "nuevo", label: "Nuevo cliente", to: "/clientes/nuevo" },
-          { id: "historial", label: "Historial", to: "/clientes/historial" },
-        ]}
-      />
-
-      {tab === "lista" ? (
-        <>
-      <div className="toolbar-pro">
-        <label className="search-hero">
-          <span className="search-hero-icon" aria-hidden>
-            🔍
-          </span>
-          <input
-            className="search-hero-input input-xl"
-            placeholder="Buscar por nombre o teléfono…"
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-          />
-        </label>
-        <button type="button" className="btn primary btn-lg" onClick={openNew}>
-          Nuevo cliente
-        </button>
-      </div>
-
-      {loading ? (
-        <div className="cards-grid">
-          <SkeletonCard />
-          <SkeletonCard />
-          <SkeletonCard />
-        </div>
-      ) : displayRows.length === 0 ? (
-        <div className="empty-state card-pro">
-          <p>No hay clientes.</p>
-          <p className="muted">Creá uno nuevo o ajustá la búsqueda.</p>
-          <button type="button" className="btn primary" onClick={openNew}>
-            Agregar cliente
-          </button>
-        </div>
-      ) : (
-        <section className="card-pro clientes-tabla-wrap">
-          <div className="table-wrap">
-            <table className="table clientes-table">
-              <thead>
-                <tr>
-                  <th className="clientes-table-col-fav" scope="col" aria-label="Favorito" />
-                  <th scope="col">Nombre</th>
-                  <th scope="col">Teléfono</th>
-                  <th scope="col">Email</th>
-                  <th scope="col" className="clientes-table-col-narrow">
-                    Puntos
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayRows.map((c) => (
-                  <tr
-                    key={c.id}
-                    className="table-row-click"
-                    onClick={() => openEdit(c)}
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        openEdit(c);
-                      }
-                    }}
-                  >
-                    <td className="clientes-table-col-fav">
-                      <button
-                        type="button"
-                        className={`cliente-fav-inline ${isClientePinned(c.id) ? "cliente-fav-inline--on" : ""}`}
-                        title={isClientePinned(c.id) ? "Quitar favorito" : "Cliente frecuente"}
-                        aria-pressed={isClientePinned(c.id)}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          togglePinCliente(c.id);
-                          setPinTick((t) => t + 1);
-                        }}
-                      >
-                        ★
-                      </button>
-                    </td>
-                    <td>
-                      <span className="cell-main">{c.nombre}</span>
-                      {c.tipo_cliente === "temporal" ? (
-                        <span className="badge-ok" style={{ marginLeft: "0.35rem", fontSize: "0.7rem" }}>
-                          ocasional
-                        </span>
-                      ) : null}
-                    </td>
-                    <td>
-                      <span className="mono">{c.telefono?.trim() ? c.telefono : "—"}</span>
-                    </td>
-                    <td>
-                      <span className="cell-sub">{c.email?.trim() ? c.email : "—"}</span>
-                    </td>
-                    <td className="clientes-table-col-narrow mono">
-                      {c.puntos != null && c.puntos > 0 ? `${c.puntos}` : "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <section className="card">
+          <div className="card-head" style={{ flexWrap: "wrap" }}>
+            <h2 className="card-title">Clientes</h2>
+            <button type="button" className="btn primary" onClick={openNew}>
+              Nuevo cliente
+            </button>
           </div>
-        </section>
-      )}
-        </>
-      ) : null}
+          <p className="hint">
+            Contactos para ventas y citas. Los favoritos y recientes se muestran primero; tocá una tarjeta
+            para editar o usá los iconos de la fila inferior.
+          </p>
 
-      {tab === "historial" ? (
-        <section className="card-pro" style={{ marginBottom: "1rem" }}>
-          <h2 className="card-pro-title">Historial (última actividad)</h2>
-          <p className="muted">Orden por fecha de actualización en el sistema.</p>
+          {!loading && rows.length > 0 ? (
+            <div className="module-filters-bar">
+              <label className="field" style={{ flex: "1 1 220px", minWidth: 0 }}>
+                <span id="cli-search-label">Búsqueda</span>
+                <input
+                  id="cli-search-input"
+                  type="search"
+                  autoComplete="off"
+                  placeholder="Nombre, teléfono, email o documento…"
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") e.preventDefault();
+                  }}
+                  aria-labelledby="cli-search-label"
+                />
+              </label>
+              <label className="field" style={{ flex: "0 1 200px" }}>
+                <span id="cli-tipo-label">Tipo</span>
+                <select
+                  id="cli-tipo-filtro"
+                  value={tipoClienteFiltro}
+                  onChange={(e) => setTipoClienteFiltro(e.target.value as TipoClienteFiltro)}
+                  aria-labelledby="cli-tipo-label"
+                >
+                  <option value="todos">Todos</option>
+                  <option value="registrado">Registrados</option>
+                  <option value="temporal">Ocasionales</option>
+                </select>
+              </label>
+            </div>
+          ) : null}
+
           {loading ? (
             <div className="cards-grid">
               <SkeletonCard />
               <SkeletonCard />
+              <SkeletonCard />
             </div>
-          ) : displayRowsHistorial.length === 0 ? (
-            <p className="muted">Sin clientes.</p>
+          ) : rows.length === 0 ? (
+            <div className="clay-empty" role="status">
+              No hay clientes cargados. Usá «Nuevo cliente» para agregar el primero.
+            </div>
+          ) : filteredListaRows.length === 0 ? (
+            <div className="clay-empty" role="status">
+              Ningún cliente coincide con los filtros. Probá otra búsqueda o cambiá el tipo.
+            </div>
           ) : (
-            <div className="table-wrap">
-              <table className="table clientes-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Nombre</th>
-                    <th scope="col">Teléfono</th>
-                    <th scope="col">Última actividad</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {displayRowsHistorial.map((c) => (
-                    <tr
-                      key={c.id}
-                      className="table-row-click"
-                      tabIndex={0}
-                      onClick={() => openEdit(c)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          openEdit(c);
-                        }
-                      }}
-                    >
-                      <td>
-                        <span className="cell-main">{c.nombre}</span>
-                        {c.tipo_cliente === "temporal" ? (
-                          <span className="badge-ok" style={{ marginLeft: "0.35rem", fontSize: "0.7rem" }}>
-                            ocasional
-                          </span>
-                        ) : null}
-                      </td>
-                      <td>
-                        <span className="mono">{c.telefono?.trim() ? c.telefono : "—"}</span>
-                      </td>
-                      <td>
-                        <span className="muted small">
-                          {new Date(c.updated_at).toLocaleString()}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="proveedores-grid" role="list">
+              {filteredListaRows.map((c) => (
+                <article
+                  key={c.id}
+                  className="prov-card prov-card--stacked prov-card--clickable"
+                  role="listitem"
+                  tabIndex={0}
+                  aria-label={`Ver o editar ${c.nombre}`}
+                  onClick={() => openEdit(c)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      openEdit(c);
+                    }
+                  }}
+                >
+                  <ClienteCardAvatar nombre={c.nombre} />
+                  <h3 className="prov-card__nombre-text">{c.nombre}</h3>
+                  {c.tipo_cliente === "temporal" ? (
+                    <span className="prov-card__badge prov-card__badge--ok" style={{ fontSize: "0.72rem" }}>
+                      ocasional
+                    </span>
+                  ) : null}
+                  <p className="cliente-card-meta">
+                    <span className="cliente-card-meta-line mono">
+                      {c.telefono?.trim() ? c.telefono : "Sin teléfono"}
+                    </span>
+                    {c.email?.trim() ? (
+                      <span className="cliente-card-meta-line">{c.email}</span>
+                    ) : null}
+                    {c.puntos != null && c.puntos > 0 ? (
+                      <span className="cliente-card-meta-line">
+                        <strong>{c.puntos}</strong> puntos
+                      </span>
+                    ) : null}
+                  </p>
+                  <ClienteCardToolbar
+                    nombreCliente={c.nombre}
+                    pinned={isClientePinned(c.id)}
+                    onEdit={() => openEdit(c)}
+                    onDelete={() => requestDeleteCliente(c)}
+                    onTogglePin={() => {
+                      togglePinCliente(c.id);
+                      setPinTick((t) => t + 1);
+                    }}
+                  />
+                </article>
+              ))}
             </div>
           )}
         </section>
-      ) : null}
-
-      {tab === "nuevo" ? (
-        <section className="card-pro">
-          <h2 className="card-pro-title">Nuevo cliente</h2>
-          <p className="muted">
-            Se abrió el panel lateral con el formulario. Completá los datos y guardá; podés cerrar
-            este mensaje y seguir en otra pestaña cuando termines.
-          </p>
-          <button type="button" className="btn primary" onClick={openNew}>
-            Abrir de nuevo el formulario
-          </button>
-        </section>
-      ) : null}
 
       <Drawer
         open={drawerOpen}
@@ -400,7 +362,7 @@ export function ClientesPage() {
         }
         wide
       >
-        <form className="form drawer-form" onSubmit={onSubmit}>
+        <form className="form drawer-form create-cliente-drawer-form" onSubmit={onSubmit}>
           {editingTemporal ? (
             <p className="hint">
               Contacto rápido sin registro completo. Cuando quieras, completá datos y pulsá{" "}
@@ -408,25 +370,46 @@ export function ClientesPage() {
             </p>
           ) : null}
           <label className="field">
-            <span>Nombre *</span>
-            <input value={nombre} onChange={(e) => setNombre(e.target.value)} required />
+            <span>Nombre completo *</span>
+            <input
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              autoComplete="name"
+              required
+            />
           </label>
-          <div className="grid-2">
+          <div className="field-row create-cliente-drawer-doc">
             <label className="field">
-              <span>Teléfono</span>
-              <input value={telefono} onChange={(e) => setTelefono(e.target.value)} />
+              <span>Tipo documento</span>
+              <select value={tipoDocumento} onChange={(e) => setTipoDocumento(e.target.value)}>
+                {TIPO_DOCUMENTO_OPTS.map((o) => (
+                  <option key={o.value || "empty"} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
             </label>
             <label className="field">
-              <span>Email</span>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <span>Número documento</span>
+              <input
+                value={numeroDocumento}
+                onChange={(e) => setNumeroDocumento(e.target.value)}
+                autoComplete="off"
+              />
             </label>
           </div>
           <label className="field">
-            <span className="field-label-inline">
-              <span>Notas</span>
-              <EmojiMartButton onPick={(native) => setNotas((prev) => prev + native)} />
-            </span>
-            <textarea value={notas} onChange={(e) => setNotas(e.target.value)} rows={3} />
+            <span>Teléfono</span>
+            <input
+              type="tel"
+              value={telefono}
+              onChange={(e) => setTelefono(e.target.value)}
+              autoComplete="tel"
+            />
+          </label>
+          <label className="field">
+            <span>Correo</span>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
           </label>
           <div className="drawer-actions">
             {editingTemporal ? (
@@ -441,14 +424,37 @@ export function ClientesPage() {
               <button
                 type="button"
                 className="btn ghost danger-text"
-                onClick={() => void onDelete(editingId)}
+                title="Eliminar cliente"
+                onClick={() => {
+                  const c = rows.find((r) => r.id === editingId);
+                  if (c) requestDeleteCliente(c);
+                }}
               >
-                Eliminar
+                🗑️ Eliminar
               </button>
             ) : null}
           </div>
         </form>
       </Drawer>
+
+      <ConfirmDialog
+        open={confirmDeleteCliente != null}
+        title="Eliminar cliente"
+        description={
+          confirmDeleteCliente ? (
+            <>
+              ¿Eliminar a <strong>{confirmDeleteCliente.nombre}</strong>? También se eliminarán las citas
+              vinculadas. Esta acción no se puede deshacer.
+            </>
+          ) : null
+        }
+        confirmLabel="Eliminar"
+        cancelLabel="Cancelar"
+        variant="danger"
+        busy={deleteBusy}
+        onCancel={() => !deleteBusy && setConfirmDeleteCliente(null)}
+        onConfirm={() => void confirmDeleteClienteAction()}
+      />
     </div>
   );
 }

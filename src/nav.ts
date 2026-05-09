@@ -33,7 +33,7 @@ export const PERMISO_MODULOS: PermisoModulo[] = [
 
 export const NAV_LABEL: Record<NavKey, string> = {
   inicio: "Dashboard",
-  ventas: "Ventas (POS)",
+  ventas: "Ventas",
   citas: "Agenda",
   clientes: "Clientes",
   inventario: "Inventario",

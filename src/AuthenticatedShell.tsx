@@ -43,6 +43,7 @@ import {
   readConfigTab,
   readEmpleadosTab,
   readLastTab,
+  readVentasTab,
 } from "./lib/moduleRoutes";
 export function AuthenticatedShell() {
   const navigate = useNavigate();
@@ -214,9 +215,9 @@ export function AuthenticatedShell() {
     const quick: PaletteAction[] = [];
     if (puedeVerModulo(permisos, "ventas")) {
       quick.push({
-        id: "palette-pos",
-        label: "Abrir ventas (POS)",
-        shortcut: "POS",
+        id: "palette-ventas",
+        label: "Abrir ventas",
+        shortcut: "V",
         onSelect: () => navigate(getModuleEntryPath("ventas")),
       });
     }
@@ -262,7 +263,7 @@ export function AuthenticatedShell() {
             } catch {
               /* ignore */
             }
-            navigate(`/clientes/${readLastTab("clientes", "lista")}`);
+            navigate("/clientes");
           },
         }));
     },
@@ -304,6 +305,7 @@ export function AuthenticatedShell() {
           { label: "Inicio", onClick: () => navigate("/inicio") },
           { label: NAV_LABEL[nav] },
         ]}
+        hideModuleHeader={nav === "ventas" || nav === "clientes"}
       >
         <Outlet />
       </AppLayout>
@@ -328,7 +330,7 @@ export function AuthenticatedRoutes() {
         <Route path="ventas/pantalla-cliente" element={<VentaClienteDisplayPage />} />
         <Route
           path="ventas"
-          element={<Navigate to={`/ventas/${readLastTab("ventas", "pos")}`} replace />}
+          element={<Navigate to={`/ventas/${readVentasTab()}`} replace />}
         />
         <Route path="ventas/:tab" element={<VentasPage />} />
         <Route
@@ -338,11 +340,8 @@ export function AuthenticatedRoutes() {
           }
         />
         <Route path="inventario/:tab" element={<InventarioPage />} />
-        <Route
-          path="clientes"
-          element={<Navigate to={`/clientes/${readLastTab("clientes", "lista")}`} replace />}
-        />
-        <Route path="clientes/:tab" element={<ClientesPage />} />
+        <Route path="clientes" element={<ClientesPage />} />
+        <Route path="clientes/:tab" element={<Navigate to="/clientes" replace />} />
         <Route path="compras" element={<Navigate to="/pedidos" replace />} />
         <Route path="proveedores" element={<ProveedoresPage />} />
         <Route

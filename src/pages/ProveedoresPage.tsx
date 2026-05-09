@@ -421,17 +421,8 @@ export function ProveedoresPage() {
         </p>
 
         {!loading && rows.length > 0 ? (
-          <div
-            className="prov-filters"
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: "0.75rem 1rem",
-              alignItems: "flex-end",
-              marginBottom: "1rem",
-            }}
-          >
-            <label className="field" style={{ flex: "1 1 220px", minWidth: 0, marginBottom: 0 }}>
+          <div className="module-filters-bar">
+            <label className="field" style={{ flex: "1 1 220px", minWidth: 0 }}>
               <span id="prov-search-label">Búsqueda</span>
               <input
                 id="prov-search-input"
@@ -446,7 +437,7 @@ export function ProveedoresPage() {
                 aria-labelledby="prov-search-label"
               />
             </label>
-            <label className="field" style={{ flex: "0 1 200px", marginBottom: 0 }}>
+            <label className="field" style={{ flex: "0 1 200px" }}>
               <span id="prov-estado-filtro-label">Estado</span>
               <select
                 id="prov-estado-filtro"

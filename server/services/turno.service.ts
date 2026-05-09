@@ -20,6 +20,46 @@ function rangesOverlap(a0: number, a1: number, b0: number, b1: number) {
   return a0 < b1 && a1 > b0;
 }
 
+const MAX_DIAS_RANGO_TURNO_PLANTILLA = 120;
+
+export type TurnoPlantillaSemanal = {
+  fecha_desde: string;
+  fecha_hasta: string;
+  dias_semana: number[];
+  hora_inicio: string;
+  hora_fin: string;
+};
+
+/** Parsea `turno_inicial` del body de POST /usuarios. Devuelve `undefined` si no aplica. */
+export function parseTurnoPlantillaSemanal(raw: unknown): TurnoPlantillaSemanal | undefined {
+  if (raw == null || raw === false) return undefined;
+  if (typeof raw !== "object" || Array.isArray(raw)) {
+    throw new AppError("turno_inicial inválido");
+  }
+  const o = raw as Record<string, unknown>;
+  const fecha_desde = typeof o.fecha_desde === "string" ? o.fecha_desde.trim().slice(0, 10) : "";
+  const fecha_hasta = typeof o.fecha_hasta === "string" ? o.fecha_hasta.trim().slice(0, 10) : "";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha_desde) || !/^\d{4}-\d{2}-\d{2}$/.test(fecha_hasta)) {
+    throw new AppError("turno_inicial: fechas requeridas (YYYY-MM-DD)");
+  }
+  const hora_inicio = typeof o.hora_inicio === "string" ? o.hora_inicio.trim() : "";
+  const hora_fin = typeof o.hora_fin === "string" ? o.hora_fin.trim() : "";
+  if (!hora_inicio || !hora_fin) throw new AppError("turno_inicial: hora_inicio y hora_fin requeridas");
+
+  let dias: number[] = [];
+  if (Array.isArray(o.dias_semana)) {
+    dias = o.dias_semana
+      .map((x) => Number(x))
+      .filter((n) => Number.isInteger(n) && n >= 0 && n <= 6);
+  }
+  dias = [...new Set(dias)].sort((a, b) => a - b);
+  if (dias.length === 0) {
+    throw new AppError("turno_inicial: elegí al menos un día de la semana (0=dom … 6=sáb)");
+  }
+
+  return { fecha_desde, fecha_hasta, dias_semana: dias, hora_inicio, hora_fin };
+}
+
 export const turnoService = {
   async list(desde?: string, hasta?: string, empleadoId?: number) {
     let sql = `SELECT t.*, u.nombre AS empleado_nombre FROM turnos_empleado t
@@ -89,6 +129,54 @@ export const turnoService = {
          JOIN usuarios u ON u.id = t.empleado_id WHERE t.id = ?`
       )
       .get(info.lastInsertRowid);
+  },
+
+  /** Una fila en `turnos_empleado` por cada fecha en el rango cuyo día de la semana esté en `dias_semana`. */
+  async bulkSemanal(empleado_id: number, plantilla: TurnoPlantillaSemanal): Promise<number> {
+    const p0 = plantilla.fecha_desde.split("-").map((x) => Number(x));
+    const p1 = plantilla.fecha_hasta.split("-").map((x) => Number(x));
+    if (p0.length !== 3 || p0.some((n) => !Number.isFinite(n)) || p1.length !== 3 || p1.some((n) => !Number.isFinite(n))) {
+      throw new AppError("Fechas inválidas");
+    }
+    const desde = new Date(p0[0], p0[1] - 1, p0[2]);
+    const hasta = new Date(p1[0], p1[1] - 1, p1[2]);
+    if (hasta < desde) throw new AppError("La fecha hasta no puede ser anterior a la desde");
+
+    let span = 0;
+    for (
+      let probe = new Date(desde.getFullYear(), desde.getMonth(), desde.getDate());
+      probe <= hasta;
+      probe.setDate(probe.getDate() + 1)
+    ) {
+      span++;
+      if (span > MAX_DIAS_RANGO_TURNO_PLANTILLA) {
+        throw new AppError(`El rango no puede superar ${MAX_DIAS_RANGO_TURNO_PLANTILLA} días`);
+      }
+    }
+
+    const diasSet = new Set(plantilla.dias_semana);
+    let created = 0;
+    for (let i = 0; ; i++) {
+      const cur = new Date(desde.getFullYear(), desde.getMonth(), desde.getDate() + i);
+      if (cur > hasta) break;
+      if (i >= MAX_DIAS_RANGO_TURNO_PLANTILLA) {
+        throw new AppError(`El rango no puede superar ${MAX_DIAS_RANGO_TURNO_PLANTILLA} días`);
+      }
+      if (!diasSet.has(cur.getDay())) continue;
+      const fecha = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}-${String(cur.getDate()).padStart(2, "0")}`;
+      await this.create({
+        empleado_id,
+        fecha,
+        hora_inicio: plantilla.hora_inicio,
+        hora_fin: plantilla.hora_fin,
+        estado: "activo",
+      });
+      created++;
+      if (created > MAX_DIAS_RANGO_TURNO_PLANTILLA) {
+        throw new AppError(`Máximo ${MAX_DIAS_RANGO_TURNO_PLANTILLA} turnos por operación`);
+      }
+    }
+    return created;
   },
 
   async update(id: number, body: Record<string, unknown>) {

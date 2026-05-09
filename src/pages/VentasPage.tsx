@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Navigate, useParams } from "react-router-dom";
+import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   createClienteTemporal,
   createVenta,
@@ -32,6 +32,7 @@ import { posBeepErr, posBeepOk } from "../lib/posSounds";
 import { SubNav } from "../components/SubNav";
 import { readLastTab, VENTAS_TABS, type VentasTab } from "../lib/moduleRoutes";
 import { publishPosClienteDisplay } from "../lib/posClientDisplay";
+import { parsePosPreloadCita } from "../lib/posPrecargaDesdeCita";
 
 type CartLine = {
   producto_id: number;
@@ -43,6 +44,8 @@ type CartLine = {
 
 export function VentasPage() {
   const { tab: tabParam } = useParams<{ tab: string }>();
+  const location = useLocation();
+  const navigate = useNavigate();
   const toast = useToast();
   const barcodeRef = useRef<HTMLInputElement>(null);
   const saleFormRef = useRef<HTMLFormElement>(null);
@@ -115,6 +118,50 @@ export function VentasPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  /** Precarga desde Citas → «Cobrar en POS» (cliente, vendedor, notas; producto si coincide el nombre del servicio). */
+  useEffect(() => {
+    if (tabParam !== "pos" || loading) return;
+    const raw = (location.state as { posPrecargaCita?: unknown } | null)?.posPrecargaCita;
+    const p = parsePosPreloadCita(raw);
+    if (!p) return;
+    navigate(".", { replace: true, state: null });
+
+    setClienteId(p.clienteId);
+    recordRecentCliente(p.clienteId);
+    if (p.usuarioId != null && equipo.some((e) => e.id === p.usuarioId)) {
+      setVendedorId(p.usuarioId);
+    }
+    const serv = (p.servicio ?? "").trim();
+    const fechaTxt =
+      p.inicioIso && !Number.isNaN(new Date(p.inicioIso).getTime())
+        ? new Date(p.inicioIso).toLocaleString("es", { dateStyle: "short", timeStyle: "short" })
+        : "";
+    setNotasVenta(`Cita #${p.citaId}${serv ? ` · ${serv}` : ""}${fechaTxt ? ` · ${fechaTxt}` : ""}`);
+
+    const norm = serv.toLowerCase();
+    if (norm && productos.length > 0) {
+      const exact = productos.find((x) => x.nombre.trim().toLowerCase() === norm);
+      const candidates = productos.filter((x) => x.nombre.toLowerCase().includes(norm));
+      const one = exact ?? (candidates.length === 1 ? candidates[0] : undefined);
+      if (one && one.stock > 0) {
+        const lista = one.precio_venta ?? one.precio ?? 0;
+        setCart([
+          {
+            producto_id: one.id,
+            nombre: one.nombre,
+            cantidad: 1,
+            precio_unitario: lista,
+            stock_max: one.stock,
+          },
+        ]);
+        recordRecentProduct(one.id);
+        setSearch("");
+        setCartSel(null);
+      }
+    }
+    toast("Cita cargada en el POS: revisá el carrito y cobrá cuando quieras.", "info");
+  }, [tabParam, loading, location.state, productos, equipo, navigate, toast]);
 
   useEffect(() => {
     const t = window.setTimeout(() => barcodeRef.current?.focus(), 80);

@@ -550,5 +550,8 @@ export async function applyMigrations(database: SqliteDb) {
   if (!cliGuestNames.has("activo")) {
     await database.exec(`ALTER TABLE clientes ADD COLUMN activo INTEGER NOT NULL DEFAULT 1`);
   }
+  if (!cliGuestNames.has("cedula")) {
+    await database.exec(`ALTER TABLE clientes ADD COLUMN cedula TEXT`);
+  }
   await migrateRolesModuloPedidosUnificado(database);
 }

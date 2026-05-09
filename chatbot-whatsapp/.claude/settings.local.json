@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir D:GitHubinventario_peluqueriachatbot-whatsapp *)",
+      "PowerShell(\\(Get-Content \"D:\\\\GitHub\\\\inventario_peluqueria\\\\src\\\\App.css\" | Measure-Object -Line\\).Lines)",
+      "Bash(npx tsc *)"
+    ]
+  }
+}

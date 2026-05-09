@@ -57,11 +57,19 @@ export type Cliente = {
   telefono: string | null;
   email: string | null;
   notas: string | null;
+  cedula?: string | null;
   puntos?: number;
   tipo_cliente?: "registrado" | "temporal";
   activo?: number;
   created_at: string;
   updated_at: string;
+};
+
+/** Datos mínimos del cliente al crear una cita sin elegir uno registrado. */
+export type CitaClienteDatos = {
+  nombre: string;
+  telefono: string;
+  cedula: string;
 };
 
 export type Cita = {
@@ -296,6 +304,16 @@ export async function fetchUsuarios(): Promise<UsuarioListado[]> {
   return requestJson("/api/usuarios");
 }
 
+/** Opcional en POST /usuarios: genera filas en Turnos para el nuevo empleado. */
+export type TurnoPlantillaInicial = {
+  fecha_desde: string;
+  fecha_hasta: string;
+  /** 0 = domingo … 6 = sábado (como `Date.getDay()`). */
+  dias_semana: number[];
+  hora_inicio: string;
+  hora_fin: string;
+};
+
 export async function createUsuario(body: {
   email: string;
   password: string;
@@ -306,7 +324,8 @@ export async function createUsuario(body: {
   foto_url?: string | null;
   tipo_comision?: string;
   valor_comision?: number;
-}): Promise<UsuarioListado> {
+  turno_inicial?: TurnoPlantillaInicial;
+}): Promise<UsuarioListado & { turnos_creados?: number }> {
   return requestJson("/api/usuarios", { method: "POST", body: JSON.stringify(body) });
 }
 
@@ -487,11 +506,78 @@ export async function convertirClienteRegistrado(
 }
 
 /* Citas */
-export async function fetchCitas(): Promise<Cita[]> {
-  return requestJson("/api/citas");
+export async function fetchCitas(params?: {
+  desde?: string;
+  hasta?: string;
+  usuario_id?: number;
+}): Promise<Cita[]> {
+  const q = new URLSearchParams();
+  if (params?.desde) q.set("desde", params.desde);
+  if (params?.hasta) q.set("hasta", params.hasta);
+  if (params?.usuario_id != null) q.set("usuario_id", String(params.usuario_id));
+  const suffix = q.toString() ? `?${q}` : "";
+  return requestJson(`/api/citas${suffix}`);
 }
 
-export async function createCita(body: Partial<Cita>): Promise<Cita> {
+/** Indica si el empleado ya tiene turno solapado en ese horario (todas las citas activas en servidor). */
+export async function fetchCitaSolape(params: {
+  usuario_id: number;
+  inicio: string;
+  duracion_min: number;
+  exclude_cita_id?: number | null;
+}): Promise<{ solapa: boolean; cita: Cita | null }> {
+  const q = new URLSearchParams();
+  q.set("usuario_id", String(params.usuario_id));
+  q.set("inicio", params.inicio);
+  q.set("duracion_min", String(params.duracion_min));
+  if (params.exclude_cita_id != null) q.set("exclude_cita_id", String(params.exclude_cita_id));
+  return requestJson(`/api/citas/solape?${q}`);
+}
+
+export async function fetchCitasConfigAgenda(): Promise<{ open: number; close: number }> {
+  return requestJson("/api/citas/config-agenda");
+}
+
+export async function fetchCitasEmpleadoAgendaDia(
+  usuario_id: number,
+  fecha: string
+): Promise<{
+  fecha: string;
+  usuario_id: number;
+  segmentos: Array<{ hora_inicio: string; hora_fin: string }>;
+}> {
+  const q = new URLSearchParams({ usuario_id: String(usuario_id), fecha });
+  return requestJson(`/api/citas/empleado-agenda-dia?${q}`);
+}
+
+/** Turnos de trabajo (Empleados → Turnos) en un rango; requiere permiso `citas` (no admin). */
+export async function fetchCitasEmpleadoTurnosRango(params: {
+  usuario_id: number;
+  desde: string;
+  hasta: string;
+}): Promise<
+  Array<{
+    id: number;
+    empleado_id: number;
+    fecha: string;
+    hora_inicio: string;
+    hora_fin: string;
+    estado: string;
+    created_at: string;
+    empleado_nombre?: string | null;
+  }>
+> {
+  const q = new URLSearchParams({
+    usuario_id: String(params.usuario_id),
+    desde: params.desde,
+    hasta: params.hasta,
+  });
+  return requestJson(`/api/citas/empleado-turnos-rango?${q}`);
+}
+
+export async function createCita(
+  body: Partial<Cita> & { cliente_datos?: CitaClienteDatos }
+): Promise<Cita> {
   return requestJson("/api/citas", { method: "POST", body: JSON.stringify(body) });
 }
 
@@ -913,6 +999,19 @@ export type TurnoEmpleado = {
   created_at: string;
   empleado_nombre?: string | null;
 };
+
+/** Crea un turno de trabajo para una fecha (horas opcionales; si no, franja del negocio). Requiere permiso citas. */
+export async function createCitaEmpleadoTurnoDia(body: {
+  usuario_id: number;
+  fecha: string;
+  hora_inicio?: string;
+  hora_fin?: string;
+}): Promise<TurnoEmpleado> {
+  return requestJson("/api/citas/empleado-turno-dia", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
 
 export async function fetchEmpleadosTurnos(params?: {
   desde?: string;

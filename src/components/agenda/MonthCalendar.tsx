@@ -1,5 +1,9 @@
 import { useMemo } from "react";
 import type { Cita } from "../../api";
+import {
+  monthMatrixSixWeeks,
+  type MetaDíaCalendario,
+} from "../../lib/citasCalendarioOcupacion";
 
 const WEEKDAYS_ES = ["Lu", "Ma", "Mi", "Ju", "Vi", "Sa", "Do"];
 
@@ -16,6 +20,7 @@ export function localDayKeyFromIso(iso: string): string {
 function countsByDay(citas: Cita[]): Map<string, number> {
   const m = new Map<string, number>();
   for (const c of citas) {
+    if (c.estado.toLowerCase().includes("cancel")) continue;
     const k = localDayKeyFromIso(c.inicio);
     if (!k) continue;
     m.set(k, (m.get(k) ?? 0) + 1);
@@ -23,29 +28,12 @@ function countsByDay(citas: Cita[]): Map<string, number> {
   return m;
 }
 
-function monthMatrix(year: number, monthIndex: number) {
-  const first = new Date(year, monthIndex, 1);
-  const startWeekdayMon0 = (first.getDay() + 6) % 7;
-  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
-  const cells: Array<{ day: number | null; key: string }> = [];
-  for (let i = 0; i < startWeekdayMon0; i++) {
-    cells.push({ day: null, key: `p-${i}` });
-  }
-  for (let d = 1; d <= daysInMonth; d++) {
-    cells.push({
-      day: d,
-      key: `${year}-${pad(monthIndex + 1)}-${pad(d)}`,
-    });
-  }
-  while (cells.length % 7 !== 0) {
-    cells.push({ day: null, key: `t-${cells.length}` });
-  }
-  return cells;
-}
-
 type Props = {
   citas: Cita[];
-  /** Primer día del mes que se muestra */
+  /** Metadatos por día (ocupación, deshabilitado, conteo); si no se pasa, solo conteo desde citas. */
+  dayMetaByKey?: Map<string, MetaDíaCalendario>;
+  /** Si true, se amplía la leyenda (días grises = sin turno cargado para el empleado filtrado). */
+  hintDescansoPorTurnos?: boolean;
   viewMonth: Date;
   selectedDay: string;
   onPrevMonth: () => void;
@@ -55,6 +43,8 @@ type Props = {
 
 export function MonthCalendar({
   citas,
+  dayMetaByKey,
+  hintDescansoPorTurnos = false,
   viewMonth,
   selectedDay,
   onPrevMonth,
@@ -64,7 +54,7 @@ export function MonthCalendar({
   const year = viewMonth.getFullYear();
   const monthIndex = viewMonth.getMonth();
   const counts = useMemo(() => countsByDay(citas), [citas]);
-  const matrix = useMemo(() => monthMatrix(year, monthIndex), [year, monthIndex]);
+  const matrix = useMemo(() => monthMatrixSixWeeks(year, monthIndex), [year, monthIndex]);
 
   const title = viewMonth.toLocaleDateString("es", { month: "long", year: "numeric" });
 
@@ -93,31 +83,55 @@ export function MonthCalendar({
       </div>
       <div className="month-cal-grid" role="grid" aria-label="Calendario mensual">
         {matrix.map((cell) => {
-          if (cell.day == null) {
-            return <div key={cell.key} className="month-cal-cell month-cal-cell--pad" />;
-          }
           const dayKey = cell.key;
-          const n = counts.get(dayKey) ?? 0;
+          const meta = dayMetaByKey?.get(dayKey);
+          const n = meta?.count ?? (counts.get(dayKey) ?? 0);
+          const ocup = meta?.ocupacion;
+          const disabled = meta?.disabled === true;
           const isToday = dayKey === todayKey;
           const isSelected = dayKey === selectedDay;
-          const titleTip =
-            n === 0
+          const titleTip = disabled
+            ? `${dayKey} · Día completo según el filtro (no hay huecos en la franja del negocio)`
+            : n === 0
               ? `${dayKey} · Sin citas`
-              : `${dayKey} · ${n} cita${n === 1 ? "" : "s"}`;
+              : ocup === "lleno"
+                ? `${dayKey} · ${n} cita${n === 1 ? "" : "s"} · Muy ocupado`
+                : ocup === "parcial"
+                  ? `${dayKey} · ${n} cita${n === 1 ? "" : "s"} · Ocupación parcial`
+                  : `${dayKey} · ${n} cita${n === 1 ? "" : "s"}`;
+          const descanso = meta?.descansoSinTurno === true;
+          const ocupClass =
+            descanso
+              ? " month-cal-day--descanso"
+              : ocup === "parcial"
+                ? " month-cal-day--ocup-parcial"
+                : ocup === "lleno"
+                  ? " month-cal-day--ocup-lleno"
+                  : ocup === "libre" && n === 0 && dayMetaByKey
+                    ? " month-cal-day--ocup-libre"
+                    : "";
+          const titleTipDescanso = `${dayKey} · Sin turno cargado: tocá para confirmar y crear el horario del negocio`;
           return (
             <button
               key={cell.key}
               type="button"
               role="gridcell"
-              className={`month-cal-cell month-cal-day ${isToday ? "month-cal-day--today" : ""} ${
-                isSelected ? "month-cal-day--selected" : ""
-              }`}
-              onClick={() => onSelectDay(dayKey)}
-              title={titleTip}
+              disabled={disabled}
+              aria-disabled={disabled}
+              className={`month-cal-cell month-cal-day ${cell.inMonth ? "" : "month-cal-day--outside"} ${
+                isToday ? "month-cal-day--today" : ""
+              } ${isSelected ? "month-cal-day--selected" : ""}${disabled ? " month-cal-day--disabled" : ""}${ocupClass}`}
+              onClick={() => {
+                if (!disabled) onSelectDay(dayKey);
+              }}
+              title={descanso ? titleTipDescanso : titleTip}
             >
-              <span className="month-cal-day-num">{cell.day}</span>
+              <span className="month-cal-day-num">{cell.displayDay}</span>
               {n > 0 ? (
-                <span className="month-cal-day-badge" aria-hidden>
+                <span
+                  className={`month-cal-day-badge${ocup === "lleno" ? " month-cal-day-badge--lleno" : ocup === "parcial" ? " month-cal-day-badge--parcial" : ""}`}
+                  aria-hidden
+                >
                   {n > 9 ? "9+" : n}
                 </span>
               ) : null}
@@ -126,7 +140,15 @@ export function MonthCalendar({
         })}
       </div>
       <p className="muted month-cal-hint">
-        Tocá un día para abrir la agenda diaria. Los números indican cantidad de citas.
+        Verde suave: día libre. Ámbar: citas pero con huecos. Rojo: día muy ocupado (franja del negocio casi
+        cubierta). Los días en rojo bloqueado no se pueden abrir. Tocá un día válido para la grilla de horas.
+        {hintDescansoPorTurnos ? (
+          <>
+            {" "}
+            <strong>Gris:</strong> sin turno cargado en esa fecha; al tocar el día se pide confirmación para
+            crear el horario del negocio y abrir la grilla.
+          </>
+        ) : null}
       </p>
     </div>
   );

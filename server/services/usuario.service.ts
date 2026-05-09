@@ -4,6 +4,7 @@ import { AppError } from "../lib/AppError.js";
 import { db, recordSyncEvent } from "../db.js";
 import { usuariosRepo } from "../repositories/usuarios.js";
 import { rolesService } from "./roles.service.js";
+import { parseTurnoPlantillaSemanal, turnoService } from "./turno.service.js";
 
 export const usuarioService = {
   async list() {
@@ -20,6 +21,8 @@ export const usuarioService = {
     foto_url?: string | null;
     tipo_comision?: string;
     valor_comision?: number;
+    /** Objeto opcional con fechas, días de semana (0–6) y horario; ver `parseTurnoPlantillaSemanal`. */
+    turno_inicial?: unknown;
   }) {
     const email = params.email.trim().toLowerCase();
     if (!email || params.password.length < 6) {
@@ -40,20 +43,28 @@ export const usuarioService = {
         ? Number(params.valor_comision)
         : 0;
 
-    const row = await usuariosRepo.create({
-      email,
-      password_hash: hash,
-      nombre: params.nombre?.trim() || null,
-      rol,
-      telefono: params.telefono?.trim() || null,
-      color_agenda: params.color_agenda?.trim() || null,
-      foto_url: params.foto_url?.trim() || null,
-      tipo_comision: tipoCom,
-      valor_comision: valorCom,
+    const plantilla = parseTurnoPlantillaSemanal(params.turno_inicial);
+
+    return await db.transaction(async () => {
+      const row = await usuariosRepo.create({
+        email,
+        password_hash: hash,
+        nombre: params.nombre?.trim() || null,
+        rol,
+        telefono: params.telefono?.trim() || null,
+        color_agenda: params.color_agenda?.trim() || null,
+        foto_url: params.foto_url?.trim() || null,
+        tipo_comision: tipoCom,
+        valor_comision: valorCom,
+      });
+      let turnos_creados: number | undefined;
+      if (plantilla) {
+        turnos_creados = await turnoService.bulkSemanal(row.id, plantilla);
+      }
+      await recordSyncEvent("usuario", "creado", { id: row.id, email: row.email });
+      const { password_hash: _p, ...safe } = row;
+      return turnos_creados != null ? { ...safe, turnos_creados } : safe;
     });
-    await recordSyncEvent("usuario", "creado", { id: row.id, email: row.email });
-    const { password_hash: _p, ...safe } = row;
-    return safe;
   },
 
   async update(

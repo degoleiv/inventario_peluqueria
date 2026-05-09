@@ -22,6 +22,7 @@ import {
   type EmpleadoResumen,
   type RolDefinicion,
   type TurnoEmpleado,
+  type TurnoPlantillaInicial,
   type UsuarioListado,
 } from "../api";
 import { Drawer } from "../components/Drawer";
@@ -36,6 +37,38 @@ type Props = { onChanged?: () => void };
 function isoToday() {
   return new Date().toISOString().slice(0, 10);
 }
+
+function addDaysIso(iso: string, days: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + days);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+}
+
+function countIsoDaysInclusive(from: string, to: string): number {
+  const a = from.split("-").map(Number);
+  const b = to.split("-").map(Number);
+  const d0 = new Date(a[0], a[1] - 1, a[2]);
+  const d1 = new Date(b[0], b[1] - 1, b[2]);
+  if (d1 < d0) return -1;
+  let n = 0;
+  for (let c = new Date(d0.getTime()); c <= d1; c.setDate(c.getDate() + 1)) {
+    n++;
+    if (n > 200) return 200;
+  }
+  return n;
+}
+
+/** Orden Lun→Dom; valores como `Date.getDay()` (0 dom … 6 sáb). */
+const TURNO_DIAS_SEMANA_OPTS: { v: number; lab: string }[] = [
+  { v: 1, lab: "Lun" },
+  { v: 2, lab: "Mar" },
+  { v: 3, lab: "Mié" },
+  { v: 4, lab: "Jue" },
+  { v: 5, lab: "Vie" },
+  { v: 6, lab: "Sáb" },
+  { v: 0, lab: "Dom" },
+];
 
 function isoMonthStart() {
   const d = new Date();
@@ -85,6 +118,13 @@ export function EmpleadosPage({ onChanged }: Props) {
     foto_url: "",
     tipo_comision: "porcentaje" as "porcentaje" | "fijo",
     valor_comision: "0",
+    registrar_turnos_plantilla: true,
+    turno_fecha_desde: isoToday(),
+    turno_fecha_hasta: addDaysIso(isoToday(), 55),
+    turno_hora_inicio: "09:00",
+    turno_hora_fin: "18:00",
+    /** Días laborables iniciales: Lun–Vie */
+    turno_dias_semana: [1, 2, 3, 4, 5] as number[],
   });
 
   const [filtDesde, setFiltDesde] = useState(isoMonthStart);
@@ -191,6 +231,12 @@ export function EmpleadosPage({ onChanged }: Props) {
       foto_url: "",
       tipo_comision: "porcentaje",
       valor_comision: "0",
+      registrar_turnos_plantilla: true,
+      turno_fecha_desde: isoToday(),
+      turno_fecha_hasta: addDaysIso(isoToday(), 55),
+      turno_hora_inicio: "09:00",
+      turno_hora_fin: "18:00",
+      turno_dias_semana: [1, 2, 3, 4, 5],
     });
     setDrawerOpen(true);
   }, [defaultRol]);
@@ -208,6 +254,12 @@ export function EmpleadosPage({ onChanged }: Props) {
       tipo_comision:
         u.tipo_comision === "fijo" ? "fijo" : ("porcentaje" as const),
       valor_comision: String(u.valor_comision ?? 0),
+      registrar_turnos_plantilla: true,
+      turno_fecha_desde: isoToday(),
+      turno_fecha_hasta: addDaysIso(isoToday(), 55),
+      turno_hora_inicio: "09:00",
+      turno_hora_fin: "18:00",
+      turno_dias_semana: [1, 2, 3, 4, 5],
     });
     setDrawerOpen(true);
   }
@@ -240,7 +292,30 @@ export function EmpleadosPage({ onChanged }: Props) {
         });
         toast("Empleado actualizado.", "success");
       } else {
-        await createUsuario({
+        let turno_inicial: TurnoPlantillaInicial | undefined;
+        if (form.registrar_turnos_plantilla) {
+          if (form.turno_dias_semana.length === 0) {
+            toast("Elegí al menos un día de la semana para los turnos iniciales.", "error");
+            return;
+          }
+          const span = countIsoDaysInclusive(form.turno_fecha_desde, form.turno_fecha_hasta);
+          if (span < 0) {
+            toast("La fecha hasta no puede ser anterior a la fecha desde.", "error");
+            return;
+          }
+          if (span > 120) {
+            toast("El rango de fechas no puede superar 120 días.", "error");
+            return;
+          }
+          turno_inicial = {
+            fecha_desde: form.turno_fecha_desde,
+            fecha_hasta: form.turno_fecha_hasta,
+            dias_semana: [...form.turno_dias_semana].sort((a, b) => a - b),
+            hora_inicio: form.turno_hora_inicio.trim(),
+            hora_fin: form.turno_hora_fin.trim(),
+          };
+        }
+        const created = await createUsuario({
           email: form.email.trim(),
           password: form.password,
           nombre: form.nombre.trim() || undefined,
@@ -250,8 +325,20 @@ export function EmpleadosPage({ onChanged }: Props) {
           foto_url: form.foto_url.trim() || null,
           tipo_comision: form.tipo_comision,
           valor_comision: Number.isFinite(vc) ? vc : 0,
+          turno_inicial,
         });
-        toast("Empleado creado.", "success");
+        if (created.turnos_creados != null) {
+          if (created.turnos_creados === 0) {
+            toast(
+              "Empleado creado. No hubo fechas en el rango que coincidan con los días elegidos; podés cargar turnos en la pestaña Turnos.",
+              "info"
+            );
+          } else {
+            toast(`Empleado creado. Se registraron ${created.turnos_creados} turnos.`, "success");
+          }
+        } else {
+          toast("Empleado creado.", "success");
+        }
       }
       setDrawerOpen(false);
       void load();
@@ -1285,6 +1372,90 @@ export function EmpleadosPage({ onChanged }: Props) {
             <p className="muted small">
               Foto cargada ({form.foto_url.length > 80 ? "data:image…" : form.foto_url})
             </p>
+          ) : null}
+          {!editing ? (
+            <fieldset className="card" style={{ padding: "0.75rem", marginTop: "0.5rem", border: "1px solid var(--border)" }}>
+              <legend className="muted small" style={{ padding: "0 0.35rem" }}>
+                Horario en Turnos
+              </legend>
+              <label className="field inline-check" style={{ marginBottom: "0.5rem" }}>
+                <input
+                  type="checkbox"
+                  checked={form.registrar_turnos_plantilla}
+                  onChange={(e) =>
+                    setForm((x) => ({ ...x, registrar_turnos_plantilla: e.target.checked }))
+                  }
+                />
+                <span>Cargar turnos al guardar (mismo horario en los días elegidos)</span>
+              </label>
+              {form.registrar_turnos_plantilla ? (
+                <>
+                  <div className="field-row">
+                    <label className="field">
+                      <span>Desde</span>
+                      <input
+                        type="date"
+                        value={form.turno_fecha_desde}
+                        onChange={(e) => setForm((x) => ({ ...x, turno_fecha_desde: e.target.value }))}
+                      />
+                    </label>
+                    <label className="field">
+                      <span>Hasta</span>
+                      <input
+                        type="date"
+                        value={form.turno_fecha_hasta}
+                        onChange={(e) => setForm((x) => ({ ...x, turno_fecha_hasta: e.target.value }))}
+                      />
+                    </label>
+                  </div>
+                  <div className="field-row">
+                    <label className="field">
+                      <span>Hora inicio</span>
+                      <input
+                        type="time"
+                        value={form.turno_hora_inicio}
+                        onChange={(e) => setForm((x) => ({ ...x, turno_hora_inicio: e.target.value }))}
+                      />
+                    </label>
+                    <label className="field">
+                      <span>Hora fin</span>
+                      <input
+                        type="time"
+                        value={form.turno_hora_fin}
+                        onChange={(e) => setForm((x) => ({ ...x, turno_hora_fin: e.target.value }))}
+                      />
+                    </label>
+                  </div>
+                  <div className="field" style={{ marginBottom: "0.35rem" }}>
+                    <span className="block" style={{ marginBottom: "0.25rem" }}>
+                      Días
+                    </span>
+                    <div className="perm-grid" style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+                      {TURNO_DIAS_SEMANA_OPTS.map(({ v, lab }) => (
+                        <label key={v} className="field inline-check">
+                          <input
+                            type="checkbox"
+                            checked={form.turno_dias_semana.includes(v)}
+                            onChange={() =>
+                              setForm((x) => ({
+                                ...x,
+                                turno_dias_semana: x.turno_dias_semana.includes(v)
+                                  ? x.turno_dias_semana.filter((d) => d !== v)
+                                  : [...x.turno_dias_semana, v].sort((a, b) => a - b),
+                              }))
+                            }
+                          />
+                          <span>{lab}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <p className="muted small" style={{ margin: 0 }}>
+                    Máximo 120 días de rango. Se crea un turno por cada fecha que coincida con los días marcados.
+                  </p>
+                </>
+              ) : null}
+            </fieldset>
           ) : null}
           <div className="drawer-actions">
             <button type="submit" className="btn primary btn-lg">

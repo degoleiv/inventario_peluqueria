@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir D:GitHubinventario_peluqueriachatbot-whatsapp *)",
+      "Bash(node -c server.js)",
+      "Bash(node -c src/conversation.js)",
+      "Bash(node -c src/whatsapp.js)"
+    ]
+  }
+}

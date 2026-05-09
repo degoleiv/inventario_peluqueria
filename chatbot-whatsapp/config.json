@@ -1,0 +1,33 @@
+{
+  "business": {
+    "name": "Peluquería Estilo",
+    "phone": "+52 555 123 4567",
+    "address": "Av. Principal 123, Ciudad",
+    "timezone": "America/Mexico_City",
+    "humanAgentNumber": "+52 555 999 8888"
+  },
+  "hours": {
+    "start": 9,
+    "end": 19,
+    "slotMinutes": 30,
+    "closedDays": [0]
+  },
+  "services": [
+    { "id": "corte_caballero", "name": "Corte de caballero", "duration": 30, "price": 150 },
+    { "id": "corte_dama", "name": "Corte de dama", "duration": 45, "price": 250 },
+    { "id": "barba", "name": "Arreglo de barba", "duration": 20, "price": 100 },
+    { "id": "corte_barba", "name": "Corte + barba", "duration": 45, "price": 220 },
+    { "id": "tinte", "name": "Tinte / coloración", "duration": 90, "price": 600 },
+    { "id": "peinado", "name": "Peinado / estilizado", "duration": 30, "price": 200 }
+  ],
+  "messages": {
+    "welcome": "👋 ¡Hola! Bienvenido a *{businessName}*.\n¿En qué te puedo ayudar?",
+    "menuTitle": "Menú principal",
+    "servicesHeader": "Nuestros servicios",
+    "servicesBody": "Elige el servicio que deseas agendar:",
+    "slotsHeader": "Horarios disponibles",
+    "slotsBody": "Estos son los horarios libres para *{date}*:",
+    "humanHandoff": "Un asesor te contactará pronto. También puedes llamarnos al {humanPhone}.",
+    "fallback": "No entendí tu mensaje. Escribe *hola* para ver el menú."
+  }
+}

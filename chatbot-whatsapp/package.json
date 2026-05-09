@@ -1,0 +1,21 @@
+{
+  "name": "chatbot-whatsapp",
+  "version": "0.1.0",
+  "description": "Chatbot de agenda de citas con WhatsApp Cloud API y Google Calendar",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.7",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "googleapis": "^144.0.0",
+    "luxon": "^3.5.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

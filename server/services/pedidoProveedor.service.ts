@@ -4,7 +4,7 @@ import { productoService } from "./producto.service.js";
 
 type LineIn = Record<string, unknown>;
 
-const ESTADOS = new Set(["pendiente", "pagado", "vencido"]);
+const ESTADOS = new Set(["pendiente", "parcial", "pagado", "vencido"]);
 
 export function parseDay(v: unknown): string | null {
   if (v == null || typeof v !== "string") return null;
@@ -41,11 +41,20 @@ export function validatePedidoFechasYMontos(opts: {
   }
   const vd = opts.valor_pago_con_descuento;
   const vs = opts.valor_pago_sin_descuento;
-  if (vd != null && vd !== undefined && (!Number.isFinite(Number(vd)) || Number(vd) <= 0)) {
-    throw new AppError("El valor a pagar con descuento debe ser numérico y mayor que 0");
+  if (vd != null && vd !== undefined && (!Number.isFinite(Number(vd)) || Number(vd) < 0)) {
+    throw new AppError("El valor a pagar con descuento debe ser numérico y ≥ 0");
   }
-  if (vs != null && vs !== undefined && (!Number.isFinite(Number(vs)) || Number(vs) <= 0)) {
-    throw new AppError("El valor a pagar sin descuento debe ser numérico y mayor que 0");
+  if (vs != null && vs !== undefined && (!Number.isFinite(Number(vs)) || Number(vs) < 0)) {
+    throw new AppError("El valor a pagar sin descuento debe ser numérico y ≥ 0");
+  }
+  if (
+    vd != null &&
+    vs != null &&
+    Number.isFinite(Number(vd)) &&
+    Number.isFinite(Number(vs)) &&
+    Number(vd) > Number(vs)
+  ) {
+    throw new AppError("El valor con descuento no puede ser mayor al valor sin descuento");
   }
 }
 
@@ -53,6 +62,7 @@ export function validatePedidoFechasYMontos(opts: {
 export function indicadorPago(row: Record<string, unknown>): string {
   const estado = String(row.estado ?? "pendiente");
   if (estado === "pagado") return "pagado";
+  if (estado === "parcial") return "parcial";
   const today = new Date().toISOString().slice(0, 10);
   const fp = fechaPedidoNorm(String(row.fecha ?? ""));
   const fd = parseDay(row.fecha_pago_con_descuento as string | null);
@@ -73,6 +83,62 @@ function enrichRow(row: Record<string, unknown>) {
 }
 
 export const pedidoProveedorService = {
+  async listProductosAsociados(proveedorId: number, q?: string, limit = 300) {
+    const pid = Number(proveedorId);
+    if (!Number.isFinite(pid) || pid <= 0) {
+      throw new AppError("proveedor_id inválido");
+    }
+    const max = Math.min(Math.max(Math.floor(Number(limit) || 300), 1), 1000);
+    const query = (q ?? "").trim().toLowerCase();
+
+    const whereSearch = query
+      ? ` AND (
+          LOWER(COALESCE(p.nombre, '')) LIKE ? OR
+          LOWER(COALESCE(p.codigo_barras, '')) LIKE ? OR
+          LOWER(COALESCE(p.marca, '')) LIKE ?
+        )`
+      : "";
+    const args: unknown[] = [pid, pid];
+    if (query) {
+      const like = `%${query}%`;
+      args.push(like, like, like);
+    }
+    args.push(max);
+
+    return db
+      .prepare(
+        `SELECT
+            p.id,
+            p.codigo_barras,
+            p.nombre,
+            p.marca,
+            p.categoria,
+            p.descripcion,
+            p.imagen_url,
+            p.stock,
+            p.precio,
+            p.precio_compra,
+            p.precio_venta,
+            p.stock_minimo,
+            p.fecha_vencimiento,
+            p.proveedor_id,
+            p.created_at,
+            p.updated_at
+         FROM productos p
+         WHERE (
+           p.proveedor_id = ?
+           OR EXISTS (
+             SELECT 1 FROM pedido_proveedor_lineas ppl
+             JOIN pedidos_proveedor pp ON pp.id = ppl.pedido_proveedor_id
+             WHERE ppl.producto_id = p.id AND pp.proveedor_id = ?
+           )
+         )${whereSearch}
+         ORDER BY p.updated_at DESC
+         LIMIT ?`
+      )
+      .all(...args);
+  },
+
   async list(desde?: string, hasta?: string) {
     let sql = `SELECT co.*, pr.nombre AS proveedor_nombre_ref
                FROM pedidos_proveedor co

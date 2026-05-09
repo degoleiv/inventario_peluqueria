@@ -47,6 +47,8 @@ export type Producto = {
   precio_venta: number | null;
   stock_minimo: number | null;
   fecha_vencimiento: string | null;
+  /** Proveedor preferente (catálogo / alta desde pedido). */
+  proveedor_id?: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -377,8 +379,30 @@ export async function fetchProductos(): Promise<Producto[]> {
   return requestJson("/api/productos");
 }
 
+export async function fetchProductosPorProveedor(
+  proveedorId: number,
+  opts?: { q?: string; limit?: number }
+): Promise<Producto[]> {
+  const q = new URLSearchParams();
+  if (opts?.q?.trim()) q.set("q", opts.q.trim());
+  if (opts?.limit != null && Number.isFinite(opts.limit)) q.set("limit", String(Math.floor(opts.limit)));
+  const suffix = q.toString() ? `?${q.toString()}` : "";
+  return requestJson(`/api/proveedores/${proveedorId}/productos${suffix}`);
+}
+
 export async function createProducto(body: Partial<Producto>): Promise<Producto> {
   return requestJson("/api/productos", { method: "POST", body: JSON.stringify(body) });
+}
+
+/** Alta desde flujo de pedidos: asocia `proveedor_id` al proveedor de la URL (permiso `pedidos`). */
+export async function createProductoRapidoDesdePedido(
+  proveedorId: number,
+  body: Record<string, unknown>
+): Promise<Producto> {
+  return requestJson(`/api/proveedores/${proveedorId}/productos-rapido`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
 }
 
 export async function updateProducto(id: number, body: Partial<Producto>): Promise<Producto> {

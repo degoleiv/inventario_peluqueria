@@ -19,7 +19,7 @@ export const productoService = {
       .prepare(
         `SELECT id, codigo_barras, nombre, marca, categoria, descripcion, imagen_url,
                 stock, precio, precio_compra, precio_venta, stock_minimo, fecha_vencimiento,
-                created_at, updated_at
+                proveedor_id, created_at, updated_at
          FROM productos ORDER BY updated_at DESC`
       )
       .all();
@@ -59,13 +59,22 @@ export const productoService = {
       if (dup) throw new AppError("Ya existe un producto con ese código de barras");
     }
 
+    let proveedor_id: number | null = null;
+    if (body.proveedor_id != null && body.proveedor_id !== "") {
+      const pid = Number(body.proveedor_id);
+      if (!Number.isFinite(pid) || pid <= 0) throw new AppError("proveedor_id inválido");
+      const pr = await db.prepare(`SELECT id FROM proveedores WHERE id = ?`).get(pid);
+      if (!pr) throw new AppError("Proveedor no encontrado");
+      proveedor_id = pid;
+    }
+
     const info = await db
       .prepare(
         `INSERT INTO productos (
           codigo_barras, nombre, marca, categoria, descripcion, imagen_url,
           stock, precio, precio_compra, precio_venta, stock_minimo, fecha_vencimiento,
-          created_at, updated_at
-        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+          proveedor_id, created_at, updated_at
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
       )
       .run(
         codigo,
@@ -82,6 +91,7 @@ export const productoService = {
         typeof body.fecha_vencimiento === "string" && body.fecha_vencimiento.trim()
           ? body.fecha_vencimiento.trim()
           : null,
+        proveedor_id,
         now,
         now
       );
@@ -137,13 +147,27 @@ export const productoService = {
         ? Math.max(0, Math.floor(body.stock))
         : Number(existing.stock);
 
+    let proveedor_id =
+      body.proveedor_id !== undefined
+        ? body.proveedor_id === null || body.proveedor_id === ""
+          ? null
+          : Number(body.proveedor_id)
+        : (existing.proveedor_id as number | null | undefined) ?? null;
+    if (body.proveedor_id !== undefined && proveedor_id != null) {
+      if (!Number.isFinite(proveedor_id) || proveedor_id <= 0) {
+        throw new AppError("proveedor_id inválido");
+      }
+      const pr = await db.prepare(`SELECT id FROM proveedores WHERE id = ?`).get(proveedor_id);
+      if (!pr) throw new AppError("Proveedor no encontrado");
+    }
+
     const now = new Date().toISOString();
     await db
       .prepare(
         `UPDATE productos SET
         codigo_barras = ?, nombre = ?, marca = ?, categoria = ?, descripcion = ?, imagen_url = ?,
         stock = ?, precio = ?, precio_compra = ?, precio_venta = ?, stock_minimo = ?, fecha_vencimiento = ?,
-        updated_at = ?
+        proveedor_id = ?, updated_at = ?
        WHERE id = ?`
       )
       .run(
@@ -161,6 +185,7 @@ export const productoService = {
         typeof body.fecha_vencimiento === "string"
           ? body.fecha_vencimiento.trim() || null
           : existing.fecha_vencimiento,
+        proveedor_id,
         now,
         id
       );

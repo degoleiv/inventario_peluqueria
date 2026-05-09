@@ -107,7 +107,7 @@ export const proveedorRepository = {
           `INSERT INTO proveedores (
             nombre, nit, telefono, email, direccion, icono_url, estado,
             fecha_creacion, fecha_actualizacion, created_at
-          ) VALUES (?,?,?,?,?,?,?,?,?,?,?)`
+          ) VALUES (?,?,?,?,?,?,?,?,?,?)`
         )
         .run(
           row.nombre,

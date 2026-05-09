@@ -15,6 +15,7 @@ import { CitasPage } from "./pages/CitasPage";
 import { VentasPage } from "./pages/VentasPage";
 import { VentaClienteDisplayPage } from "./pages/VentaClienteDisplayPage";
 import { PedidosModulePage } from "./pages/PedidosModulePage";
+import { ProveedoresPage } from "./pages/ProveedoresPage";
 import { FinanzasPage } from "./pages/FinanzasPage";
 import { ReportesPage } from "./pages/ReportesPage";
 import { ConfiguracionPage } from "./pages/ConfiguracionPage";
@@ -42,7 +43,6 @@ import {
   readConfigTab,
   readEmpleadosTab,
   readLastTab,
-  readPedidosTab,
 } from "./lib/moduleRoutes";
 export function AuthenticatedShell() {
   const navigate = useNavigate();
@@ -343,13 +343,13 @@ export function AuthenticatedRoutes() {
           element={<Navigate to={`/clientes/${readLastTab("clientes", "lista")}`} replace />}
         />
         <Route path="clientes/:tab" element={<ClientesPage />} />
-        <Route path="compras" element={<Navigate to="/pedidos/pedidos-proveedores" replace />} />
-        <Route path="proveedores" element={<Navigate to="/pedidos/proveedores" replace />} />
+        <Route path="compras" element={<Navigate to="/pedidos" replace />} />
+        <Route path="proveedores" element={<ProveedoresPage />} />
         <Route
           path="pedidos-proveedores"
-          element={<Navigate to="/pedidos/pedidos-proveedores" replace />}
+          element={<Navigate to="/pedidos" replace />}
         />
-        <Route path="pedidos" element={<Navigate to={`/pedidos/${readPedidosTab()}`} replace />} />
+        <Route path="pedidos" element={<PedidosModulePage />} />
         <Route path="pedidos/:tab" element={<PedidosModulePage />} />
         <Route path="finanzas" element={<FinanzasPage />} />
         <Route path="facturas" element={<Navigate to="/finanzas" replace />} />

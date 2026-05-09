@@ -95,6 +95,8 @@ export function EmpleadosPage({ onChanged }: Props) {
   const [movimientosRows, setMovimientosRows] = useState<EmpleadoMovimiento[]>([]);
   const [resumenEmp, setResumenEmp] = useState<EmpleadoResumen | null>(null);
 
+  const [turnoDrawerOpen, setTurnoDrawerOpen] = useState(false);
+  const [turnoDrawerBusy, setTurnoDrawerBusy] = useState(false);
   const [turnoForm, setTurnoForm] = useState({
     empleado_id: "" as number | "",
     fecha: isoToday(),
@@ -436,6 +438,10 @@ export function EmpleadosPage({ onChanged }: Props) {
   }, [tabParam, loadTurnos]);
 
   useEffect(() => {
+    if (tabParam !== "turnos") setTurnoDrawerOpen(false);
+  }, [tabParam]);
+
+  useEffect(() => {
     if (tabParam !== "movimientos") return;
     void loadMovimientosTab();
   }, [tabParam, loadMovimientosTab]);
@@ -648,89 +654,46 @@ export function EmpleadosPage({ onChanged }: Props) {
       ) : null}
 
       {tab === "turnos" ? (
-        <section className="card">
-          <div className="card-head">
-            <h2 className="card-title">Turnos</h2>
-            <button type="button" className="btn ghost small" onClick={() => void loadTurnos()}>
-              Actualizar
-            </button>
-          </div>
-          <p className="hint">
-            Horarios laborales por empleado. No se permiten solapes el mismo día. Usá HH:MM (ej. 09:00).
-          </p>
-          <div className="field-row" style={{ marginBottom: "1rem", flexWrap: "wrap" }}>
-            <label className="field">
-              <span>Desde</span>
-              <input
-                type="date"
-                value={filtDesde}
-                onChange={(e) => setFiltDesde(e.target.value)}
-              />
-            </label>
-            <label className="field">
-              <span>Hasta</span>
-              <input
-                type="date"
-                value={filtHasta}
-                onChange={(e) => setFiltHasta(e.target.value)}
-              />
-            </label>
-            <label className="field">
-              <span>Empleado</span>
-              <select
-                value={filtUsuario === "" ? "" : String(filtUsuario)}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setFiltUsuario(v === "" ? "" : Number(v));
-                }}
-              >
-                <option value="">Todos</option>
-                {usuarios.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.nombre || u.email}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <form
-            className="form"
-            style={{ marginBottom: "1.25rem", padding: "1rem", background: "var(--panel)" }}
-            onSubmit={async (e) => {
-              e.preventDefault();
-              if (turnoForm.empleado_id === "") {
-                toast("Elegí empleado.", "warning");
-                return;
-              }
-              try {
-                await createTurnoEmpleado({
-                  empleado_id: Number(turnoForm.empleado_id),
-                  fecha: turnoForm.fecha,
-                  hora_inicio: turnoForm.hora_inicio,
-                  hora_fin: turnoForm.hora_fin,
-                  estado: turnoForm.estado,
-                });
-                toast("Turno creado.", "success");
-                void loadTurnos();
-              } catch (err) {
-                toast(err instanceof Error ? err.message : "Error", "error");
-              }
-            }}
-          >
-            <div className="field-row" style={{ flexWrap: "wrap" }}>
+        <>
+          <section className="card">
+            <div className="card-head">
+              <h2 className="card-title">Turnos</h2>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexShrink: 0 }}>
+                <button type="button" className="btn ghost small" onClick={() => void loadTurnos()}>
+                  Actualizar
+                </button>
+                <button
+                  type="button"
+                  className="btn primary small"
+                  onClick={() => {
+                    setTurnoForm({
+                      empleado_id: typeof filtUsuario === "number" ? filtUsuario : "",
+                      fecha: isoToday(),
+                      hora_inicio: "09:00",
+                      hora_fin: "13:00",
+                      estado: "activo",
+                    });
+                    setTurnoDrawerOpen(true);
+                  }}
+                >
+                  Agregar turno
+                </button>
+              </div>
+            </div>
+            <p className="hint">
+              Horarios laborales por empleado. No se permiten solapes el mismo día. Usá HH:MM (ej. 09:00).
+            </p>
+            <div className="field-row" style={{ marginBottom: "1rem", flexWrap: "wrap" }}>
               <label className="field">
                 <span>Empleado</span>
                 <select
-                  required
-                  value={turnoForm.empleado_id === "" ? "" : String(turnoForm.empleado_id)}
-                  onChange={(e) =>
-                    setTurnoForm((x) => ({
-                      ...x,
-                      empleado_id: e.target.value === "" ? "" : Number(e.target.value),
-                    }))
-                  }
+                  value={filtUsuario === "" ? "" : String(filtUsuario)}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setFiltUsuario(v === "" ? "" : Number(v));
+                  }}
                 >
-                  <option value="">—</option>
+                  <option value="">Todos</option>
                   {usuarios.map((u) => (
                     <option key={u.id} value={u.id}>
                       {u.nombre || u.email}
@@ -739,50 +702,23 @@ export function EmpleadosPage({ onChanged }: Props) {
                 </select>
               </label>
               <label className="field">
-                <span>Fecha</span>
+                <span>Desde</span>
                 <input
                   type="date"
-                  value={turnoForm.fecha}
-                  onChange={(e) => setTurnoForm((x) => ({ ...x, fecha: e.target.value }))}
+                  value={filtDesde}
+                  onChange={(e) => setFiltDesde(e.target.value)}
                 />
               </label>
               <label className="field">
-                <span>Inicio</span>
+                <span>Hasta</span>
                 <input
-                  value={turnoForm.hora_inicio}
-                  onChange={(e) => setTurnoForm((x) => ({ ...x, hora_inicio: e.target.value }))}
-                  placeholder="09:00"
+                  type="date"
+                  value={filtHasta}
+                  onChange={(e) => setFiltHasta(e.target.value)}
                 />
-              </label>
-              <label className="field">
-                <span>Fin</span>
-                <input
-                  value={turnoForm.hora_fin}
-                  onChange={(e) => setTurnoForm((x) => ({ ...x, hora_fin: e.target.value }))}
-                  placeholder="17:00"
-                />
-              </label>
-              <label className="field">
-                <span>Estado</span>
-                <select
-                  value={turnoForm.estado}
-                  onChange={(e) =>
-                    setTurnoForm((x) => ({
-                      ...x,
-                      estado: e.target.value as "activo" | "finalizado",
-                    }))
-                  }
-                >
-                  <option value="activo">activo</option>
-                  <option value="finalizado">finalizado</option>
-                </select>
               </label>
             </div>
-            <button type="submit" className="btn primary">
-              Agregar turno
-            </button>
-          </form>
-          <div className="table-wrap">
+            <div className="table-wrap">
             <table className="table">
               <thead>
                 <tr>
@@ -826,6 +762,117 @@ export function EmpleadosPage({ onChanged }: Props) {
             </table>
           </div>
         </section>
+
+        <Drawer
+          open={turnoDrawerOpen}
+          onClose={() => {
+            if (turnoDrawerBusy) return;
+            setTurnoDrawerOpen(false);
+          }}
+          title="Nuevo turno"
+        >
+          <form
+            className="form drawer-form"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (turnoForm.empleado_id === "") {
+                toast("Elegí empleado.", "warning");
+                return;
+              }
+              setTurnoDrawerBusy(true);
+              try {
+                await createTurnoEmpleado({
+                  empleado_id: Number(turnoForm.empleado_id),
+                  fecha: turnoForm.fecha,
+                  hora_inicio: turnoForm.hora_inicio,
+                  hora_fin: turnoForm.hora_fin,
+                  estado: turnoForm.estado,
+                });
+                toast("Turno creado.", "success");
+                setTurnoDrawerOpen(false);
+                void loadTurnos();
+              } catch (err) {
+                toast(err instanceof Error ? err.message : "Error", "error");
+              } finally {
+                setTurnoDrawerBusy(false);
+              }
+            }}
+          >
+            <label className="field">
+              <span>Empleado</span>
+              <select
+                required
+                value={turnoForm.empleado_id === "" ? "" : String(turnoForm.empleado_id)}
+                onChange={(e) =>
+                  setTurnoForm((x) => ({
+                    ...x,
+                    empleado_id: e.target.value === "" ? "" : Number(e.target.value),
+                  }))
+                }
+              >
+                <option value="">—</option>
+                {usuarios.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.nombre || u.email}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>Fecha</span>
+              <input
+                type="date"
+                value={turnoForm.fecha}
+                onChange={(e) => setTurnoForm((x) => ({ ...x, fecha: e.target.value }))}
+              />
+            </label>
+            <label className="field">
+              <span>Hora inicio</span>
+              <input
+                value={turnoForm.hora_inicio}
+                onChange={(e) => setTurnoForm((x) => ({ ...x, hora_inicio: e.target.value }))}
+                placeholder="09:00"
+              />
+            </label>
+            <label className="field">
+              <span>Hora fin</span>
+              <input
+                value={turnoForm.hora_fin}
+                onChange={(e) => setTurnoForm((x) => ({ ...x, hora_fin: e.target.value }))}
+                placeholder="17:00"
+              />
+            </label>
+            <label className="field">
+              <span>Estado</span>
+              <select
+                value={turnoForm.estado}
+                onChange={(e) =>
+                  setTurnoForm((x) => ({
+                    ...x,
+                    estado: e.target.value as "activo" | "finalizado",
+                  }))
+                }
+              >
+                <option value="activo">activo</option>
+                <option value="finalizado">finalizado</option>
+              </select>
+            </label>
+            <div className="drawer-actions">
+              <button
+                type="button"
+                className="btn ghost"
+                disabled={turnoDrawerBusy}
+                onClick={() => setTurnoDrawerOpen(false)}
+              >
+                Cancelar
+              </button>
+              <button type="submit" className="btn primary btn-lg" disabled={turnoDrawerBusy}>
+                {turnoDrawerBusy ? "Guardando…" : "Guardar"}
+              </button>
+            </div>
+          </form>
+        </Drawer>
+        </>
       ) : null}
 
       {tab === "movimientos" ? (

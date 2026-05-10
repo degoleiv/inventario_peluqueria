@@ -32,7 +32,6 @@ export function InventarioPage() {
   const toast = useToast();
   const [productos, setProductos] = useState<Producto[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   const [codigo, setCodigo] = useState("");
   const [nombre, setNombre] = useState("");
@@ -78,17 +77,16 @@ export function InventarioPage() {
   }, []);
 
   const load = useCallback(async () => {
-    setError(null);
     setLoading(true);
     try {
       const rows = await fetchProductos();
       setProductos(rows);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al cargar productos");
+      toast(e instanceof Error ? e.message : "Error al cargar productos", "error");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     void load();
@@ -196,7 +194,6 @@ export function InventarioPage() {
       stock_minimo: stockMinimo === "" ? undefined : Number(stockMinimo),
       fecha_vencimiento: fechaVencimiento.trim() || null,
     };
-    setError(null);
     try {
       if (editingId != null) {
         await updateProducto(editingId, body);
@@ -207,8 +204,7 @@ export function InventarioPage() {
       cerrarDrawer();
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al guardar");
-      toast(err instanceof Error ? err.message : "Error", "error");
+      toast(err instanceof Error ? err.message : "Error al guardar", "error");
     }
   }
 
@@ -233,7 +229,6 @@ export function InventarioPage() {
     e.preventDefault();
     if (ajustePid <= 0 || ajusteReal === "") return;
     setAjusteMsg(null);
-    setError(null);
     try {
       await registrarAjusteStock({
         producto_id: ajustePid,
@@ -245,12 +240,11 @@ export function InventarioPage() {
       setAjusteMotivo("");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error en ajuste");
+      toast(err instanceof Error ? err.message : "Error en ajuste", "error");
     }
   }
 
   async function duplicarProducto(p: Producto) {
-    setError(null);
     try {
       await createProducto({
         codigo_barras: null,
@@ -268,8 +262,7 @@ export function InventarioPage() {
       toast("Producto duplicado", "success");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al duplicar");
-      toast(err instanceof Error ? err.message : "Error", "error");
+      toast(err instanceof Error ? err.message : "Error al duplicar", "error");
     }
   }
 
@@ -313,7 +306,6 @@ export function InventarioPage() {
   async function onEliminarProducto(p: Producto) {
     if (!window.confirm("¿Eliminar este producto?")) return;
     const snapshot = p;
-    setError(null);
     setProductos((rows) => rows.filter((x) => x.id !== p.id));
     if (editingId === p.id) resetForm();
     try {
@@ -348,7 +340,6 @@ export function InventarioPage() {
       await load();
     } catch (err) {
       setProductos((rows) => [...rows, snapshot].sort((a, b) => a.id - b.id));
-      setError(err instanceof Error ? err.message : "Error al eliminar");
       toast(err instanceof Error ? err.message : "Error al eliminar", "error");
     }
   }
@@ -381,12 +372,6 @@ export function InventarioPage() {
 
   return (
     <>
-      {error ? (
-        <div className="banner banner-error" role="alert">
-          {error}
-        </div>
-      ) : null}
-
       <SubNav
         moduleId="inventario"
         items={[

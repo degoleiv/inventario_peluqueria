@@ -1,12 +1,16 @@
-<<<<<<< Updated upstream
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-=======
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import { Check, MagnifyingGlass, Plus, Truck } from "@phosphor-icons/react";
->>>>>>> Stashed changes
 import {
   createPedidoProveedor,
+  createProducto,
   fetchPedidosProveedores,
   fetchProductos,
   fetchProveedores,
@@ -15,32 +19,60 @@ import {
   type Producto,
   type Proveedor,
 } from "../api";
-
-type Modo = "existente" | "nuevo";
+import { Drawer } from "../components/Drawer";
+import { useToast } from "../context/ToastContext";
+import { ProveedoresPage } from "./ProveedoresPage";
 
 type Linea = {
-  modo: Modo;
   producto_id: number;
   cantidad: number;
   costo_unitario: number | "";
-  actualizar_precios: boolean;
-  precio_venta_lista: number | "";
-  nuevo_nombre: string;
-  nuevo_precio_venta: number | "";
-  nuevo_codigo: string;
 };
 
-const lineaVacia = (): Linea => ({
-  modo: "existente",
-  producto_id: 0,
-  cantidad: 1,
-  costo_unitario: "",
-  actualizar_precios: true,
-  precio_venta_lista: "",
-  nuevo_nombre: "",
-  nuevo_precio_venta: "",
-  nuevo_codigo: "",
-});
+type VistaTab = "pedido" | "proveedores" | "historial";
+
+const pasos = ["Proveedor", "Productos", "Pagos", "Resumen y notas"] as const;
+
+/** Línea sin producto ni costo (p. ej. si se deselecciona el producto en el selector). */
+function isLineaPlaceholderExistente(ln: Linea): boolean {
+  return !ln.producto_id && ln.costo_unitario === "";
+}
+
+function fechaLocalISO(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+const moneyEsAr = new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" });
+
+function roundMoney2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+function matchesProveedorSearch(p: Proveedor, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return (
+    p.nombre.toLowerCase().includes(q) ||
+    p.nit.toLowerCase().includes(q) ||
+    (p.telefono ?? "").toLowerCase().includes(q) ||
+    (p.email ?? "").toLowerCase().includes(q)
+  );
+}
+
+function matchesProductoSearch(p: Producto, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return (
+    p.nombre.toLowerCase().includes(q) ||
+    (p.marca ?? "").toLowerCase().includes(q) ||
+    (p.codigo_barras ?? "").toLowerCase().includes(q) ||
+    (p.categoria ?? "").toLowerCase().includes(q)
+  );
+}
 
 function labelIndicador(k: string | undefined): string {
   switch (k) {
@@ -63,31 +95,10 @@ function labelIndicador(k: string | undefined): string {
   }
 }
 
-<<<<<<< Updated upstream
-=======
-const moneyEsAr = new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" });
-
-function roundMoney2(n: number): number {
-  return Math.round(n * 100) / 100;
-}
-
-function matchesProveedorSearch(p: Proveedor, query: string): boolean {
-  const q = query.trim().toLowerCase();
-  if (!q) return true;
-  return (
-    p.nombre.toLowerCase().includes(q) ||
-    p.nit.toLowerCase().includes(q) ||
-    (p.telefono ?? "").toLowerCase().includes(q) ||
-    (p.email ?? "").toLowerCase().includes(q)
-  );
-}
-
 function labelEstadoPago(estado: string): string {
   switch (estado) {
     case "pendiente":
       return "Pendiente";
-    case "parcial":
-      return "Parcial";
     case "pagado":
       return "Pagado";
     case "vencido":
@@ -114,25 +125,40 @@ function ProveedorSelectableMedia({ proveedor }: { proveedor: Proveedor }) {
   );
 }
 
->>>>>>> Stashed changes
 export function PedidosProveedoresPage() {
+  const toast = useToast();
+  const resumenFocusRef = useRef<HTMLDivElement | null>(null);
+  const prevWizardStepRef = useRef(0);
+  const [bloqueoRegistrarPedido, setBloqueoRegistrarPedido] = useState(false);
   const [pedidos, setPedidos] = useState<PedidoProveedor[]>([]);
   const [productos, setProductos] = useState<Producto[]>([]);
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [okMsg, setOkMsg] = useState<string | null>(null);
+
+  const [vistaTab, setVistaTab] = useState<VistaTab>("pedido");
+  const [wizardStep, setWizardStep] = useState(0);
+  const [proveedorSearch, setProveedorSearch] = useState("");
+  const [productoSearch, setProductoSearch] = useState("");
 
   const [proveedorId, setProveedorId] = useState<number | "">("");
-  const [fechaPedido, setFechaPedido] = useState(() => new Date().toISOString().slice(0, 10));
+  const [fechaPedido, setFechaPedido] = useState(fechaLocalISO);
   const [fechaPagoDesc, setFechaPagoDesc] = useState("");
   const [fechaPagoMax, setFechaPagoMax] = useState("");
   const [valorDesc, setValorDesc] = useState<number | "">("");
   const [valorSinDesc, setValorSinDesc] = useState<number | "">("");
+  const [valorSinDescManual, setValorSinDescManual] = useState(false);
+  const [tieneDescuento, setTieneDescuento] = useState(false);
   const [estadoNuevo, setEstadoNuevo] = useState("pendiente");
   const [notas, setNotas] = useState("");
   const [referencia, setReferencia] = useState("");
-  const [lineas, setLineas] = useState<Linea[]>([lineaVacia()]);
+  const [lineas, setLineas] = useState<Linea[]>([]);
+
+  const [drawerNuevoProducto, setDrawerNuevoProducto] = useState(false);
+  const [nuevoProdBusy, setNuevoProdBusy] = useState(false);
+  const [nuevoNombre, setNuevoNombre] = useState("");
+  const [nuevoCodigo, setNuevoCodigo] = useState("");
+  const [nuevoPrecioCompra, setNuevoPrecioCompra] = useState<number | "">("");
+  const [nuevoPrecioVenta, setNuevoPrecioVenta] = useState<number | "">("");
 
   const [edit, setEdit] = useState<PedidoProveedor | null>(null);
   const [editFecha, setEditFecha] = useState("");
@@ -146,7 +172,6 @@ export function PedidosProveedoresPage() {
   const [editBusy, setEditBusy] = useState(false);
 
   const load = useCallback(async () => {
-    setError(null);
     setLoading(true);
     try {
       const [p, pr, prod] = await Promise.all([
@@ -158,15 +183,27 @@ export function PedidosProveedoresPage() {
       setProveedores(pr);
       setProductos(prod);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
+      toast(e instanceof Error ? e.message : "Error", "error");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  /** Tras Pagos → Resumen el botón primario pasa de «Siguiente» a «Registrar» en el mismo lugar: evitamos doble clic accidental. */
+  useLayoutEffect(() => {
+    if (wizardStep === 3 && prevWizardStepRef.current === 2) {
+      resumenFocusRef.current?.focus({ preventScroll: false });
+      setBloqueoRegistrarPedido(true);
+      const t = window.setTimeout(() => setBloqueoRegistrarPedido(false), 500);
+      prevWizardStepRef.current = wizardStep;
+      return () => clearTimeout(t);
+    }
+    prevWizardStepRef.current = wizardStep;
+  }, [wizardStep]);
 
   useEffect(() => {
     if (!edit) return;
@@ -182,90 +219,121 @@ export function PedidosProveedoresPage() {
     [proveedores]
   );
 
+  const proveedoresActivosFiltrados = useMemo(
+    () => proveedoresActivos.filter((p) => matchesProveedorSearch(p, proveedorSearch)),
+    [proveedoresActivos, proveedorSearch]
+  );
+
+  const proveedorSeleccionado = useMemo(
+    () => (proveedorId === "" ? undefined : proveedores.find((p) => p.id === proveedorId)),
+    [proveedorId, proveedores]
+  );
+
+  const productosCatalogoProveedor = useMemo(() => {
+    if (proveedorId === "") return productos;
+    const id = Number(proveedorId);
+    return productos.filter((p) => p.proveedor_id == null || p.proveedor_id === id);
+  }, [productos, proveedorId]);
+
+  const productosFiltrados = useMemo(
+    () => productosCatalogoProveedor.filter((p) => matchesProductoSearch(p, productoSearch)),
+    [productosCatalogoProveedor, productoSearch]
+  );
+
+  const totalGeneralPedido = useMemo(() => {
+    let sum = 0;
+    for (const ln of lineas) {
+      const unit = ln.costo_unitario === "" ? NaN : Number(ln.costo_unitario);
+      const qty = Math.max(1, Number(ln.cantidad) || 1);
+      if (!Number.isFinite(unit) || unit < 0) continue;
+      sum += qty * unit;
+    }
+    return sum;
+  }, [lineas]);
+
+  useEffect(() => {
+    if (valorSinDescManual) return;
+    const t = roundMoney2(totalGeneralPedido);
+    setValorSinDesc(t > 0 ? t : "");
+  }, [totalGeneralPedido, valorSinDescManual]);
+
   function setLinea(i: number, patch: Partial<Linea>) {
     setLineas((prev) => prev.map((l, j) => (j === i ? { ...l, ...patch } : l)));
   }
 
-  function addLinea() {
-    setLineas((prev) => [...prev, lineaVacia()]);
+  function openDrawerNuevoProducto() {
+    if (proveedorId === "") {
+      toast("Elegí un proveedor en el paso 1.", "warning");
+      return;
+    }
+    setNuevoNombre("");
+    setNuevoCodigo("");
+    setNuevoPrecioCompra("");
+    setNuevoPrecioVenta("");
+    setDrawerNuevoProducto(true);
+  }
+
+  async function guardarNuevoProducto(e: FormEvent) {
+    e.preventDefault();
+    if (proveedorId === "") return;
+    const nom = nuevoNombre.trim();
+    if (!nom) {
+      toast("El nombre es obligatorio.", "warning");
+      return;
+    }
+    const pc = nuevoPrecioCompra === "" ? NaN : Number(nuevoPrecioCompra);
+    if (!Number.isFinite(pc) || pc < 0) {
+      toast("Indicá un precio de compra válido (≥ 0).", "warning");
+      return;
+    }
+    const pvRaw = nuevoPrecioVenta === "" ? NaN : Number(nuevoPrecioVenta);
+    const pv = Number.isFinite(pvRaw) && pvRaw >= 0 ? pvRaw : pc;
+    if (pv < pc) {
+      toast("El precio de venta debe ser mayor o igual al de compra.", "warning");
+      return;
+    }
+    setNuevoProdBusy(true);
+    try {
+      const created = await createProducto({
+        nombre: nom,
+        codigo_barras: nuevoCodigo.trim() || null,
+        precio_compra: pc,
+        precio_venta: pv,
+        proveedor_id: Number(proveedorId),
+        stock: 0,
+      });
+      await load();
+      addProductoExistente({ ...created, proveedor_id: created.proveedor_id ?? Number(proveedorId) });
+      toast("Producto creado en el catálogo del proveedor y sumado al pedido.", "success");
+      setDrawerNuevoProducto(false);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "No se pudo crear el producto", "error");
+    } finally {
+      setNuevoProdBusy(false);
+    }
   }
 
   function removeLinea(i: number) {
     setLineas((prev) => prev.filter((_, j) => j !== i));
   }
 
-<<<<<<< Updated upstream
-  async function onPedidoSubmit(e: React.FormEvent) {
-=======
   function addProductoExistente(producto: Producto) {
     setLineas((prev) => {
-      const idx = prev.findIndex((ln) => ln.modo === "existente" && ln.producto_id === producto.id);
+      const idx = prev.findIndex((ln) => ln.producto_id === producto.id);
       if (idx >= 0) {
         return prev.map((ln, i) =>
           i === idx ? { ...ln, cantidad: Math.max(1, Number(ln.cantidad) || 1) + 1 } : ln
         );
       }
-      return [
-        ...prev,
-        {
-          ...lineaVacia(),
-          modo: "existente",
-          producto_id: producto.id,
-          cantidad: 1,
-          costo_unitario: Number(producto.precio_compra ?? producto.precio ?? 0),
-        },
-      ];
-    });
-  }
-
-  function openProductoRapidoModal() {
-    if (proveedorId === "") {
-      setError("Seleccioná un proveedor en el paso 1 antes de crear un producto.");
-      return;
-    }
-    setError(null);
-    setProductoRapidoForm(emptyProductoCatalogoFields());
-    setProductoRapidoModalOpen(true);
-  }
-
-  async function onGuardarProductoRapido(e: React.FormEvent) {
-    e.preventDefault();
-    if (proveedorId === "") {
-      setError("Seleccioná un proveedor en el paso 1.");
-      return;
-    }
-    if (!productoRapidoForm.nombre.trim()) {
-      setError("El nombre del producto es obligatorio.");
-      return;
-    }
-    setProductoRapidoBusy(true);
-    setError(null);
-    try {
-      const body = {
-        ...catalogoFieldsToCreateBody(productoRapidoForm),
-        codigo_barras: null,
-        imagen_url: null,
-        fecha_vencimiento: null,
-        precio_venta: null,
-        marca: null,
-        stock: 0,
-        stock_minimo: undefined,
+      const nueva: Linea = {
+        producto_id: producto.id,
+        cantidad: 1,
+        costo_unitario: Number(producto.precio_compra ?? producto.precio ?? 0),
       };
-      const created = await createProductoRapidoDesdePedido(proveedorId, body);
-      setProductosProveedor((prev) => {
-        const rest = prev.filter((p) => p.id !== created.id);
-        return [created, ...rest];
-      });
-      addProductoExistente(created);
-      toast("Producto creado y asociado al proveedor", "success");
-      setProductoRapidoModalOpen(false);
-      setProductoRapidoForm(emptyProductoCatalogoFields());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo crear el producto");
-      toast(err instanceof Error ? err.message : "Error al crear producto", "error");
-    } finally {
-      setProductoRapidoBusy(false);
-    }
+      // Quitar filas placeholder (sin producto ni costo) para no dejar líneas inválidas junto a la nueva.
+      const sinPlaceholders = prev.filter((ln) => !isLineaPlaceholderExistente(ln));
+      return [...sinPlaceholders, nueva];
+    });
   }
 
   function validateLineas(): string | null {
@@ -276,15 +344,16 @@ export function PedidosProveedoresPage() {
       if (!Number.isFinite(cant) || cant <= 0 || !Number.isFinite(costo) || costo < 0) {
         return "Revisá cantidad y costo en cada línea.";
       }
-      if (ln.modo === "nuevo") {
-        const pv = ln.nuevo_precio_venta === "" ? NaN : Number(ln.nuevo_precio_venta);
-        if (!ln.nuevo_nombre.trim() || !Number.isFinite(pv) || pv < 0) {
-          return "Producto nuevo: nombre y precio de venta obligatorios.";
-        }
-      } else if (!ln.producto_id) {
-        return "Seleccioná un producto en cada línea existente.";
+      if (!ln.producto_id) {
+        return "Seleccioná un producto en cada línea.";
       }
     }
+    return null;
+  }
+
+  /** Solo lo mínimo para poder ver el paso Resumen; el resto se valida al registrar y aparece como aviso en el resumen. */
+  function validatePagosForAdvance(): string | null {
+    if (!fechaPedido.trim()) return "La fecha del pedido es obligatoria.";
     return null;
   }
 
@@ -303,10 +372,7 @@ export function PedidosProveedoresPage() {
     if (tieneDescuento && valorDesc !== "" && (!Number.isFinite(Number(valorDesc)) || Number(valorDesc) < 0)) {
       return "El valor con descuento debe ser un número válido mayor o igual a 0.";
     }
-    if (
-      valorSinDesc !== "" &&
-      (!Number.isFinite(Number(valorSinDesc)) || Number(valorSinDesc) < 0)
-    ) {
+    if (valorSinDesc !== "" && (!Number.isFinite(Number(valorSinDesc)) || Number(valorSinDesc) < 0)) {
       return "El valor sin descuento debe ser un número válido mayor o igual a 0.";
     }
     if (
@@ -333,7 +399,7 @@ export function PedidosProveedoresPage() {
       return null;
     }
     if (step === 1) return validateLineas();
-    if (step === 2) return validatePagos();
+    if (step === 2) return validatePagosForAdvance();
     return null;
   }
 
@@ -346,26 +412,23 @@ export function PedidosProveedoresPage() {
     for (let s = wizardStep; s < target; s += 1) {
       const msg = validateStep(s);
       if (msg) {
-        setError(msg);
+        toast(msg, "warning");
         return;
       }
     }
-    setError(null);
     setWizardStep(target);
   }
 
   function onNextStep() {
     const msg = validateStep(wizardStep);
     if (msg) {
-      setError(msg);
+      toast(msg, "warning");
       return;
     }
-    setError(null);
     setWizardStep((s) => Math.min(3, s + 1));
   }
 
   function onPrevStep() {
-    setError(null);
     setWizardStep((s) => Math.max(0, s - 1));
   }
 
@@ -377,28 +440,18 @@ export function PedidosProveedoresPage() {
     }
   }
 
-  async function onPedidoSubmit(e: React.FormEvent<HTMLFormElement>) {
->>>>>>> Stashed changes
+  async function onPedidoSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const ne = e.nativeEvent;
     const canUseSubmitter = typeof SubmitEvent !== "undefined" && ne instanceof SubmitEvent;
     const submitter = canUseSubmitter ? ne.submitter : undefined;
 
-    /*
-     * El wizard está dentro de un <form>. Enter en un input de una sola línea (p. ej. referencia)
-     * dispara envío implícito (submitter === null). Eso debe avanzar el paso, no registrar.
-     *
-     * En algunos navegadores pueden encolarse dos submit seguidos: el primero pasa de Pagos a
-     * Resumen (paso 3) y el segundo ya ve paso 3; si registráramos igual, se guardaría el pedido
-     * y el efecto de éxito te devuelve al paso 1 del stepper (reset a 0).
-     */
     if (wizardStep < 3) {
       const msg = validateStep(wizardStep);
       if (msg) {
-        setError(msg);
+        toast(msg, "warning");
         return;
       }
-      setError(null);
       setWizardStep((s) => Math.min(3, s + 1));
       return;
     }
@@ -407,9 +460,14 @@ export function PedidosProveedoresPage() {
       return;
     }
 
-    setOkMsg(null);
+    const pagosErr = validatePagos();
+    if (pagosErr) {
+      toast(pagosErr, "warning");
+      return;
+    }
+
     if (proveedorId === "") {
-      setError("Elegí un proveedor activo de la lista o gestioná altas en el módulo Proveedores.");
+      toast("Elegí un proveedor activo de la lista o gestioná altas en el módulo Proveedores.", "warning");
       return;
     }
     const built: Record<string, unknown>[] = [];
@@ -417,70 +475,52 @@ export function PedidosProveedoresPage() {
       const cant = Number(ln.cantidad);
       const costo = ln.costo_unitario === "" ? NaN : Number(ln.costo_unitario);
       if (!Number.isFinite(cant) || cant <= 0 || !Number.isFinite(costo) || costo < 0) {
-        setError("Revisá cantidad y costo en cada línea");
+        toast("Revisá cantidad y costo en cada línea", "warning");
         return;
       }
-      if (ln.modo === "nuevo") {
-        const pv = ln.nuevo_precio_venta === "" ? NaN : Number(ln.nuevo_precio_venta);
-        if (!ln.nuevo_nombre.trim() || !Number.isFinite(pv)) {
-          setError("Producto nuevo: nombre y precio de venta obligatorios");
-          return;
-        }
-        built.push({
-          cantidad: cant,
-          costo_unitario: costo,
-          actualizar_precios: ln.actualizar_precios,
-          precio_venta_lista: ln.precio_venta_lista === "" ? undefined : Number(ln.precio_venta_lista),
-          nuevo_producto: {
-            nombre: ln.nuevo_nombre.trim(),
-            codigo_barras: ln.nuevo_codigo.trim() || null,
-            precio_venta: pv,
-            marca: null,
-          },
-        });
-      } else {
-        if (!ln.producto_id) {
-          setError("Seleccioná un producto en cada línea existente");
-          return;
-        }
-        built.push({
-          producto_id: ln.producto_id,
-          cantidad: cant,
-          costo_unitario: costo,
-          actualizar_precios: ln.actualizar_precios,
-          precio_venta_lista: ln.precio_venta_lista === "" ? undefined : Number(ln.precio_venta_lista),
-        });
+      if (!ln.producto_id) {
+        toast("Seleccioná un producto en cada línea", "warning");
+        return;
       }
+      built.push({
+        producto_id: ln.producto_id,
+        cantidad: cant,
+        costo_unitario: costo,
+      });
     }
 
-    setError(null);
     try {
       await createPedidoProveedor({
         proveedor_id: proveedorId,
         fecha: fechaPedido,
-        fecha_pago_con_descuento: fechaPagoDesc.trim() || null,
+        fecha_pago_con_descuento: tieneDescuento ? fechaPagoDesc.trim() || null : null,
         fecha_pago_maxima: fechaPagoMax.trim() || null,
-        valor_pago_con_descuento: valorDesc === "" ? null : Number(valorDesc),
+        valor_pago_con_descuento: tieneDescuento ? (valorDesc === "" ? null : Number(valorDesc)) : null,
         valor_pago_sin_descuento: valorSinDesc === "" ? null : Number(valorSinDesc),
         estado: estadoNuevo,
         notas: notas.trim() || null,
         referencia: referencia.trim() || null,
         lineas: built,
       });
-      setOkMsg("Pedido registrado; stock actualizado (ENTRADA).");
+      toast("Pedido registrado; stock actualizado (ENTRADA).", "success");
       setProveedorId("");
-      setFechaPedido(new Date().toISOString().slice(0, 10));
+      setWizardStep(0);
+      setProveedorSearch("");
+      setProductoSearch("");
+      setFechaPedido(fechaLocalISO());
       setFechaPagoDesc("");
       setFechaPagoMax("");
       setValorDesc("");
       setValorSinDesc("");
+      setValorSinDescManual(false);
+      setTieneDescuento(false);
       setEstadoNuevo("pendiente");
       setNotas("");
       setReferencia("");
-      setLineas([lineaVacia()]);
+      setLineas([]);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al registrar pedido");
+      toast(err instanceof Error ? err.message : "Error al registrar pedido", "error");
     }
   }
 
@@ -496,11 +536,10 @@ export function PedidosProveedoresPage() {
     setEditRef(p.referencia ?? "");
   }
 
-  async function onEditSave(e: React.FormEvent) {
+  async function onEditSave(e: FormEvent) {
     e.preventDefault();
     if (!edit) return;
     setEditBusy(true);
-    setError(null);
     try {
       await updatePedidoProveedorMeta(edit.id, {
         fecha: editFecha,
@@ -513,164 +552,19 @@ export function PedidosProveedoresPage() {
         referencia: editRef.trim() || null,
       });
       setEdit(null);
-      setOkMsg("Pedido actualizado.");
+      toast("Pedido actualizado.", "success");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al guardar");
+      toast(err instanceof Error ? err.message : "Error al guardar", "error");
     } finally {
       setEditBusy(false);
     }
   }
 
+  const resumenWarnings = [validateLineas(), validatePagos()].filter((x): x is string => Boolean(x));
+
   return (
-    <>
-      {error ? (
-        <div className="pedidos-alert pedidos-alert--error" role="alert">
-          {error}
-        </div>
-      ) : null}
-      {okMsg ? (
-        <div className="pedidos-alert pedidos-alert--success" role="status">
-          {okMsg}
-        </div>
-      ) : null}
-
-<<<<<<< Updated upstream
-      <section className="card">
-        <h2 className="card-title">Nuevo pedido a proveedor</h2>
-        <p className="hint">
-          Cada pedido debe tener un proveedor de la lista. Actualiza stock (ENTRADA) y opcionalmente
-          precios de compra / venta por línea.
-        </p>
-        <form className="form" onSubmit={onPedidoSubmit}>
-          <div className="grid-2">
-            <label className="field">
-              <span>Proveedor *</span>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
-                <select
-                  style={{ flex: "1 1 12rem", minWidth: 0 }}
-                  value={proveedorId === "" ? "" : String(proveedorId)}
-                  onChange={(e) =>
-                    setProveedorId(e.target.value === "" ? "" : Number(e.target.value))
-                  }
-                  required
-                >
-                  <option value="">— Elegir —</option>
-                  {proveedoresActivos.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.nombre}
-                    </option>
-                  ))}
-                </select>
-                <Link to="/pedidos/proveedores" className="btn ghost small">
-                  Proveedores
-                </Link>
-              </div>
-            </label>
-            <label className="field">
-              <span>Fecha del pedido *</span>
-              <input
-                type="date"
-                value={fechaPedido}
-                onChange={(e) => setFechaPedido(e.target.value)}
-                required
-              />
-            </label>
-            <label className="field">
-              <span>Fecha límite pago con descuento</span>
-              <input type="date" value={fechaPagoDesc} onChange={(e) => setFechaPagoDesc(e.target.value)} />
-            </label>
-            <label className="field">
-              <span>Fecha máxima de pago (sin descuento)</span>
-              <input type="date" value={fechaPagoMax} onChange={(e) => setFechaPagoMax(e.target.value)} />
-            </label>
-            <label className="field">
-              <span>Valor a pagar con descuento</span>
-              <input
-                type="number"
-                step="0.01"
-                min={0}
-                value={valorDesc}
-                onChange={(e) => setValorDesc(e.target.value === "" ? "" : Number(e.target.value))}
-              />
-            </label>
-            <label className="field">
-              <span>Valor a pagar sin descuento</span>
-              <input
-                type="number"
-                step="0.01"
-                min={0}
-                value={valorSinDesc}
-                onChange={(e) => setValorSinDesc(e.target.value === "" ? "" : Number(e.target.value))}
-              />
-            </label>
-            <label className="field">
-              <span>Estado</span>
-              <select value={estadoNuevo} onChange={(e) => setEstadoNuevo(e.target.value)}>
-                <option value="pendiente">Pendiente</option>
-                <option value="pagado">Pagado</option>
-                <option value="vencido">Vencido</option>
-              </select>
-            </label>
-            <label className="field">
-              <span>Referencia / remito</span>
-              <input value={referencia} onChange={(e) => setReferencia(e.target.value)} />
-            </label>
-            <label className="field">
-              <span>Notas</span>
-              <input value={notas} onChange={(e) => setNotas(e.target.value)} />
-            </label>
-          </div>
-
-          <div className="lineas-head">
-            <span className="field-label-strong">Líneas del pedido</span>
-            <button type="button" className="btn ghost small" onClick={addLinea}>
-              + Línea
-            </button>
-          </div>
-
-          {lineas.map((ln, i) => (
-            <div key={i} className="card inner-line">
-              <div className="field-row">
-                <label className="field">
-                  <span>Modo</span>
-                  <select
-                    value={ln.modo}
-                    onChange={(e) => setLinea(i, { modo: e.target.value as Modo })}
-                  >
-                    <option value="existente">Producto existente</option>
-                    <option value="nuevo">Alta producto nuevo</option>
-                  </select>
-                </label>
-              </div>
-              {ln.modo === "existente" ? (
-                <div className="grid-3 compra-grid">
-                  <label className="field">
-                    <span>Producto</span>
-                    <select
-                      value={ln.producto_id || ""}
-                      onChange={(e) => setLinea(i, { producto_id: Number(e.target.value) || 0 })}
-                    >
-                      <option value="">—</option>
-                      {productos.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.nombre}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="field">
-                    <span>Cantidad</span>
-                    <input
-                      type="number"
-                      min={1}
-                      value={ln.cantidad}
-                      onChange={(e) => setLinea(i, { cantidad: Number(e.target.value) })}
-                    />
-                  </label>
-                  <label className="field">
-                    <span>Costo unit.</span>
-=======
+    <div className="page-pedidos">
       <header className="pedidos-hero">
         <div className="pedidos-hero__icon" aria-hidden>
           <Truck size={26} weight="duotone" />
@@ -679,18 +573,20 @@ export function PedidosProveedoresPage() {
           <p className="pedidos-hero__eyebrow">Compras y stock</p>
           <h1 className="pedidos-hero__title">Pedidos a proveedor</h1>
           <p className="pedidos-hero__lede">
-            Flujo guiado en cuatro pasos: elegí proveedor, cargá productos, definí pagos y cerrá con
-            resumen y notas. Todo queda guardado en borrador hasta que confirmes.
+            Flujo guiado en cuatro pasos: elegí proveedor, cargá productos, definí pagos y cerrá con resumen y notas.
+            Podés moverte entre pasos con el stepper o con Anterior / Siguiente.
           </p>
         </div>
       </header>
 
       <nav className="pedidos-segmented" aria-label="Navegación de pedidos" role="tablist">
-        {([
-          { id: "pedido", label: "Pedido" },
-          { id: "proveedores", label: "Proveedores" },
-          { id: "historial", label: "Historial" },
-        ] as const).map((tab) => {
+        {(
+          [
+            { id: "pedido" as const, label: "Pedido" },
+            { id: "proveedores" as const, label: "Proveedores" },
+            { id: "historial" as const, label: "Historial" },
+          ] as const
+        ).map((tab) => {
           const active = vistaTab === tab.id;
           return (
             <button
@@ -778,10 +674,7 @@ export function PedidosProveedoresPage() {
                       return (
                         <article
                           key={p.id}
-                          className={[
-                            "pedidos-prov-card",
-                            selected ? "pedidos-prov-card--selected" : "",
-                          ]
+                          className={["pedidos-prov-card", selected ? "pedidos-prov-card--selected" : ""]
                             .filter(Boolean)
                             .join(" ")}
                           role="listitem"
@@ -790,13 +683,11 @@ export function PedidosProveedoresPage() {
                           aria-label={`Seleccionar ${p.nombre}`}
                           onClick={() => {
                             setProveedorId(p.id);
-                            setError(null);
                           }}
                           onKeyDown={(e) => {
                             if (e.key === "Enter" || e.key === " ") {
                               e.preventDefault();
                               setProveedorId(p.id);
-                              setError(null);
                             }
                           }}
                         >
@@ -839,157 +730,110 @@ export function PedidosProveedoresPage() {
                     <div className="pedidos-dash-layout__main">
                       <div className="pedidos-lines-head">
                         <h3 className="pedidos-lines-head__title">Líneas del pedido</h3>
-                        <p className="pedidos-lines-head__hint">Editá cantidades y costos; el total se actualiza al instante.</p>
+                        <p className="pedidos-lines-head__hint">
+                          Sumá ítems desde el catálogo del proveedor a la derecha o creá uno nuevo en el panel lateral.
+                        </p>
                       </div>
-                      <div className="pedidos-lines-stack">
-                        {lineasExistentes.length === 0 && lineasNuevas.length === 0 ? (
-                          <div className="pedidos-empty-lines">
-                            <p className="pedidos-empty-lines__title">Todavía no agregaste productos</p>
-                            <p className="pedidos-empty-lines__text">
-                              Buscá en el catálogo del proveedor a la derecha y tocá un ítem para sumarlo al pedido.
-                            </p>
-                          </div>
-                        ) : null}
-                        {lineasExistentes.map(({ ln, idx }) => {
-                          const producto = productosProveedor.find((p) => p.id === ln.producto_id);
-                          const unit = ln.costo_unitario === "" ? 0 : Number(ln.costo_unitario);
-                          const subtotal = Math.max(1, Number(ln.cantidad) || 1) * unit;
-                          return (
-                            <div className="pedidos-line-card" key={`exist-${idx}`}>
-                              <div className="pedidos-line-card__main">
-                                <p className="pedidos-line-card__badge">Catálogo</p>
-                                <h4 className="pedidos-line-card__title">
-                                  {producto?.nombre ?? `Producto #${ln.producto_id}`}
-                                </h4>
-                                <div className="pedidos-line-card__grid">
-                                  <label className="pedidos-field pedidos-field--compact">
-                                    <span className="pedidos-field__label">Cantidad</span>
-                                    <input
-                                      className="pedidos-input"
-                                      type="number"
-                                      min={1}
-                                      value={ln.cantidad}
-                                      onChange={(e) =>
-                                        setLinea(idx, { cantidad: Math.max(1, Number(e.target.value) || 1) })
-                                      }
-                                    />
-                                  </label>
-                                  <label className="pedidos-field pedidos-field--compact">
-                                    <span className="pedidos-field__label">Costo unit.</span>
-                                    <input
-                                      className="pedidos-input"
-                                      type="number"
-                                      min={0}
-                                      step="0.01"
-                                      value={ln.costo_unitario}
-                                      onChange={(e) =>
-                                        setLinea(idx, {
-                                          costo_unitario: e.target.value === "" ? "" : Number(e.target.value),
-                                        })
-                                      }
-                                    />
-                                  </label>
-                                </div>
-                              </div>
-                              <div className="pedidos-line-card__aside">
-                                <div className="pedidos-line-card__sub">
-                                  <span className="pedidos-line-card__sub-label">Subtotal</span>
-                                  <span className="pedidos-line-card__sub-value">
-                                    {Number.isFinite(subtotal) ? moneyEsAr.format(subtotal) : moneyEsAr.format(0)}
-                                  </span>
-                                </div>
-                                <button
-                                  type="button"
-                                  className="pedidos-line-card__remove"
-                                  onClick={() => removeLinea(idx)}
-                                >
-                                  Quitar
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })}
-                        {lineasNuevas.map(({ ln, idx }) => {
-                          const unit = ln.costo_unitario === "" ? 0 : Number(ln.costo_unitario);
-                          const subtotal = Math.max(1, Number(ln.cantidad) || 1) * unit;
-                          return (
-                            <div className="pedidos-line-card" key={`new-${idx}`}>
-                              <div className="pedidos-line-card__main">
-                                <p className="pedidos-line-card__badge pedidos-line-card__badge--new">Nuevo</p>
-                                <div className="pedidos-line-card__grid pedidos-line-card__grid--2">
-                                  <label className="pedidos-field pedidos-field--compact">
-                                    <span className="pedidos-field__label">Nombre</span>
-                                    <input
-                                      className="pedidos-input"
-                                      value={ln.nuevo_nombre}
-                                      placeholder="Nombre del producto"
-                                      onChange={(e) => setLinea(idx, { nuevo_nombre: e.target.value })}
-                                    />
-                                  </label>
-                                  <label className="pedidos-field pedidos-field--compact">
-                                    <span className="pedidos-field__label">Precio venta</span>
-                                    <input
-                                      className="pedidos-input"
-                                      type="number"
-                                      min={0}
-                                      step="0.01"
-                                      value={ln.nuevo_precio_venta}
-                                      placeholder="0"
-                                      onChange={(e) =>
-                                        setLinea(idx, {
-                                          nuevo_precio_venta: e.target.value === "" ? "" : Number(e.target.value),
-                                        })
-                                      }
-                                    />
-                                  </label>
-                                  <label className="pedidos-field pedidos-field--compact">
-                                    <span className="pedidos-field__label">Cantidad</span>
-                                    <input
-                                      className="pedidos-input"
-                                      type="number"
-                                      min={1}
-                                      value={ln.cantidad}
-                                      onChange={(e) =>
-                                        setLinea(idx, { cantidad: Math.max(1, Number(e.target.value) || 1) })
-                                      }
-                                    />
-                                  </label>
-                                  <label className="pedidos-field pedidos-field--compact">
-                                    <span className="pedidos-field__label">Costo unit.</span>
-                                    <input
-                                      className="pedidos-input"
-                                      type="number"
-                                      min={0}
-                                      step="0.01"
-                                      value={ln.costo_unitario}
-                                      onChange={(e) =>
-                                        setLinea(idx, {
-                                          costo_unitario: e.target.value === "" ? "" : Number(e.target.value),
-                                        })
-                                      }
-                                    />
-                                  </label>
-                                </div>
-                              </div>
-                              <div className="pedidos-line-card__aside">
-                                <div className="pedidos-line-card__sub">
-                                  <span className="pedidos-line-card__sub-label">Subtotal</span>
-                                  <span className="pedidos-line-card__sub-value">
-                                    {Number.isFinite(subtotal) ? moneyEsAr.format(subtotal) : moneyEsAr.format(0)}
-                                  </span>
-                                </div>
-                                <button
-                                  type="button"
-                                  className="pedidos-line-card__remove"
-                                  onClick={() => removeLinea(idx)}
-                                >
-                                  Quitar
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })}
+                      <div className="pedidos-actions-row">
+                        <button type="button" className="pedidos-btn pedidos-btn--ghost" onClick={openDrawerNuevoProducto}>
+                          + Nuevo producto (modal)
+                        </button>
                       </div>
+                      {lineas.length === 0 ? (
+                        <div className="pedidos-empty-lines">
+                          <p className="pedidos-empty-lines__title">Todavía no agregaste productos</p>
+                          <p className="pedidos-empty-lines__text">
+                            Buscá en el catálogo a la derecha y tocá un producto para sumarlo al pedido.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="table-wrap pedidos-lineas-table-wrap">
+                          <table className="table pedidos-lineas-table">
+                            <thead>
+                              <tr>
+                                <th scope="col">Producto</th>
+                                <th scope="col" className="pedidos-lineas-table__col-num">
+                                  Cant.
+                                </th>
+                                <th scope="col" className="pedidos-lineas-table__col-num">
+                                  Costo u.
+                                </th>
+                                <th scope="col" className="pedidos-lineas-table__col-num">
+                                  Subtotal
+                                </th>
+                                <th scope="col" className="pedidos-lineas-table__col-acc" />
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {lineas.map((ln, idx) => {
+                                const unit = ln.costo_unitario === "" ? 0 : Number(ln.costo_unitario);
+                                const subtotal = Math.max(1, Number(ln.cantidad) || 1) * unit;
+                                const subStr = Number.isFinite(subtotal)
+                                  ? moneyEsAr.format(subtotal)
+                                  : moneyEsAr.format(0);
+                                return (
+                                  <tr key={`ped-line-${idx}`}>
+                                    <td>
+                                      <select
+                                        className="pedidos-input pedidos-select pedidos-lineas-table__control"
+                                        value={ln.producto_id || ""}
+                                        onChange={(e) =>
+                                          setLinea(idx, { producto_id: Number(e.target.value) || 0 })
+                                        }
+                                        aria-label="Producto"
+                                      >
+                                        <option value="">— Elegir —</option>
+                                        {productosCatalogoProveedor.map((p) => (
+                                          <option key={p.id} value={p.id}>
+                                            {p.nombre}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </td>
+                                    <td className="pedidos-lineas-table__col-num">
+                                      <input
+                                        className="pedidos-input pedidos-lineas-table__control pedidos-lineas-table__control--qty"
+                                        type="number"
+                                        min={1}
+                                        value={ln.cantidad}
+                                        onChange={(e) =>
+                                          setLinea(idx, { cantidad: Math.max(1, Number(e.target.value) || 1) })
+                                        }
+                                        aria-label="Cantidad"
+                                      />
+                                    </td>
+                                    <td className="pedidos-lineas-table__col-num">
+                                      <input
+                                        className="pedidos-input pedidos-lineas-table__control pedidos-lineas-table__control--money"
+                                        type="number"
+                                        min={0}
+                                        step="0.01"
+                                        value={ln.costo_unitario}
+                                        onChange={(e) =>
+                                          setLinea(idx, {
+                                            costo_unitario: e.target.value === "" ? "" : Number(e.target.value),
+                                          })
+                                        }
+                                        aria-label="Costo unitario"
+                                      />
+                                    </td>
+                                    <td className="pedidos-lineas-table__col-num mono">{subStr}</td>
+                                    <td className="pedidos-lineas-table__col-acc">
+                                      <button
+                                        type="button"
+                                        className="pedidos-lineas-table__btn-remove"
+                                        onClick={() => removeLinea(idx)}
+                                      >
+                                        Quitar
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
                       <div className="pedidos-total-strip">
                         <span className="pedidos-total-strip__label">Total general del pedido</span>
                         <span className="pedidos-total-strip__value">
@@ -1002,22 +846,10 @@ export function PedidosProveedoresPage() {
                       <div className="pedidos-sidebar-card__head">
                         <div>
                           <h3 className="pedidos-sidebar-card__title">Catálogo del proveedor</h3>
-                          <p className="pedidos-sidebar-card__hint">Tocá un producto para agregarlo al pedido.</p>
+                          <p className="pedidos-sidebar-card__hint">
+                            Productos generales del salón y los asociados a {proveedorSeleccionado?.nombre ?? "este proveedor"}. Tocá uno para sumarlo al pedido.
+                          </p>
                         </div>
-                        <button
-                          type="button"
-                          className="pedidos-icon-btn"
-                          onClick={openProductoRapidoModal}
-                          disabled={!proveedorSeleccionado}
-                          title={
-                            proveedorSeleccionado
-                              ? "Crear producto nuevo asociado a este proveedor"
-                              : "Elegí proveedor en el paso 1"
-                          }
-                          aria-label="Agregar producto nuevo"
-                        >
-                          <Plus size={20} weight="bold" />
-                        </button>
                       </div>
                       <label className="pedidos-field pedidos-field--compact">
                         <span className="pedidos-field__label">Buscar</span>
@@ -1026,25 +858,20 @@ export function PedidosProveedoresPage() {
                           <input
                             className="pedidos-input pedidos-input--with-icon"
                             type="search"
-                            placeholder="Nombre, código o marca"
+                            placeholder="Nombre, código, marca…"
                             value={productoSearch}
                             onChange={(e) => setProductoSearch(e.target.value)}
                           />
                         </span>
                       </label>
-                      {productosProveedorLoading ? (
-                        <p className="pedidos-sidebar-card__status">Buscando productos…</p>
-                      ) : productosProveedor.length === 0 ? (
+                      {productosFiltrados.length === 0 ? (
                         <div className="pedidos-sidebar-empty">
                           <p className="pedidos-sidebar-empty__title">Sin resultados</p>
-                          <p className="pedidos-sidebar-empty__text">
-                            Este proveedor aún no tiene productos asociados por historial, o no coinciden con la
-                            búsqueda.
-                          </p>
+                          <p className="pedidos-sidebar-empty__text">Probá otra búsqueda o creá un producto nuevo.</p>
                         </div>
                       ) : (
                         <div className="pedidos-catalog-list" role="list">
-                          {productosProveedor.map((p) => (
+                          {productosFiltrados.slice(0, 200).map((p) => (
                             <button
                               key={p.id}
                               type="button"
@@ -1060,9 +887,12 @@ export function PedidosProveedoresPage() {
                           ))}
                         </div>
                       )}
-                      <button type="button" className="pedidos-sidebar-cta" onClick={openProductoRapidoModal}>
+                      {productosFiltrados.length > 200 ? (
+                        <p className="pedidos-sidebar-card__status">Mostrando los primeros 200 resultados.</p>
+                      ) : null}
+                      <button type="button" className="pedidos-sidebar-cta" onClick={openDrawerNuevoProducto}>
                         <Plus size={18} weight="bold" aria-hidden />
-                        Agregar producto nuevo
+                        Nuevo producto en catálogo
                       </button>
                     </aside>
                   </div>
@@ -1074,8 +904,8 @@ export function PedidosProveedoresPage() {
               <div className="pedidos-panel">
                 <div className="pedidos-inline-hint">
                   Total del pedido:{" "}
-                  <strong>{moneyEsAr.format(roundMoney2(totalGeneralPedido))}</strong>. El valor sin descuento
-                  sigue al total salvo que lo edites a mano.
+                  <strong>{moneyEsAr.format(roundMoney2(totalGeneralPedido))}</strong>. El valor sin descuento sigue
+                  al total salvo que lo edites a mano.
                 </div>
                 {validatePagos() ? (
                   <div className="pedidos-callout pedidos-callout--warn" role="status">
@@ -1094,6 +924,9 @@ export function PedidosProveedoresPage() {
                     className="pedidos-input"
                     value={referencia}
                     onChange={(e) => setReferencia(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") e.preventDefault();
+                    }}
                     placeholder="Nº remito, OC, factura…"
                     autoComplete="off"
                   />
@@ -1101,7 +934,6 @@ export function PedidosProveedoresPage() {
                 <div className="pedidos-form-grid">
                   <label className="pedidos-field">
                     <span className="pedidos-field__label">Fecha del pedido *</span>
->>>>>>> Stashed changes
                     <input
                       className="pedidos-input"
                       type="date"
@@ -1118,7 +950,6 @@ export function PedidosProveedoresPage() {
                       onChange={(e) => setEstadoNuevo(e.target.value)}
                     >
                       <option value="pendiente">Pendiente</option>
-                      <option value="parcial">Parcial</option>
                       <option value="pagado">Pagado</option>
                       <option value="vencido">Vencido</option>
                     </select>
@@ -1168,6 +999,9 @@ export function PedidosProveedoresPage() {
                         inputMode="decimal"
                         value={valorDesc}
                         onChange={(e) => setValorDesc(e.target.value === "" ? "" : Number(e.target.value))}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") e.preventDefault();
+                        }}
                       />
                     </label>
                   ) : null}
@@ -1178,21 +1012,15 @@ export function PedidosProveedoresPage() {
                       type="number"
                       step="0.01"
                       min={0}
-<<<<<<< Updated upstream
-                      value={ln.costo_unitario}
-                      onChange={(e) =>
-                        setLinea(i, {
-                          costo_unitario: e.target.value === "" ? "" : Number(e.target.value),
-                        })
-                      }
-=======
                       inputMode="decimal"
                       value={valorSinDesc}
                       onChange={(e) => {
                         setValorSinDescManual(true);
                         setValorSinDesc(e.target.value === "" ? "" : Number(e.target.value));
                       }}
->>>>>>> Stashed changes
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") e.preventDefault();
+                      }}
                     />
                     <span className="pedidos-field__hint">
                       Sugerido: {moneyEsAr.format(roundMoney2(totalGeneralPedido))}
@@ -1200,149 +1028,6 @@ export function PedidosProveedoresPage() {
                     </span>
                   </label>
                 </div>
-<<<<<<< Updated upstream
-              ) : (
-                <div className="grid-2">
-                  <label className="field">
-                    <span>Nombre nuevo producto *</span>
-                    <input
-                      value={ln.nuevo_nombre}
-                      onChange={(e) => setLinea(i, { nuevo_nombre: e.target.value })}
-                    />
-                  </label>
-                  <label className="field">
-                    <span>Precio venta lista *</span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min={0}
-                      value={ln.nuevo_precio_venta}
-                      onChange={(e) =>
-                        setLinea(i, {
-                          nuevo_precio_venta: e.target.value === "" ? "" : Number(e.target.value),
-                        })
-                      }
-                    />
-                  </label>
-                  <label className="field">
-                    <span>Código barras</span>
-                    <input
-                      value={ln.nuevo_codigo}
-                      onChange={(e) => setLinea(i, { nuevo_codigo: e.target.value })}
-                    />
-                  </label>
-                  <label className="field">
-                    <span>Cantidad</span>
-                    <input
-                      type="number"
-                      min={1}
-                      value={ln.cantidad}
-                      onChange={(e) => setLinea(i, { cantidad: Number(e.target.value) })}
-                    />
-                  </label>
-                  <label className="field">
-                    <span>Costo unit.</span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min={0}
-                      value={ln.costo_unitario}
-                      onChange={(e) =>
-                        setLinea(i, {
-                          costo_unitario: e.target.value === "" ? "" : Number(e.target.value),
-                        })
-                      }
-                    />
-                  </label>
-                </div>
-              )}
-              <label className="field inline-check">
-                <input
-                  type="checkbox"
-                  checked={ln.actualizar_precios}
-                  onChange={(e) => setLinea(i, { actualizar_precios: e.target.checked })}
-                />
-                <span>Actualizar precio compra (y opcional lista venta) según esta línea</span>
-              </label>
-              {ln.modo === "existente" ? (
-                <label className="field">
-                  <span>Nuevo precio venta lista (opcional)</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min={0}
-                    value={ln.precio_venta_lista}
-                    onChange={(e) =>
-                      setLinea(i, {
-                        precio_venta_lista: e.target.value === "" ? "" : Number(e.target.value),
-                      })
-                    }
-                  />
-                </label>
-              ) : null}
-              {lineas.length > 1 ? (
-                <button type="button" className="btn ghost small" onClick={() => removeLinea(i)}>
-                  Quitar línea
-                </button>
-              ) : null}
-            </div>
-          ))}
-
-          <div className="actions">
-            <button type="submit" className="btn primary">
-              Registrar pedido
-            </button>
-          </div>
-        </form>
-      </section>
-
-      <section className="card">
-        <div className="card-head">
-          <h2 className="card-title">Historial de pedidos</h2>
-          <button type="button" className="btn ghost small" onClick={() => void load()}>
-            Actualizar
-          </button>
-        </div>
-        {loading ? (
-          <p className="muted">Cargando…</p>
-        ) : pedidos.length === 0 ? (
-          <p className="muted">Sin pedidos registrados.</p>
-        ) : (
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Fecha pedido</th>
-                  <th>Proveedor</th>
-                  <th>Total ítems</th>
-                  <th>Estado</th>
-                  <th>Indicador pago</th>
-                  <th>Ref.</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {pedidos.map((c) => (
-                  <tr key={c.id}>
-                    <td className="mono">{String(c.fecha).slice(0, 10)}</td>
-                    <td>{c.proveedor_nombre_ref ?? c.proveedor_nombre ?? "—"}</td>
-                    <td>{Number(c.total).toFixed(2)}</td>
-                    <td>{c.estado ?? "—"}</td>
-                    <td>{labelIndicador(c.indicador_pago)}</td>
-                    <td>{c.referencia ?? "—"}</td>
-                    <td>
-                      <button type="button" className="btn ghost small" onClick={() => openEdit(c)}>
-                        Editar plazos / montos
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-=======
                 <div className="pedidos-actions-row pedidos-actions-row--start">
                   <button
                     type="button"
@@ -1359,7 +1044,12 @@ export function PedidosProveedoresPage() {
             ) : null}
 
             {wizardStep === 3 ? (
-              <div className="pedidos-panel">
+              <div
+                ref={resumenFocusRef}
+                tabIndex={-1}
+                className="pedidos-panel pedidos-panel--resumen"
+                aria-label="Resumen del pedido"
+              >
                 {resumenWarnings.length > 0 ? (
                   <div className="pedidos-callout pedidos-callout--warn" role="status">
                     Atención: {resumenWarnings.join(" ")}
@@ -1394,9 +1084,6 @@ export function PedidosProveedoresPage() {
                     </div>
                     <p className="pedidos-resumen-tile__strong">{lineas.length} línea(s)</p>
                     <p className="pedidos-resumen-tile__meta">
-                      Total compra: {moneyEsAr.format(roundMoney2(resumenLineas))}
-                    </p>
-                    <p className="pedidos-resumen-tile__meta">
                       Total general: {moneyEsAr.format(roundMoney2(totalGeneralPedido))}
                     </p>
                   </div>
@@ -1412,17 +1099,14 @@ export function PedidosProveedoresPage() {
                     ) : (
                       <ul className="pedidos-resumen-lines">
                         {lineas.map((ln, i) => {
-                          const producto =
-                            ln.modo === "existente"
-                              ? productosProveedor.find((p) => p.id === ln.producto_id)?.nombre ??
-                                `Producto #${ln.producto_id}`
-                              : ln.nuevo_nombre || "Producto nuevo";
+                          const nombre =
+                            productos.find((p) => p.id === ln.producto_id)?.nombre ?? `Producto #${ln.producto_id}`;
                           const unit = ln.costo_unitario === "" ? 0 : Number(ln.costo_unitario);
                           const subtotal = Math.max(1, Number(ln.cantidad) || 1) * unit;
                           const qty = Math.max(1, Number(ln.cantidad) || 1);
                           return (
                             <li className="pedidos-resumen-line" key={`res-ln-${i}`}>
-                              <span className="pedidos-resumen-line__name">{producto}</span>
+                              <span className="pedidos-resumen-line__name">{nombre}</span>
                               <span className="pedidos-resumen-line__detail">
                                 {qty} × {moneyEsAr.format(unit)}
                               </span>
@@ -1456,13 +1140,16 @@ export function PedidosProveedoresPage() {
                     </p>
                   </div>
                   <div className="pedidos-resumen-notes">
-                    <EntityNotes
-                      title="Notas finales"
-                      notes={notasItems}
-                      onChange={setNotasItems}
-                      currentAuthor={currentAuthor}
-                      emptyLabel="Sin notas finales. Son opcionales."
-                    />
+                    <label className="pedidos-field">
+                      <span className="pedidos-field__label">Notas finales (opcional)</span>
+                      <textarea
+                        className="pedidos-input"
+                        rows={4}
+                        value={notas}
+                        onChange={(e) => setNotas(e.target.value)}
+                        placeholder="Observaciones sobre el pedido, entrega, condiciones…"
+                      />
+                    </label>
                   </div>
                 </div>
               </div>
@@ -1481,7 +1168,16 @@ export function PedidosProveedoresPage() {
                   Siguiente
                 </button>
               ) : (
-                <button type="submit" className="pedidos-btn pedidos-btn--primary">
+                <button
+                  type="submit"
+                  className="pedidos-btn pedidos-btn--primary"
+                  disabled={bloqueoRegistrarPedido}
+                  title={
+                    bloqueoRegistrarPedido
+                      ? "Esperá un instante: acabás de pasar al resumen."
+                      : undefined
+                  }
+                >
                   Registrar pedido
                 </button>
               )}
@@ -1544,10 +1240,7 @@ export function PedidosProveedoresPage() {
         </section>
       ) : null}
 
-      {vistaTab === "proveedores" ? (
-        <ProveedoresPage />
-      ) : null}
->>>>>>> Stashed changes
+      {vistaTab === "proveedores" ? <ProveedoresPage /> : null}
 
       {edit ? (
         <div
@@ -1562,8 +1255,7 @@ export function PedidosProveedoresPage() {
               Editar pedido #{edit.id}
             </h3>
             <p className="pedidos-drawer-card__lede">
-              Solo fechas de pago, montos acordados, estado y notas. Las líneas y el proveedor no se modifican
-              aquí.
+              Solo fechas de pago, montos acordados, estado y notas. Las líneas y el proveedor no se modifican aquí.
             </p>
             <form className="pedidos-form pedidos-drawer-form" onSubmit={onEditSave}>
               <label className="pedidos-field">
@@ -1622,28 +1314,17 @@ export function PedidosProveedoresPage() {
                 <span className="pedidos-field__label">Referencia</span>
                 <input className="pedidos-input" value={editRef} onChange={(e) => setEditRef(e.target.value)} />
               </label>
-<<<<<<< Updated upstream
-              <label className="field">
-                <span>Notas</span>
-                <input value={editNotas} onChange={(e) => setEditNotas(e.target.value)} />
-              </label>
-              <div className="actions">
-                <button type="button" className="btn ghost" onClick={() => setEdit(null)}>
-=======
-              <div className="pedidos-field">
+              <label className="pedidos-field">
                 <span className="pedidos-field__label">Notas</span>
-                <div className="pedidos-drawer-notes">
-                  <EntityNotes
-                    notes={editNotasItems}
-                    onChange={setEditNotasItems}
-                    currentAuthor={currentAuthor}
-                    emptyLabel="Sin notas para este pedido."
-                  />
-                </div>
-              </div>
+                <textarea
+                  className="pedidos-input"
+                  rows={3}
+                  value={editNotas}
+                  onChange={(e) => setEditNotas(e.target.value)}
+                />
+              </label>
               <div className="pedidos-wizard-footer pedidos-drawer-footer">
                 <button type="button" className="pedidos-btn pedidos-btn--ghost" onClick={() => setEdit(null)}>
->>>>>>> Stashed changes
                   Cancelar
                 </button>
                 <button type="submit" className="pedidos-btn pedidos-btn--primary" disabled={editBusy}>
@@ -1654,72 +1335,79 @@ export function PedidosProveedoresPage() {
           </div>
         </div>
       ) : null}
-<<<<<<< Updated upstream
-=======
-      {productoRapidoModalOpen && proveedorSeleccionado ? (
-        <div
-          className="drawer-overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="producto-rapido-title"
-          onClick={() => {
-            if (!productoRapidoBusy) setProductoRapidoModalOpen(false);
-          }}
-        >
-          <div
-            className="card drawer-overlay-card pedidos-drawer-card pedido-rapido-modal"
-            style={{ maxWidth: 480, width: "min(92vw, 480px)", maxHeight: "88vh", overflow: "auto" }}
-            onClick={(e) => e.stopPropagation()}
+
+      <Drawer
+        open={drawerNuevoProducto}
+        title="Nuevo producto en catálogo del proveedor"
+        onClose={() => {
+          if (!nuevoProdBusy) setDrawerNuevoProducto(false);
+        }}
+        footer={
+          <button
+            type="submit"
+            form="form-nuevo-producto-proveedor"
+            className="pedidos-btn pedidos-btn--primary"
+            disabled={nuevoProdBusy}
           >
-            <div className="pedidos-drawer-card__toolbar">
-              <h3 id="producto-rapido-title" className="pedidos-drawer-card__title" style={{ margin: 0 }}>
-                Pre-registro de producto
-              </h3>
-              <button
-                type="button"
-                className="pedidos-btn pedidos-btn--ghost"
-                disabled={productoRapidoBusy}
-                onClick={() => setProductoRapidoModalOpen(false)}
-              >
-                Cerrar
-              </button>
-            </div>
-            <form className="pedidos-form pedido-rapido-form" onSubmit={onGuardarProductoRapido}>
-              <p className="pedidos-drawer-card__lede" style={{ marginTop: 0 }}>
-                Registrá solo datos base para compra inicial (nombre, categoría, descripción y costo de compra). El
-                stock real se actualizará al registrar la entrada del pedido.
-              </p>
-              <ProductoCatalogoForm
-                values={productoRapidoForm}
-                onChange={(patch) => setProductoRapidoForm((f) => ({ ...f, ...patch }))}
-                mode="create"
-                hideBarcodeLookup
-                quickCreateFromPedido
-                proveedorResumen={{
-                  nombre: proveedorSeleccionado.nombre,
-                  nit: proveedorSeleccionado.nit,
-                  telefono: proveedorSeleccionado.telefono,
-                  email: proveedorSeleccionado.email,
-                }}
-              />
-              <div className="pedidos-wizard-footer pedidos-drawer-footer" style={{ marginTop: "1rem" }}>
-                <button
-                  type="button"
-                  className="pedidos-btn pedidos-btn--ghost"
-                  disabled={productoRapidoBusy}
-                  onClick={() => setProductoRapidoModalOpen(false)}
-                >
-                  Cancelar
-                </button>
-                <button type="submit" className="pedidos-btn pedidos-btn--primary" disabled={productoRapidoBusy}>
-                  {productoRapidoBusy ? "Guardando…" : "Guardar y agregar al pedido"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      ) : null}
->>>>>>> Stashed changes
-    </>
+            {nuevoProdBusy ? "Guardando…" : "Crear y sumar al pedido"}
+          </button>
+        }
+      >
+        <form id="form-nuevo-producto-proveedor" className="pedidos-form" onSubmit={guardarNuevoProducto}>
+          <p className="pedidos-callout pedidos-callout--info">
+            Quedará asociado a <strong>{proveedorSeleccionado?.nombre ?? "—"}</strong> y lo vas a ver en el catálogo
+            lateral para próximos pedidos.
+          </p>
+          <label className="pedidos-field">
+            <span className="pedidos-field__label">Nombre *</span>
+            <input
+              className="pedidos-input"
+              value={nuevoNombre}
+              onChange={(e) => setNuevoNombre(e.target.value)}
+              required
+              autoComplete="off"
+              autoFocus
+            />
+          </label>
+          <label className="pedidos-field">
+            <span className="pedidos-field__label">Código de barras (opcional)</span>
+            <input
+              className="pedidos-input"
+              value={nuevoCodigo}
+              onChange={(e) => setNuevoCodigo(e.target.value)}
+              autoComplete="off"
+            />
+          </label>
+          <label className="pedidos-field">
+            <span className="pedidos-field__label">Precio de compra *</span>
+            <input
+              className="pedidos-input"
+              type="number"
+              min={0}
+              step="0.01"
+              value={nuevoPrecioCompra}
+              onChange={(e) =>
+                setNuevoPrecioCompra(e.target.value === "" ? "" : Number(e.target.value))
+              }
+              required
+            />
+          </label>
+          <label className="pedidos-field">
+            <span className="pedidos-field__label">Precio de venta (opcional)</span>
+            <input
+              className="pedidos-input"
+              type="number"
+              min={0}
+              step="0.01"
+              value={nuevoPrecioVenta}
+              onChange={(e) =>
+                setNuevoPrecioVenta(e.target.value === "" ? "" : Number(e.target.value))
+              }
+              placeholder="Si lo dejás vacío, usamos el de compra"
+            />
+          </label>
+        </form>
+      </Drawer>
+    </div>
   );
 }

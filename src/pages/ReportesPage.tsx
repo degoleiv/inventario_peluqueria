@@ -11,14 +11,24 @@ import {
   type DashboardStats,
   type Venta,
 } from "../api";
+import { useToast } from "../context/ToastContext";
+
+/** Rango inclusivo por día calendario → ISO para comparar con `ventas.fecha` en el servidor. */
+function fechaDiaToIsoDesde(yyyyMmDd: string) {
+  return `${yyyyMmDd.trim()}T00:00:00.000Z`;
+}
+
+function fechaDiaToIsoHasta(yyyyMmDd: string) {
+  return `${yyyyMmDd.trim()}T23:59:59.999Z`;
+}
 
 export function ReportesPage() {
+  const toast = useToast();
   const [dash, setDash] = useState<DashboardStats | null>(null);
   const [ventas, setVentas] = useState<Venta[]>([]);
-  const [desde, setDesde] = useState("");
-  const [hasta, setHasta] = useState("");
+  const [fechaDesde, setFechaDesde] = useState("");
+  const [fechaHasta, setFechaHasta] = useState("");
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [topProd, setTopProd] = useState<
     Array<{ id: number; nombre: string; unidades: number; total_vendido: number }>
   >([]);
@@ -56,14 +66,13 @@ export function ReportesPage() {
   useEffect(() => {
     let cancel = false;
     (async () => {
-      setError(null);
       setLoading(true);
       try {
         await loadDash();
         const v = await fetchReporteVentas();
         if (!cancel) setVentas(v);
       } catch (e) {
-        if (!cancel) setError(e instanceof Error ? e.message : "Error");
+        if (!cancel) toast(e instanceof Error ? e.message : "Error", "error");
       } finally {
         if (!cancel) setLoading(false);
       }
@@ -71,13 +80,14 @@ export function ReportesPage() {
     return () => {
       cancel = true;
     };
-  }, [loadDash]);
+  }, [loadDash, toast]);
 
   async function aplicarFiltro() {
-    const d = desde.trim();
-    const h = hasta.trim();
+    const fd = fechaDesde.trim();
+    const fh = fechaHasta.trim();
+    const d = fd ? fechaDiaToIsoDesde(fd) : "";
+    const h = fh ? fechaDiaToIsoHasta(fh) : "";
     setLoading(true);
-    setError(null);
     try {
       const v = await fetchReporteVentas(d || undefined, h || undefined);
       setVentas(v);
@@ -105,7 +115,7 @@ export function ReportesPage() {
         setKpis(null);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
+      toast(e instanceof Error ? e.message : "Error", "error");
     } finally {
       setLoading(false);
     }
@@ -115,12 +125,6 @@ export function ReportesPage() {
 
   return (
     <>
-      {error ? (
-        <div className="banner banner-error" role="alert">
-          {error}
-        </div>
-      ) : null}
-
       <section className="card">
         <h2 className="card-title">Resumen</h2>
         {loading && !dash ? (
@@ -148,19 +152,21 @@ export function ReportesPage() {
         <h2 className="card-title">Ventas por período</h2>
         <div className="filtros-row">
           <label className="field inline">
-            <span>Desde (ISO)</span>
+            <span>Desde</span>
             <input
-              value={desde}
-              onChange={(e) => setDesde(e.target.value)}
-              placeholder="2026-05-01T00:00:00.000Z"
+              type="date"
+              value={fechaDesde}
+              max={fechaHasta || undefined}
+              onChange={(e) => setFechaDesde(e.target.value)}
             />
           </label>
           <label className="field inline">
-            <span>Hasta (ISO)</span>
+            <span>Hasta</span>
             <input
-              value={hasta}
-              onChange={(e) => setHasta(e.target.value)}
-              placeholder="2026-05-31T23:59:59.999Z"
+              type="date"
+              value={fechaHasta}
+              min={fechaDesde || undefined}
+              onChange={(e) => setFechaHasta(e.target.value)}
             />
           </label>
           <button type="button" className="btn secondary" onClick={() => void aplicarFiltro()}>
@@ -169,7 +175,7 @@ export function ReportesPage() {
         </div>
         <p className="hint">
           Total mostrado: <strong>{sumaFiltrada.toFixed(2)}</strong> ({ventas.length} ventas). Con
-          desde+hasta también se cargan rankings e ingresos diarios.
+          ambas fechas también se cargan rankings e ingresos diarios.
         </p>
         {loading ? (
           <p className="muted">Cargando lista…</p>

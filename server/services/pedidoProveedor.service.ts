@@ -180,10 +180,6 @@ export const pedidoProveedorService = {
     const updStock = db.prepare(
       `UPDATE productos SET stock = stock + ?, updated_at = ? WHERE id = ?`
     );
-    const updPrecios = db.prepare(
-      `UPDATE productos SET precio_compra = ?, precio_venta = COALESCE(?, precio_venta),
-       precio = COALESCE(?, precio), updated_at = ? WHERE id = ?`
-    );
 
     const pedidoId = await db.transaction(async () => {
       let total = 0;
@@ -192,8 +188,6 @@ export const pedidoProveedorService = {
         cantidad: number;
         costo_unitario: number;
         subtotal: number;
-        actualizar_precios: boolean;
-        nuevo_precio_venta: number | null;
       }[] = [];
 
       for (const raw of lineasIn as LineIn[]) {
@@ -209,11 +203,11 @@ export const pedidoProveedorService = {
 
         if (raw.nuevo_producto && typeof raw.nuevo_producto === "object") {
           const np = raw.nuevo_producto as Record<string, unknown>;
-          const pv =
+          let pv =
             typeof np.precio_venta === "number" && Number.isFinite(np.precio_venta)
               ? np.precio_venta
               : null;
-          if (pv == null) throw new AppError("nuevo_producto.precio_venta es requerido");
+          if (pv == null) pv = costo_unitario;
           const created = (await productoService.create({
             ...np,
             stock: 0,
@@ -232,19 +226,12 @@ export const pedidoProveedorService = {
 
         const subtotal = costo_unitario * cantidad;
         total += subtotal;
-        const actualizar_precios = raw.actualizar_precios === true;
-        const nuevo_precio_venta =
-          typeof raw.precio_venta_lista === "number" && Number.isFinite(raw.precio_venta_lista)
-            ? raw.precio_venta_lista
-            : null;
 
         resolvedLines.push({
           producto_id,
           cantidad,
           costo_unitario,
           subtotal,
-          actualizar_precios,
-          nuevo_precio_venta,
         });
       }
 
@@ -271,15 +258,6 @@ export const pedidoProveedorService = {
       for (const ln of resolvedLines) {
         await insLine.run(pid, ln.producto_id, ln.cantidad, ln.costo_unitario, ln.subtotal);
         await updStock.run(ln.cantidad, now, ln.producto_id);
-        if (ln.actualizar_precios) {
-          await updPrecios.run(
-            ln.costo_unitario,
-            ln.nuevo_precio_venta,
-            ln.nuevo_precio_venta,
-            now,
-            ln.producto_id
-          );
-        }
         await insMov.run(ln.producto_id, ln.cantidad, pid, `pedido_proveedor:${pid}`, now);
       }
 

@@ -550,5 +550,61 @@ export async function applyMigrations(database: SqliteDb) {
   if (!cliGuestNames.has("activo")) {
     await database.exec(`ALTER TABLE clientes ADD COLUMN activo INTEGER NOT NULL DEFAULT 1`);
   }
+
+  const prodColsProv = (await database.prepare(`PRAGMA table_info(productos)`).all()) as { name: string }[];
+  const prodProvNames = new Set(prodColsProv.map((c) => c.name));
+  if (!prodProvNames.has("proveedor_id")) {
+    await database.exec(
+      `ALTER TABLE productos ADD COLUMN proveedor_id INTEGER REFERENCES proveedores(id) ON DELETE SET NULL`
+    );
+    await database.exec(`CREATE INDEX IF NOT EXISTS idx_productos_proveedor ON productos(proveedor_id)`);
+  }
+
   await migrateRolesModuloPedidosUnificado(database);
+
+  const citaColsImp = (await database.prepare(`PRAGMA table_info(citas)`).all()) as { name: string }[];
+  const citaImpNames = new Set(citaColsImp.map((c) => c.name));
+  if (!citaImpNames.has("importe_servicio")) {
+    await database.exec(`ALTER TABLE citas ADD COLUMN importe_servicio REAL`);
+  }
+
+  const comColsLiq = (await database.prepare(`PRAGMA table_info(comisiones)`).all()) as { name: string }[];
+  const comLiqNames = new Set(comColsLiq.map((c) => c.name));
+  if (!comLiqNames.has("cita_id")) {
+    await database.exec(`PRAGMA foreign_keys = OFF`);
+    await database.exec(`
+      CREATE TABLE comisiones_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        empleado_id INTEGER NOT NULL REFERENCES usuarios(id),
+        venta_id INTEGER REFERENCES ventas(id) ON DELETE CASCADE,
+        cita_id INTEGER REFERENCES citas(id) ON DELETE CASCADE,
+        monto REAL NOT NULL,
+        base_calculo REAL,
+        fecha TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        CHECK (
+          (venta_id IS NOT NULL AND cita_id IS NULL) OR
+          (cita_id IS NOT NULL AND venta_id IS NULL)
+        )
+      )
+    `);
+    await database.exec(`
+      INSERT INTO comisiones_new (id, empleado_id, venta_id, cita_id, monto, base_calculo, fecha, created_at)
+      SELECT c.id, c.empleado_id, c.venta_id, NULL, c.monto,
+             (SELECT v.total FROM ventas v WHERE v.id = c.venta_id),
+             c.fecha, c.created_at
+      FROM comisiones c
+    `);
+    await database.exec(`DROP TABLE comisiones`);
+    await database.exec(`ALTER TABLE comisiones_new RENAME TO comisiones`);
+    await database.exec(`CREATE INDEX IF NOT EXISTS idx_comisiones_empleado ON comisiones(empleado_id)`);
+    await database.exec(`CREATE INDEX IF NOT EXISTS idx_comisiones_fecha ON comisiones(fecha)`);
+    await database.exec(
+      `CREATE UNIQUE INDEX IF NOT EXISTS uq_comisiones_venta ON comisiones(venta_id) WHERE venta_id IS NOT NULL`
+    );
+    await database.exec(
+      `CREATE UNIQUE INDEX IF NOT EXISTS uq_comisiones_cita ON comisiones(cita_id) WHERE cita_id IS NOT NULL`
+    );
+    await database.exec(`PRAGMA foreign_keys = ON`);
+  }
 }

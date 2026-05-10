@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Navigate, useParams } from "react-router-dom";
 import {
   createClienteTemporal,
@@ -16,6 +16,7 @@ import {
   type PuntosConfig,
   type Venta,
 } from "../api";
+import { Drawer } from "../components/Drawer";
 import { SkeletonCard } from "../components/Skeleton";
 import { useToast } from "../context/ToastContext";
 import {
@@ -66,6 +67,8 @@ export function VentasPage() {
   const [flashId, setFlashId] = useState<number | null>(null);
   /** Índice de línea seleccionada en carrito (↑↓); null = modo solo escáner */
   const [cartSel, setCartSel] = useState<number | null>(null);
+  const [resumenCobroOpen, setResumenCobroOpen] = useState(false);
+  const [ventaBusy, setVentaBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -134,6 +137,7 @@ export function VentasPage() {
   }, [search]);
 
   const nuevaVenta = useCallback(() => {
+    setResumenCobroOpen(false);
     setCart([]);
     setSearch("");
     setCartSel(null);
@@ -147,6 +151,7 @@ export function VentasPage() {
 
   const cancelarVenta = useCallback(() => {
     if (cart.length === 0 && !search.trim()) return;
+    setResumenCobroOpen(false);
     setCart([]);
     setSearch("");
     setCartSel(null);
@@ -269,6 +274,110 @@ export function VentasPage() {
     barcodeRef.current?.focus();
   }
 
+  const total = useMemo(
+    () => cart.reduce((s, l) => s + l.precio_unitario * l.cantidad, 0),
+    [cart]
+  );
+
+  useEffect(() => {
+    publishPosClienteDisplay({
+      lines: cart.map((l) => ({
+        nombre: l.nombre,
+        cantidad: l.cantidad,
+        importe: l.precio_unitario * l.cantidad,
+      })),
+      subtotal: total,
+    });
+  }, [cart, total]);
+
+  const solicitarResumenCobro = useCallback(
+    (e: FormEvent) => {
+      e.preventDefault();
+      if (resumenCobroOpen) return;
+      if (cart.length === 0) {
+        posBeepErr();
+        toast("Agregá productos al carrito", "warning");
+        return;
+      }
+      if (vendedorId === "") {
+        posBeepErr();
+        toast("Seleccioná el vendedor", "warning");
+        return;
+      }
+      setResumenCobroOpen(true);
+      posBeepOk();
+    },
+    [cart.length, vendedorId, toast, resumenCobroOpen]
+  );
+
+  const confirmarVentaDesdeResumen = useCallback(async () => {
+    if (ventaBusy) return;
+    if (cart.length === 0) {
+      posBeepErr();
+      toast("Agregá productos al carrito", "warning");
+      return;
+    }
+    if (vendedorId === "") {
+      posBeepErr();
+      toast("Seleccioná el vendedor", "warning");
+      return;
+    }
+    const built = cart.map((l) => ({
+      producto_id: l.producto_id,
+      cantidad: l.cantidad,
+      precio_unitario: l.precio_unitario,
+    }));
+    setVentaBusy(true);
+    try {
+      const r = await createVenta({
+        cliente_id: clienteId === "" ? null : clienteId,
+        usuario_id: Number(vendedorId),
+        metodo_pago: metodoPago,
+        notas: notasVenta.trim() || null,
+        lineas: built,
+        emitir_factura: emitirFactura,
+        puntos_canjeados:
+          clienteId !== "" && puntosCanjeados !== ""
+            ? Math.floor(Number(puntosCanjeados))
+            : undefined,
+      });
+      posBeepOk();
+      if (r.factura_error) {
+        toast("Venta ok. Factura: " + r.factura_error, "warning");
+      } else {
+        toast("Venta " + (r.total as number).toFixed(2) + " — listo", "success");
+      }
+      if (r.puntos_otorgados && r.puntos_otorgados > 0) {
+        toast("+" + r.puntos_otorgados + " puntos al cliente", "info");
+      }
+      setResumenCobroOpen(false);
+      setCart([]);
+      setCartSel(null);
+      setClienteId("");
+      setNotasVenta("");
+      setPuntosCanjeados("");
+      setMetodoPago("efectivo");
+      await load();
+    } catch (err) {
+      posBeepErr();
+      toast(err instanceof Error ? err.message : "Error al vender", "error");
+    } finally {
+      setVentaBusy(false);
+      barcodeRef.current?.focus();
+    }
+  }, [
+    ventaBusy,
+    cart,
+    vendedorId,
+    clienteId,
+    metodoPago,
+    notasVenta,
+    emitirFactura,
+    puntosCanjeados,
+    toast,
+    load,
+  ]);
+
   useEffect(() => {
     const onDocKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
@@ -293,7 +402,11 @@ export function VentasPage() {
       }
       if (e.ctrlKey && e.key === "Enter") {
         e.preventDefault();
-        saleFormRef.current?.requestSubmit();
+        if (resumenCobroOpen) {
+          void confirmarVentaDesdeResumen();
+        } else {
+          saleFormRef.current?.requestSubmit();
+        }
         return;
       }
 
@@ -317,7 +430,11 @@ export function VentasPage() {
       }
       if (e.code === "F10") {
         e.preventDefault();
-        saleFormRef.current?.requestSubmit();
+        if (resumenCobroOpen) {
+          void confirmarVentaDesdeResumen();
+        } else {
+          saleFormRef.current?.requestSubmit();
+        }
         return;
       }
       if (e.code === "F4") {
@@ -341,23 +458,7 @@ export function VentasPage() {
     };
     window.addEventListener("keydown", onDocKey);
     return () => window.removeEventListener("keydown", onDocKey);
-  }, [nuevaVenta, cancelarVenta, cartSel, cart]);
-
-  const total = useMemo(
-    () => cart.reduce((s, l) => s + l.precio_unitario * l.cantidad, 0),
-    [cart]
-  );
-
-  useEffect(() => {
-    publishPosClienteDisplay({
-      lines: cart.map((l) => ({
-        nombre: l.nombre,
-        cantidad: l.cantidad,
-        importe: l.precio_unitario * l.cantidad,
-      })),
-      subtotal: total,
-    });
-  }, [cart, total]);
+  }, [nuevaVenta, cancelarVenta, cartSel, cart, resumenCobroOpen, confirmarVentaDesdeResumen]);
 
   const abrirPantallaCliente = useCallback(() => {
     try {
@@ -415,59 +516,6 @@ export function VentasPage() {
 
     posBeepErr();
     toast("Sin coincidencia. Escribí más o escaneá el código (≥8 dígitos).", "warning");
-  }
-
-  async function pagar(e: React.FormEvent) {
-    e.preventDefault();
-    const built = cart.map((l) => ({
-      producto_id: l.producto_id,
-      cantidad: l.cantidad,
-      precio_unitario: l.precio_unitario,
-    }));
-    if (built.length === 0) {
-      posBeepErr();
-      toast("Agregá productos al carrito", "warning");
-      return;
-    }
-    if (vendedorId === "") {
-      posBeepErr();
-      toast("Seleccioná el vendedor", "warning");
-      return;
-    }
-    try {
-      const r = await createVenta({
-        cliente_id: clienteId === "" ? null : clienteId,
-        usuario_id: Number(vendedorId),
-        metodo_pago: metodoPago,
-        notas: notasVenta.trim() || null,
-        lineas: built,
-        emitir_factura: emitirFactura,
-        puntos_canjeados:
-          clienteId !== "" && puntosCanjeados !== ""
-            ? Math.floor(Number(puntosCanjeados))
-            : undefined,
-      });
-      posBeepOk();
-      if (r.factura_error) {
-        toast("Venta ok. Factura: " + r.factura_error, "warning");
-      } else {
-        toast("Venta " + (r.total as number).toFixed(2) + " — listo", "success");
-      }
-      if (r.puntos_otorgados && r.puntos_otorgados > 0) {
-        toast("+" + r.puntos_otorgados + " puntos al cliente", "info");
-      }
-      setCart([]);
-      setCartSel(null);
-      setClienteId("");
-      setNotasVenta("");
-      setPuntosCanjeados("");
-      setMetodoPago("efectivo");
-      await load();
-    } catch (err) {
-      posBeepErr();
-      toast(err instanceof Error ? err.message : "Error al vender", "error");
-    }
-    barcodeRef.current?.focus();
   }
 
   const tabOk = tabParam != null && VENTAS_TABS.includes(tabParam as VentasTab);
@@ -554,7 +602,7 @@ export function VentasPage() {
           <kbd className="kbd-mini">↓</kbd> carrito · <kbd className="kbd-mini">Del</kbd> quitar línea ·{" "}
           <kbd className="kbd-mini">F1</kbd> efectivo · <kbd className="kbd-mini">F2</kbd> transfer. ·{" "}
           <kbd className="kbd-mini">F3</kbd> mixto · <kbd className="kbd-mini">F10</kbd> /{" "}
-          <kbd className="kbd-mini">Ctrl</kbd>+<kbd className="kbd-mini">Enter</kbd> cobrar ·{" "}
+          <kbd className="kbd-mini">Ctrl</kbd>+<kbd className="kbd-mini">Enter</kbd> resumen (repite para confirmar) ·{" "}
           <kbd className="kbd-mini">Ctrl</kbd>+<kbd className="kbd-mini">N</kbd> nueva ·{" "}
           <kbd className="kbd-mini">Ctrl</kbd>+<kbd className="kbd-mini">C</kbd> cancelar ·{" "}
           <kbd className="kbd-mini">F4</kbd> foco aquí
@@ -564,7 +612,7 @@ export function VentasPage() {
           <form
             ref={saleFormRef}
             className="pos-cart-column pos-sale-form pos-exempt-focus"
-            onSubmit={pagar}
+            onSubmit={solicitarResumenCobro}
           >
             <h3 className="pos-panel-title">Carrito</h3>
             <div className="cart-lines cart-lines--main">
@@ -656,7 +704,7 @@ export function VentasPage() {
             </div>
 
             <button type="submit" className="btn btn-pay btn-xl" disabled={cart.length === 0}>
-              Cobrar <span className="btn-pay-keys">F10 · Ctrl+Enter</span>
+              Resumen y cobrar <span className="btn-pay-keys">F10 · Ctrl+Enter</span>
             </button>
 
             <div className="pos-options pos-options--panel">
@@ -735,6 +783,9 @@ export function VentasPage() {
                     onChange={(e) =>
                       setPuntosCanjeados(e.target.value === "" ? "" : Number(e.target.value))
                     }
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") e.preventDefault();
+                    }}
                   />
                 </label>
               ) : null}
@@ -743,6 +794,9 @@ export function VentasPage() {
                 <input
                   value={notasVenta}
                   onChange={(e) => setNotasVenta(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") e.preventDefault();
+                  }}
                   placeholder="Opcional"
                 />
               </label>
@@ -847,6 +901,67 @@ export function VentasPage() {
           </p>
         </section>
       ) : null}
+
+      <Drawer
+        open={resumenCobroOpen}
+        title="Resumen de cobro"
+        onClose={() => {
+          if (!ventaBusy) setResumenCobroOpen(false);
+        }}
+        footer={
+          <div className="drawer-footer-actions" style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className="btn ghost"
+              disabled={ventaBusy}
+              onClick={() => setResumenCobroOpen(false)}
+            >
+              Volver
+            </button>
+            <button
+              type="button"
+              className="btn primary"
+              disabled={ventaBusy}
+              onClick={() => void confirmarVentaDesdeResumen()}
+            >
+              {ventaBusy ? "Guardando…" : "Confirmar venta"}
+            </button>
+          </div>
+        }
+      >
+        <p className="muted" style={{ marginBottom: "1rem" }}>
+          Revisá el total y los datos. <kbd className="kbd-mini">F10</kbd> o{" "}
+          <kbd className="kbd-mini">Ctrl</kbd>+<kbd className="kbd-mini">Enter</kbd> confirma desde cualquier parte.
+        </p>
+        <ul className="sale-list" style={{ marginBottom: "1rem" }}>
+          {cart.map((l) => (
+            <li key={l.producto_id} className="sale-list-item">
+              <span className="sale-list-client">{l.nombre}</span>
+              <span className="muted small">
+                {l.cantidad} × {l.precio_unitario.toFixed(2)}
+              </span>
+              <span className="sale-list-total">{(l.precio_unitario * l.cantidad).toFixed(2)}</span>
+            </li>
+          ))}
+        </ul>
+        <div className="cart-total-block cart-total-block--hero" style={{ marginBottom: "1rem" }}>
+          <span className="cart-total-label">Total</span>
+          <span className="cart-total-value mono">{total.toFixed(2)}</span>
+        </div>
+        <p>
+          <strong>Pago:</strong> {metodoPago}
+        </p>
+        <p>
+          <strong>Cliente:</strong>{" "}
+          {clienteId === "" ? "Sin cliente" : (clientes.find((c) => c.id === clienteId)?.nombre ?? "—")}
+        </p>
+        {notasVenta.trim() ? (
+          <p>
+            <strong>Notas:</strong> {notasVenta.trim()}
+          </p>
+        ) : null}
+        {emitirFactura ? <p className="muted small">Se solicitará factura electrónica.</p> : null}
+      </Drawer>
     </>
   );
 }

@@ -2258,8 +2258,6 @@ select {
   font-size: clamp(1.45rem, 2.5vw, 1.9rem);
 }
 
-<<<<<<< Updated upstream
-=======
 /* Pedidos: aprovechar más ancho disponible del layout */
 .main-pro-content:has(.page-pedidos) {
   max-width: 1440px;
@@ -2604,6 +2602,12 @@ select {
   gap: 20px;
 }
 
+.page-pedidos .pedidos-panel--resumen:focus-visible {
+  outline: 2px solid var(--pp-accent, #6366f1);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
 .page-pedidos .pedidos-field {
   display: flex;
   flex-direction: column;
@@ -2929,6 +2933,191 @@ select {
   border-color: #cbd5e1;
 }
 
+.page-pedidos .pedidos-line-card--dense {
+  padding: 12px 14px;
+  gap: 12px;
+}
+
+.page-pedidos .pedidos-line-card__head-tight .pedidos-line-card__badge {
+  margin-bottom: 0;
+}
+
+.page-pedidos .pedidos-line-details {
+  margin-top: 2px;
+}
+
+.page-pedidos .pedidos-line-details > summary {
+  list-style: none;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--pp-primary);
+  user-select: none;
+}
+
+.page-pedidos .pedidos-line-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.page-pedidos .pedidos-line-details[open] > summary {
+  margin-bottom: 8px;
+  color: var(--pp-muted);
+}
+
+.page-pedidos .pedidos-line-details__body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.page-pedidos .pedidos-line-inline-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--pp-text);
+  line-height: 1.35;
+}
+
+.page-pedidos .pedidos-line-inline-check input {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.page-pedidos .pedidos-lineas-table-wrap {
+  border-radius: var(--pp-radius-md);
+  border: 1px solid var(--pp-line);
+  background: var(--pp-card);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  max-height: min(56vh, 520px);
+}
+
+.page-pedidos .pedidos-lineas-table-wrap .table th,
+.page-pedidos .pedidos-lineas-table-wrap .table td {
+  border-bottom-color: var(--pp-line);
+  vertical-align: middle;
+}
+
+.page-pedidos .pedidos-lineas-table-wrap .table th {
+  color: var(--pp-muted);
+}
+
+.page-pedidos .pedidos-lineas-table .pedidos-lineas-table__col-tipo {
+  width: 7rem;
+  white-space: nowrap;
+}
+
+.page-pedidos .pedidos-lineas-table .pedidos-lineas-table__col-num {
+  width: 6.5rem;
+}
+
+.page-pedidos .pedidos-lineas-table td.pedidos-lineas-table__col-num.mono {
+  text-align: right;
+  font-weight: 600;
+}
+
+.page-pedidos .pedidos-lineas-table .pedidos-lineas-table__col-acc {
+  width: 5rem;
+  text-align: right;
+  vertical-align: middle;
+}
+
+.page-pedidos .pedidos-lineas-table__badge {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: 6px;
+  background: var(--pp-info-bg);
+  color: var(--pp-muted);
+}
+
+.page-pedidos .pedidos-lineas-table__badge--new {
+  background: var(--pp-violet-soft);
+  color: var(--pp-primary);
+}
+
+.page-pedidos .pedidos-lineas-table__control {
+  width: 100%;
+  max-width: 100%;
+  min-height: 40px;
+}
+
+.page-pedidos .pedidos-lineas-table__control--qty {
+  max-width: 5rem;
+}
+
+.page-pedidos .pedidos-lineas-table__control--money {
+  max-width: 7rem;
+}
+
+.page-pedidos .pedidos-lineas-table__control--narrow {
+  max-width: 8rem;
+}
+
+.page-pedidos .pedidos-lineas-table__control--max {
+  max-width: 14rem;
+}
+
+.page-pedidos .pedidos-lineas-table__producto-nuevo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.page-pedidos .pedidos-lineas-table__subrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.page-pedidos .pedidos-lineas-table__subrow-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--pp-muted);
+}
+
+.page-pedidos .pedidos-lineas-table__btn-remove {
+  border: 1px solid var(--pp-line);
+  background: #fff;
+  color: var(--pp-muted);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: var(--pp-radius-sm);
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.page-pedidos .pedidos-lineas-table__btn-remove:hover {
+  background: var(--pp-danger-bg);
+  color: var(--pp-danger-text);
+  border-color: var(--pp-danger-line);
+}
+
+[data-theme="dark"] .page-pedidos .pedidos-lineas-table__btn-remove {
+  background: var(--pp-card);
+}
+
+.page-pedidos .pedidos-lineas-table__opts-row td {
+  background: var(--pp-bg);
+  border-bottom-color: var(--pp-line);
+  padding-top: 6px;
+  padding-bottom: 10px;
+}
+
+.page-pedidos .pedidos-lineas-table__opts-row .pedidos-line-details {
+  margin-top: 0;
+}
+
 .page-pedidos .pedidos-line-card__main {
   flex: 1 1 220px;
   min-width: 0;
@@ -2967,6 +3156,26 @@ select {
 
 .page-pedidos .pedidos-line-card__grid--2 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.page-pedidos .pedidos-line-card__grid--product-row {
+  grid-template-columns: 1fr minmax(3.75rem, 4.5rem) minmax(4.5rem, 5.5rem);
+  gap: 8px 10px;
+  align-items: end;
+}
+
+.page-pedidos .pedidos-line-card__grid--product-row .pedidos-line-span-full {
+  grid-column: 1 / -1;
+}
+
+.page-pedidos .pedidos-line-card__grid--new-compact {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px 12px;
+  align-items: end;
+}
+
+.page-pedidos .pedidos-line-card__grid--new-compact .pedidos-line-span-full {
+  grid-column: 1 / -1;
 }
 
 .page-pedidos .pedidos-line-card__aside {
@@ -3732,7 +3941,6 @@ select {
   }
 }
 
->>>>>>> Stashed changes
 /* Pantalla secundaria: solo lo que ve el cliente (subtotal + líneas) */
 .app-root--customer-display {
   padding: clamp(1rem, 3vw, 2.25rem);
@@ -4092,6 +4300,12 @@ select {
   background: #fff8e6;
   color: #6a4a00;
   border: 1px solid #e8d28a;
+}
+
+.cita-estado--realizado {
+  background: #e3f0ff;
+  color: #0b4f8c;
+  border: 1px solid #8ec5f0;
 }
 
 .cita-estado--confirmado {
@@ -5470,8 +5684,6 @@ select {
       2 18,
     text;
 }
-<<<<<<< Updated upstream
-=======
 
 .subnav-link--btn {
   border: 0;
@@ -5554,4 +5766,3 @@ select {
 .pedido-rapido-modal textarea {
   min-height: 58px;
 }
->>>>>>> Stashed changes

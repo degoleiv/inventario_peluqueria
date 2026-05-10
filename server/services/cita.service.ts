@@ -1,8 +1,9 @@
 import { businessHours } from "../config.js";
 import { db, recordSyncEvent } from "../db.js";
 import { AppError } from "../lib/AppError.js";
+import { commissionService } from "./commission.service.js";
 
-const ESTADOS = new Set(["pendiente", "confirmado", "cancelado"]);
+const ESTADOS = new Set(["pendiente", "confirmado", "realizado", "cancelado"]);
 
 function parseMs(iso: string) {
   const t = new Date(iso).getTime();
@@ -61,7 +62,7 @@ async function assertNoOverlap(
   const rows = (await db
     .prepare(
       `SELECT id, inicio, duracion_min, usuario_id FROM citas
-       WHERE estado NOT IN ('cancelado','cancelada')`
+       WHERE estado NOT IN ('cancelado','cancelada','realizado')`
     )
     .all()) as { id: number; inicio: string; duracion_min: number; usuario_id: number | null }[];
 
@@ -97,6 +98,12 @@ async function crearCita(body: Record<string, unknown>) {
   if (!ESTADOS.has(estado)) estado = "pendiente";
 
   const usuario_id = await parseUsuarioIdOrThrow(body, true);
+
+  if (estado === "realizado") {
+    throw new AppError(
+      "Creá la cita como pendiente o confirmada y luego marcala como realizada con el importe cobrado"
+    );
+  }
 
   if (estado !== "cancelado") await assertNoOverlap(inicio, duracion_min, null, usuario_id);
 
@@ -162,14 +169,35 @@ export const citaService = {
       throw new AppError("Seleccioná un profesional para la cita");
     }
 
-    if (estado !== "cancelado") {
+    let importe_servicio: number | null =
+      existing.importe_servicio != null && existing.importe_servicio !== ""
+        ? Number(existing.importe_servicio)
+        : null;
+    if (body.importe_servicio !== undefined && body.importe_servicio !== null && body.importe_servicio !== "") {
+      const raw = Number(body.importe_servicio);
+      if (!Number.isFinite(raw) || raw < 0) throw new AppError("importe_servicio inválido");
+      importe_servicio = raw > 0 ? raw : null;
+    } else if (body.importe_servicio === null) {
+      importe_servicio = null;
+    }
+
+    if (estado === "realizado") {
+      const imp = importe_servicio ?? 0;
+      if (imp <= 0) {
+        throw new AppError(
+          "Indicá el importe cobrado por el servicio (importe_servicio) para marcar la cita como realizada"
+        );
+      }
+    }
+
+    if (estado !== "cancelado" && estado !== "realizado") {
       await assertNoOverlap(inicio, duracion_min, id, usuario_id);
     }
 
     const now = new Date().toISOString();
     await db
       .prepare(
-        `UPDATE citas SET cliente_id = ?, usuario_id = ?, inicio = ?, duracion_min = ?, servicio = ?, estado = ?, notas = ?, updated_at = ? WHERE id = ?`
+        `UPDATE citas SET cliente_id = ?, usuario_id = ?, inicio = ?, duracion_min = ?, servicio = ?, estado = ?, notas = ?, importe_servicio = ?, updated_at = ? WHERE id = ?`
       )
       .run(
         cliente_id,
@@ -179,9 +207,18 @@ export const citaService = {
         typeof body.servicio === "string" ? body.servicio || null : existing.servicio,
         estado,
         typeof body.notas === "string" ? body.notas || null : existing.notas,
+        importe_servicio,
         now,
         id
       );
+
+    if (estado === "realizado") {
+      await commissionService.deleteByCitaId(id);
+      await commissionService.insertForCita(id, usuario_id, importe_servicio!, inicio);
+    } else if (String(existing.estado) === "realizado") {
+      await commissionService.deleteByCitaId(id);
+    }
+
     const row = await db.prepare(`${rowSql} WHERE c.id = ?`).get(id);
     await recordSyncEvent("cita", "actualizada", row);
     return row;
@@ -209,6 +246,8 @@ export const citaService = {
     if (String(existing.estado) === "cancelado") {
       throw new AppError("La cita ya está cancelada");
     }
+
+    await commissionService.deleteByCitaId(id);
 
     const now = new Date().toISOString();
     await db

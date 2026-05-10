@@ -10,8 +10,10 @@ import {
   type Cliente,
   type GastoOperativo,
 } from "../api";
+import { useToast } from "../context/ToastContext";
 
 export function FinanzasPage() {
+  const toast = useToast();
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
   const [flujo, setFlujo] = useState<{
@@ -36,7 +38,6 @@ export function FinanzasPage() {
   >([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const [gConcepto, setGConcepto] = useState("");
   const [gMonto, setGMonto] = useState<number | "">("");
@@ -49,7 +50,6 @@ export function FinanzasPage() {
   const [cVenc, setCVenc] = useState("");
 
   const load = useCallback(async () => {
-    setError(null);
     setLoading(true);
     try {
       const [g, cob, cl] = await Promise.all([
@@ -61,11 +61,11 @@ export function FinanzasPage() {
       setCobranzas(cob as typeof cobranzas);
       setClientes(cl);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
+      toast(e instanceof Error ? e.message : "Error", "error");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     void load();
@@ -75,22 +75,20 @@ export function FinanzasPage() {
     const d = desde.trim();
     const h = hasta.trim();
     if (!d || !h) {
-      setError("Indicá desde y hasta (ISO o fecha) para el flujo de caja");
+      toast("Indicá desde y hasta (ISO o fecha) para el flujo de caja", "warning");
       return;
     }
-    setError(null);
     try {
       const f = await fetchFlujoCaja(d, h);
       setFlujo(f);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
+      toast(e instanceof Error ? e.message : "Error", "error");
     }
   }
 
   async function onGasto(e: React.FormEvent) {
     e.preventDefault();
     if (!gConcepto.trim() || gMonto === "") return;
-    setError(null);
     try {
       await createGasto({
         concepto: gConcepto.trim(),
@@ -102,14 +100,13 @@ export function FinanzasPage() {
       setGMonto("");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo registrar (¿admin?)");
+      toast(err instanceof Error ? err.message : "No se pudo registrar (¿admin?)", "error");
     }
   }
 
   async function onDeuda(e: React.FormEvent) {
     e.preventDefault();
     if (cCliente === "" || !cDesc.trim() || cMonto === "") return;
-    setError(null);
     try {
       await createCobranza({
         cliente_id: Number(cCliente),
@@ -122,7 +119,7 @@ export function FinanzasPage() {
       setCVenc("");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error");
+      toast(err instanceof Error ? err.message : "Error", "error");
     }
   }
 
@@ -131,23 +128,16 @@ export function FinanzasPage() {
     if (m == null) return;
     const n = Number(m);
     if (!Number.isFinite(n) || n <= 0) return;
-    setError(null);
     try {
       await registrarPagoCobranza(id, n);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error");
+      toast(err instanceof Error ? err.message : "Error", "error");
     }
   }
 
   return (
     <>
-      {error ? (
-        <div className="banner banner-error" role="alert">
-          {error}
-        </div>
-      ) : null}
-
       <section className="card">
         <h2 className="card-title">Flujo de caja (ventas vs gastos + pedidos proveedores)</h2>
         <p className="muted">

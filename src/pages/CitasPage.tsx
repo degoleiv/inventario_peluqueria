@@ -28,7 +28,7 @@ import { MonthCalendar, localDayKeyFromIso } from "../components/agenda/MonthCal
 import { CITAS_TABS, readCitasTab, type CitasTab } from "../lib/moduleRoutes";
 import { filterIntegerTyping, parseIntLoose } from "../lib/decimalInput";
 
-const ESTADOS = ["pendiente", "confirmado", "cancelado"] as const;
+const ESTADOS = ["pendiente", "confirmado", "realizado", "cancelado"] as const;
 
 function pad2(n: number) {
   return String(n).padStart(2, "0");
@@ -65,6 +65,7 @@ function overlapConflict(
   for (const c of citas) {
     if (excludeId != null && c.id === excludeId) continue;
     if (isCancelledEstado(c.estado)) continue;
+    if (String(c.estado).toLowerCase() === "realizado") continue;
     if (!mismoProf(staffId, c.usuario_id ?? null)) continue;
     const s = new Date(c.inicio).getTime();
     const e = s + c.duracion_min * 60_000;
@@ -102,7 +103,6 @@ export function CitasPage() {
   const [citas, setCitas] = useState<Cita[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   const [clienteId, setClienteId] = useState<number | "">("");
   const [clienteBusqueda, setClienteBusqueda] = useState("");
@@ -111,6 +111,7 @@ export function CitasPage() {
   const [servicio, setServicio] = useState("");
   const [estado, setEstado] = useState<string>("pendiente");
   const [notas, setNotas] = useState("");
+  const [importeServicioStr, setImporteServicioStr] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -121,7 +122,6 @@ export function CitasPage() {
   const [serieIntervaloStr, setSerieIntervaloStr] = useState("15");
   const [serieRepsStr, setSerieRepsStr] = useState("4");
   const [serieInicio, setSerieInicio] = useState("");
-  const [serieMsg, setSerieMsg] = useState<string | null>(null);
 
   const [filtroEstado, setFiltroEstado] = useState<"todos" | string>("todos");
   const [filtroProf, setFiltroProf] = useState<number | "todos">("todos");
@@ -156,18 +156,17 @@ export function CitasPage() {
   }, [fechaDia]);
 
   const load = useCallback(async () => {
-    setError(null);
     setLoading(true);
     try {
       const [c, cl] = await Promise.all([fetchCitas(), fetchClientes()]);
       setCitas(c);
       setClientes(cl);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
+      toast(e instanceof Error ? e.message : "Error", "error");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   const usarClienteOcasional = useCallback(async () => {
     try {
@@ -212,6 +211,7 @@ export function CitasPage() {
     setServicio("");
     setEstado("pendiente");
     setNotas("");
+    setImporteServicioStr("");
     setEditingId(null);
     setProfesionalId(miUsuarioId ?? "");
   }
@@ -267,18 +267,26 @@ export function CitasPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (clienteId === "" || !inicio.trim() || profesionalId === "") return;
-    setError(null);
     const inicioDate = new Date(inicio);
     if (Number.isNaN(inicioDate.getTime())) {
-      setError("Fecha u hora no válida.");
+      toast("Fecha u hora no válida.", "warning");
       return;
     }
     const duracionMin = parseIntLoose(duracionStr, 60);
     const pid = Number(profesionalId);
+    if (estado === "realizado") {
+      const imp = Number(importeServicioStr.replace(",", "."));
+      if (!Number.isFinite(imp) || imp <= 0) {
+        toast("Indicá el importe cobrado por el servicio para marcar la cita como realizada.", "warning");
+        return;
+      }
+    }
+
     const clash = overlapConflict(inicioDate, duracionMin, citas, editingId, pid);
     if (clash) {
-      setError(
-        `Solapamiento con cita de ${clash.cliente_nombre} (${new Date(clash.inicio).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}).`
+      toast(
+        `Solapamiento con cita de ${clash.cliente_nombre} (${new Date(clash.inicio).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}).`,
+        "warning"
       );
       return;
     }
@@ -293,6 +301,8 @@ export function CitasPage() {
           servicio: servicio.trim() || null,
           estado,
           notas: notas.trim() || null,
+          importe_servicio:
+            estado === "realizado" ? Number(importeServicioStr.replace(",", ".")) : null,
         });
       } else {
         await createCita({
@@ -309,7 +319,7 @@ export function CitasPage() {
       setDrawerOpen(false);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al guardar");
+      toast(err instanceof Error ? err.message : "Error al guardar", "error");
     }
   }
 
@@ -330,6 +340,11 @@ export function CitasPage() {
     setServicio(x.servicio ?? "");
     setEstado(x.estado);
     setNotas(x.notas ?? "");
+    setImporteServicioStr(
+      x.importe_servicio != null && Number(x.importe_servicio) > 0
+        ? String(x.importe_servicio)
+        : ""
+    );
     setDrawerOpen(true);
   }
 
@@ -349,7 +364,7 @@ export function CitasPage() {
       );
       setSlots(r.slots);
     } catch {
-      setError("No se pudieron calcular horarios");
+      toast("No se pudieron calcular horarios", "error");
     } finally {
       setCargandoSlots(false);
     }
@@ -362,8 +377,6 @@ export function CitasPage() {
   async function onSerie(e: React.FormEvent) {
     e.preventDefault();
     if (clienteId === "" || !serieInicio.trim() || profesionalId === "") return;
-    setError(null);
-    setSerieMsg(null);
     try {
       const out = await crearCitasSerieRecurrente({
         cliente_id: Number(clienteId),
@@ -376,16 +389,15 @@ export function CitasPage() {
         repeticiones: parseIntLoose(serieRepsStr, 4),
         notas: notas.trim() || null,
       });
-      setSerieMsg(`Se crearon ${out.creadas} citas.`);
+      toast(`Se crearon ${out.creadas} citas.`, "success");
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error en serie");
+      toast(err instanceof Error ? err.message : "Error en serie", "error");
     }
   }
 
   async function onDelete(id: number) {
     if (!confirm("¿Eliminar esta cita?")) return;
-    setError(null);
     try {
       await deleteCita(id);
       if (editingId === id) {
@@ -394,7 +406,7 @@ export function CitasPage() {
       }
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error");
+      toast(err instanceof Error ? err.message : "Error", "error");
     }
   }
 
@@ -553,7 +565,7 @@ export function CitasPage() {
           <select value={estado} onChange={(e) => setEstado(e.target.value)}>
             {ESTADOS.map((s) => (
               <option key={s} value={s}>
-                {s}
+                {s === "realizado" ? "realizado (servicio cobrado / comisión)" : s}
               </option>
             ))}
           </select>
@@ -563,6 +575,22 @@ export function CitasPage() {
           <input value={notas} onChange={(e) => setNotas(e.target.value)} />
         </label>
       </div>
+      {estado === "realizado" ? (
+        <label className="field">
+          <span>Importe cobrado por el servicio *</span>
+          <input
+            type="text"
+            inputMode="decimal"
+            autoComplete="off"
+            value={importeServicioStr}
+            onChange={(e) => setImporteServicioStr(e.target.value)}
+            placeholder="Ej. 15000"
+          />
+          <span className="muted small">
+            Base para calcular la comisión del profesional (según su % o monto fijo en Equipo).
+          </span>
+        </label>
+      ) : null}
       <div className="drawer-actions">
         <button type="submit" className="btn primary btn-lg">
           {editingId ? "Guardar" : "Agendar"}
@@ -588,12 +616,6 @@ export function CitasPage() {
 
   return (
     <>
-      {error ? (
-        <div className="banner banner-error" role="alert">
-          {error}
-        </div>
-      ) : null}
-
       <SubNav
         moduleId="citas"
         enableNumberShortcuts={!drawerOpen}
@@ -812,7 +834,7 @@ export function CitasPage() {
                   <select value={estado} onChange={(e) => setEstado(e.target.value)}>
                     {ESTADOS.map((s) => (
                       <option key={s} value={s}>
-                        {s}
+                        {s === "realizado" ? "realizado (servicio cobrado / comisión)" : s}
                       </option>
                     ))}
                   </select>
@@ -822,6 +844,22 @@ export function CitasPage() {
                   <input value={notas} onChange={(e) => setNotas(e.target.value)} />
                 </label>
               </div>
+              {estado === "realizado" ? (
+                <label className="field">
+                  <span>Importe cobrado por el servicio *</span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    value={importeServicioStr}
+                    onChange={(e) => setImporteServicioStr(e.target.value)}
+                    placeholder="Ej. 15000"
+                  />
+                  <span className="muted small">
+                    Base para la comisión del profesional (configuración en Equipo → Empleados).
+                  </span>
+                </label>
+              ) : null}
               <div className="actions">
                 <button type="submit" className="btn primary">
                   {editingId ? "Guardar cita" : "Agendar"}
@@ -871,7 +909,6 @@ export function CitasPage() {
             <p className="muted">
               Varias citas al mismo cliente cada X días (ej. mantenimiento cada 15 días).
             </p>
-            {serieMsg ? <div className="banner banner-info">{serieMsg}</div> : null}
             <form className="form" onSubmit={onSerie}>
               <label className="field">
                 <span>Primera cita *</span>

@@ -19,7 +19,7 @@ export const productoService = {
       .prepare(
         `SELECT id, codigo_barras, nombre, marca, categoria, descripcion, imagen_url,
                 stock, precio, precio_compra, precio_venta, stock_minimo, fecha_vencimiento,
-                created_at, updated_at
+                proveedor_id, created_at, updated_at
          FROM productos ORDER BY updated_at DESC`
       )
       .all();
@@ -59,13 +59,21 @@ export const productoService = {
       if (dup) throw new AppError("Ya existe un producto con ese código de barras");
     }
 
+    const proveedor_id =
+      body.proveedor_id != null &&
+      body.proveedor_id !== "" &&
+      Number.isFinite(Number(body.proveedor_id)) &&
+      Number(body.proveedor_id) > 0
+        ? Math.floor(Number(body.proveedor_id))
+        : null;
+
     const info = await db
       .prepare(
         `INSERT INTO productos (
           codigo_barras, nombre, marca, categoria, descripcion, imagen_url,
           stock, precio, precio_compra, precio_venta, stock_minimo, fecha_vencimiento,
-          created_at, updated_at
-        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+          proveedor_id, created_at, updated_at
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
       )
       .run(
         codigo,
@@ -82,6 +90,7 @@ export const productoService = {
         typeof body.fecha_vencimiento === "string" && body.fecha_vencimiento.trim()
           ? body.fecha_vencimiento.trim()
           : null,
+        proveedor_id,
         now,
         now
       );
@@ -137,13 +146,22 @@ export const productoService = {
         ? Math.max(0, Math.floor(body.stock))
         : Number(existing.stock);
 
+    const proveedor_id =
+      body.proveedor_id === undefined
+        ? (existing.proveedor_id as number | null | undefined) ?? null
+        : body.proveedor_id === null || body.proveedor_id === ""
+          ? null
+          : Number.isFinite(Number(body.proveedor_id)) && Number(body.proveedor_id) > 0
+            ? Math.floor(Number(body.proveedor_id))
+            : null;
+
     const now = new Date().toISOString();
     await db
       .prepare(
         `UPDATE productos SET
         codigo_barras = ?, nombre = ?, marca = ?, categoria = ?, descripcion = ?, imagen_url = ?,
         stock = ?, precio = ?, precio_compra = ?, precio_venta = ?, stock_minimo = ?, fecha_vencimiento = ?,
-        updated_at = ?
+        proveedor_id = ?, updated_at = ?
        WHERE id = ?`
       )
       .run(
@@ -161,6 +179,7 @@ export const productoService = {
         typeof body.fecha_vencimiento === "string"
           ? body.fecha_vencimiento.trim() || null
           : existing.fecha_vencimiento,
+        proveedor_id,
         now,
         id
       );

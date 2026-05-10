@@ -36,13 +36,14 @@ export function readConfigTab(): ConfigTab {
   return "parametros";
 }
 
-export const EMPLEADOS_TABS = ["lista", "turnos", "movimientos", "roles"] as const;
+export const EMPLEADOS_TABS = ["lista", "turnos", "movimientos", "liquidacion", "roles"] as const;
 export type EmpleadosTab = (typeof EMPLEADOS_TABS)[number];
 
 /** Migra pestañas antiguas (`nuevo`, `comisiones`, `auditoria`) → válidas. */
 export function readEmpleadosTab(): EmpleadosTab {
   let t = readLastTab("empleados", "lista");
-  if (t === "nuevo" || t === "comisiones" || t === "auditoria") return "lista";
+  if (t === "nuevo" || t === "auditoria") return "lista";
+  if (t === "comisiones") return "liquidacion";
   if (EMPLEADOS_TABS.includes(t as EmpleadosTab)) return t as EmpleadosTab;
   return "lista";
 }

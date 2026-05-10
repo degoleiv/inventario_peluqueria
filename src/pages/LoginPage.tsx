@@ -8,16 +8,17 @@ import {
 } from "../api";
 import { setAccessToken } from "../auth/token";
 import { applyBrandingToDocument } from "../lib/brandingDocument";
+import { useToast } from "../context/ToastContext";
 
 type Props = { onLoggedIn: () => void };
 
 export function LoginPage({ onLoggedIn }: Props) {
+  const toast = useToast();
   const [needsBootstrap, setNeedsBootstrap] = useState<boolean | null>(null);
   const [branding, setBranding] = useState<BrandingConfig | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [nombre, setNombre] = useState("");
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -53,7 +54,6 @@ export function LoginPage({ onLoggedIn }: Props) {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
     setLoading(true);
     try {
       if (needsBootstrap) {
@@ -69,7 +69,7 @@ export function LoginPage({ onLoggedIn }: Props) {
       }
       onLoggedIn();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error de acceso");
+      toast(err instanceof Error ? err.message : "Error de acceso", "error");
     } finally {
       setLoading(false);
     }
@@ -105,11 +105,6 @@ export function LoginPage({ onLoggedIn }: Props) {
             ? "Creá el primer usuario administrador (solo esta vez)."
             : "Iniciá sesión con tu cuenta."}
         </p>
-        {error ? (
-          <div className="banner banner-error" role="alert">
-            {error}
-          </div>
-        ) : null}
         <form className="form" onSubmit={onSubmit}>
           {needsBootstrap ? (
             <label className="field">

@@ -47,6 +47,8 @@ export type Producto = {
   precio_venta: number | null;
   stock_minimo: number | null;
   fecha_vencimiento: string | null;
+  /** Si está definido, el ítem se asocia a ese proveedor (catálogo de pedidos). */
+  proveedor_id?: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -73,6 +75,8 @@ export type Cita = {
   servicio: string | null;
   estado: string;
   notas: string | null;
+  /** Cobrado por el servicio; obligatorio al pasar la cita a realizada (base de comisión). */
+  importe_servicio?: number | null;
   created_at: string;
   updated_at: string;
   cliente_nombre: string;
@@ -882,12 +886,17 @@ export async function fetchAuditoria(limit = 100): Promise<AuditoriaRow[]> {
 export type ComisionRow = {
   id: number;
   empleado_id: number;
-  venta_id: number;
+  venta_id: number | null;
+  cita_id?: number | null;
   monto: number;
   fecha: string;
   created_at: string;
+  base_calculo?: number | null;
   empleado_nombre?: string | null;
   venta_total?: number | null;
+  cita_servicio?: string | null;
+  cita_inicio?: string | null;
+  cita_cliente_nombre?: string | null;
 };
 
 export async function fetchEmpleadosComisiones(params?: {
@@ -901,6 +910,51 @@ export async function fetchEmpleadosComisiones(params?: {
   if (params?.usuario_id != null) q.set("usuario_id", String(params.usuario_id));
   const suffix = q.toString() ? `?${q}` : "";
   return requestJson(`/api/empleados/comisiones${suffix}`);
+}
+
+export type LiquidacionComisionLinea = {
+  comision_id: number;
+  fecha: string;
+  origen: "venta" | "cita";
+  detalle: string;
+  base: number | null;
+  monto: number;
+  venta_id: number | null;
+  cita_id: number | null;
+};
+
+export type LiquidacionTurnoAgenda = {
+  id: number;
+  empleado_id: number;
+  fecha: string;
+  hora_inicio: string;
+  hora_fin: string;
+  estado: string;
+  empleado_nombre?: string | null;
+};
+
+export type LiquidacionEmpleado = {
+  empleado_id: number;
+  empleado_nombre: string | null;
+  tipo_comision: string;
+  valor_comision: number;
+  total_comisiones: number;
+  lineas: LiquidacionComisionLinea[];
+  turnos_agenda: LiquidacionTurnoAgenda[];
+};
+
+export type LiquidacionComisionesResponse = {
+  periodo: { desde: string; hasta: string };
+  total_general: number;
+  empleados: LiquidacionEmpleado[];
+};
+
+export async function fetchEmpleadoLiquidacionComisiones(
+  desde: string,
+  hasta: string
+): Promise<LiquidacionComisionesResponse> {
+  const q = new URLSearchParams({ desde, hasta });
+  return requestJson(`/api/empleados/liquidacion-comisiones?${q}`);
 }
 
 export type TurnoEmpleado = {

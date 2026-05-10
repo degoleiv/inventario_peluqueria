@@ -8,6 +8,7 @@ export const AGENDA_SPAN_MIN = (AGENDA_END_HOUR - AGENDA_START_HOUR) * 60;
 function estadoVisualClass(estado: string) {
   const e = estado.toLowerCase();
   if (e.includes("cancel")) return "cita-estado--cancelado";
+  if (e.includes("realiz")) return "cita-estado--realizado";
   if (e.includes("confirm")) return "cita-estado--confirmado";
   return "cita-estado--pendiente";
 }

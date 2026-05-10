@@ -139,23 +139,47 @@ export const pedidoProveedorService = {
       .all(...args);
   },
 
-  async list(desde?: string, hasta?: string) {
+  async list(opts?: {
+    desde?: string;
+    hasta?: string;
+    proveedor_id?: number;
+    referencia?: string;
+  }) {
+    const desde = opts?.desde?.trim();
+    const hasta = opts?.hasta?.trim();
+    const proveedor_id = opts?.proveedor_id;
+    const referencia = opts?.referencia?.trim() ?? "";
+
     let sql = `SELECT co.*, pr.nombre AS proveedor_nombre_ref
                FROM pedidos_proveedor co
                LEFT JOIN proveedores pr ON pr.id = co.proveedor_id`;
-    const params: string[] = [];
-    if (desde) {
-      sql += ` WHERE co.fecha >= ?`;
-      params.push(desde);
-      if (hasta) {
-        sql += ` AND co.fecha <= ?`;
-        params.push(hasta);
-      }
-    } else if (hasta) {
-      sql += ` WHERE co.fecha <= ?`;
-      params.push(hasta);
+    const cond: string[] = [];
+    const params: (string | number)[] = [];
+
+    const d0 = desde ? parseDay(desde) : null;
+    if (d0) {
+      cond.push(`co.fecha >= ?`);
+      params.push(d0);
     }
-    sql += ` ORDER BY co.fecha DESC`;
+    const h0 = hasta ? parseDay(hasta) : null;
+    if (h0) {
+      cond.push(`co.fecha <= ?`);
+      params.push(h0);
+    }
+    if (proveedor_id != null && Number.isFinite(proveedor_id) && proveedor_id > 0) {
+      cond.push(`co.proveedor_id = ?`);
+      params.push(proveedor_id);
+    }
+    if (referencia) {
+      const low = referencia.toLowerCase();
+      cond.push(
+        `(INSTR(LOWER(COALESCE(co.referencia, '')), ?) > 0 OR CAST(co.id AS TEXT) = ? OR INSTR(CAST(co.id AS TEXT), ?) > 0)`
+      );
+      params.push(low, referencia, referencia);
+    }
+
+    if (cond.length) sql += ` WHERE ${cond.join(" AND ")}`;
+    sql += ` ORDER BY co.fecha DESC, co.id DESC`;
     const rows = (await db.prepare(sql).all(...params)) as Record<string, unknown>[];
     return rows.map((r) => enrichRow(r));
   },

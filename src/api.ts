@@ -84,6 +84,13 @@ export type Cita = {
   empleado_color?: string | null;
 };
 
+/** Datos mínimos del cliente al crear una cita sin elegir uno registrado. */
+export type CitaClienteDatos = {
+  nombre: string;
+  telefono: string;
+  cedula: string;
+};
+
 export type Venta = {
   id: number;
   cliente_id: number | null;
@@ -408,6 +415,136 @@ export async function updatePuntosConfig(body: Partial<PuntosConfig>): Promise<P
   });
 }
 
+/* Configuración: categorías de producto y servicios (admin) */
+export type CategoriaProducto = {
+  id: number;
+  nombre_categoria: string;
+  descripcion: string | null;
+  emoji: string | null;
+  estado: "activo" | "inactivo";
+  fecha_creacion: string;
+  updated_at: string;
+  productos_count: number;
+};
+
+export type ListCategoriasProductoResult = {
+  items: CategoriaProducto[];
+  total: number;
+  page: number;
+  page_size: number;
+};
+
+export type CategoriaServicio = {
+  id: number;
+  nombre_categoria: string;
+  descripcion: string | null;
+  emoji: string | null;
+  estado: "activo" | "inactivo";
+  fecha_creacion: string;
+  updated_at: string;
+  productos_count: number;
+};
+
+export type ListCategoriasServicioResult = {
+  items: CategoriaServicio[];
+  total: number;
+  page: number;
+  page_size: number;
+};
+
+type CategoriasListParams = {
+  q?: string;
+  estado?: "activo" | "inactivo" | "todos";
+  page?: number;
+  page_size?: number;
+};
+
+function categoriasListQuery(params?: CategoriasListParams): string {
+  const q = new URLSearchParams();
+  if (params?.q?.trim()) q.set("q", params.q.trim());
+  if (params?.estado) q.set("estado", params.estado);
+  if (params?.page != null && Number.isFinite(params.page)) q.set("page", String(params.page));
+  if (params?.page_size != null && Number.isFinite(params.page_size)) {
+    q.set("page_size", String(params.page_size));
+  }
+  const s = q.toString();
+  return s ? `?${s}` : "";
+}
+
+export async function fetchCategoriasProducto(
+  params?: CategoriasListParams
+): Promise<ListCategoriasProductoResult> {
+  return requestJson(`/api/configuracion/categorias-producto${categoriasListQuery(params)}`);
+}
+
+export async function createCategoriaProducto(body: {
+  nombre_categoria: string;
+  descripcion?: string | null;
+  estado?: "activo" | "inactivo";
+  emoji?: string | null;
+}): Promise<CategoriaProducto> {
+  return requestJson("/api/configuracion/categorias-producto", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function updateCategoriaProducto(
+  id: number,
+  body: {
+    nombre_categoria?: string;
+    descripcion?: string | null;
+    estado?: "activo" | "inactivo";
+    emoji?: string | null;
+  }
+): Promise<CategoriaProducto> {
+  return requestJson(`/api/configuracion/categorias-producto/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deleteCategoriaProducto(id: number): Promise<void> {
+  await requestJson(`/api/configuracion/categorias-producto/${id}`, { method: "DELETE" });
+}
+
+export async function fetchCategoriasServicio(
+  params?: CategoriasListParams
+): Promise<ListCategoriasServicioResult> {
+  return requestJson(`/api/configuracion/categorias-servicio${categoriasListQuery(params)}`);
+}
+
+export async function createCategoriaServicio(body: {
+  nombre_categoria: string;
+  descripcion?: string | null;
+  estado?: "activo" | "inactivo";
+  emoji?: string | null;
+}): Promise<CategoriaServicio> {
+  return requestJson("/api/configuracion/categorias-servicio", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function updateCategoriaServicio(
+  id: number,
+  body: {
+    nombre_categoria?: string;
+    descripcion?: string | null;
+    estado?: "activo" | "inactivo";
+    emoji?: string | null;
+  }
+): Promise<CategoriaServicio> {
+  return requestJson(`/api/configuracion/categorias-servicio/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deleteCategoriaServicio(id: number): Promise<void> {
+  await requestJson(`/api/configuracion/categorias-servicio/${id}`, { method: "DELETE" });
+}
+
 /* Clientes */
 export async function fetchClientes(q?: string): Promise<Cliente[]> {
   const suffix = q?.trim() ? `?q=${encodeURIComponent(q.trim())}` : "";
@@ -495,7 +632,9 @@ export async function fetchCitas(): Promise<Cita[]> {
   return requestJson("/api/citas");
 }
 
-export async function createCita(body: Partial<Cita>): Promise<Cita> {
+export async function createCita(
+  body: Partial<Cita> & { cliente_datos?: CitaClienteDatos }
+): Promise<Cita> {
   return requestJson("/api/citas", { method: "POST", body: JSON.stringify(body) });
 }
 
@@ -505,6 +644,75 @@ export async function updateCita(id: number, body: Partial<Cita>): Promise<Cita>
 
 export async function deleteCita(id: number): Promise<void> {
   await requestJson(`/api/citas/${id}`, { method: "DELETE" });
+}
+
+/** Indica si el empleado ya tiene turno solapado en ese horario (todas las citas activas en servidor). */
+export async function fetchCitaSolape(params: {
+  usuario_id: number;
+  inicio: string;
+  duracion_min: number;
+  exclude_cita_id?: number | null;
+}): Promise<{ solapa: boolean; cita: Cita | null }> {
+  const q = new URLSearchParams();
+  q.set("usuario_id", String(params.usuario_id));
+  q.set("inicio", params.inicio);
+  q.set("duracion_min", String(params.duracion_min));
+  if (params.exclude_cita_id != null) q.set("exclude_cita_id", String(params.exclude_cita_id));
+  return requestJson(`/api/citas/solape?${q}`);
+}
+
+export async function fetchCitasConfigAgenda(): Promise<{ open: number; close: number }> {
+  return requestJson("/api/citas/config-agenda");
+}
+
+export async function fetchCitasEmpleadoAgendaDia(
+  usuario_id: number,
+  fecha: string
+): Promise<{
+  fecha: string;
+  usuario_id: number;
+  segmentos: Array<{ hora_inicio: string; hora_fin: string }>;
+}> {
+  const q = new URLSearchParams({ usuario_id: String(usuario_id), fecha });
+  return requestJson(`/api/citas/empleado-agenda-dia?${q}`);
+}
+
+/** Turnos de trabajo (Empleados → Turnos) en un rango; requiere permiso `citas`. */
+export async function fetchCitasEmpleadoTurnosRango(params: {
+  usuario_id: number;
+  desde: string;
+  hasta: string;
+}): Promise<
+  Array<{
+    id: number;
+    empleado_id: number;
+    fecha: string;
+    hora_inicio: string;
+    hora_fin: string;
+    estado: string;
+    created_at: string;
+    empleado_nombre?: string | null;
+  }>
+> {
+  const q = new URLSearchParams({
+    usuario_id: String(params.usuario_id),
+    desde: params.desde,
+    hasta: params.hasta,
+  });
+  return requestJson(`/api/citas/empleado-turnos-rango?${q}`);
+}
+
+/** Crea un turno de trabajo para una fecha (horas opcionales; si no, franja del negocio). Requiere permiso citas. */
+export async function createCitaEmpleadoTurnoDia(body: {
+  usuario_id: number;
+  fecha: string;
+  hora_inicio?: string;
+  hora_fin?: string;
+}): Promise<TurnoEmpleado> {
+  return requestJson("/api/citas/empleado-turno-dia", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
 }
 
 /* Ventas */
@@ -631,13 +839,19 @@ export type PedidoProveedor = {
   lineas?: unknown[];
 };
 
-export async function fetchPedidosProveedores(
-  desde?: string,
-  hasta?: string
-): Promise<PedidoProveedor[]> {
+export async function fetchPedidosProveedores(params?: {
+  desde?: string;
+  hasta?: string;
+  proveedor_id?: number;
+  referencia?: string;
+}): Promise<PedidoProveedor[]> {
   const q = new URLSearchParams();
-  if (desde) q.set("desde", desde);
-  if (hasta) q.set("hasta", hasta);
+  if (params?.desde?.trim()) q.set("desde", params.desde.trim());
+  if (params?.hasta?.trim()) q.set("hasta", params.hasta.trim());
+  if (params?.proveedor_id != null && params.proveedor_id > 0) {
+    q.set("proveedor_id", String(params.proveedor_id));
+  }
+  if (params?.referencia?.trim()) q.set("referencia", params.referencia.trim());
   const suffix = q.toString() ? `?${q}` : "";
   return requestJson(`/api/pedidos-proveedores${suffix}`);
 }

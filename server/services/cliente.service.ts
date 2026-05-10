@@ -108,16 +108,16 @@ export const clienteService = {
   },
 
   /**
-   * Cliente temporal para una cita nueva: exige nombre, teléfono y cédula (no hace falta estar registrado antes).
+   * Cliente temporal para una cita nueva: exige nombre y teléfono (no hace falta estar registrado antes).
    * Si el teléfono ya existe, reutiliza ese cliente (misma lógica que createTemporal).
    */
   async createTemporalParaCita(body: Record<string, unknown>): Promise<number> {
     const nombre = typeof body.nombre === "string" ? body.nombre.trim() : "";
     const telefonoRaw = typeof body.telefono === "string" ? body.telefono.trim() : "";
-    const cedula = typeof body.cedula === "string" ? body.cedula.trim() : "";
+    const cedulaRaw = typeof body.cedula === "string" ? body.cedula.trim() : "";
+    const cedula = cedulaRaw || null;
     if (!nombre) throw new AppError("El nombre del cliente es obligatorio para la cita.");
     if (!telefonoRaw) throw new AppError("El teléfono del cliente es obligatorio para la cita.");
-    if (!cedula) throw new AppError("La cédula del cliente es obligatoria para la cita.");
     const telefono = telefonoRaw || null;
     if (telefono) {
       const ex = (await db

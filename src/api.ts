@@ -66,6 +66,8 @@ export type Cliente = {
   updated_at: string;
 };
 
+
+
 export type Cita = {
   id: number;
   cliente_id: number;

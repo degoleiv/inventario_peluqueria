@@ -12,9 +12,11 @@ import {
   fetchCitaSolape,
   fetchCitasSugerenciasHorario,
   fetchCitasEmpleadoTurnosRango,
+  fetchCategoriasServicio,
   fetchClientes,
   fetchEquipo,
   updateCita,
+  type CategoriaServicio,
   type Cita,
   type Cliente,
   type EquipoMiembro,
@@ -32,6 +34,21 @@ import {
 import type { PosPreloadCitaPayload } from "../lib/posPrecargaDesdeCita";
 import { CITAS_TABS, readCitasTab, type CitasTab } from "../lib/moduleRoutes";
 import { filterIntegerTyping, parseIntLoose } from "../lib/decimalInput";
+import { SearchableSelect } from "../components/SearchableSelect";
+
+const SERVICIO_EMOJI_FALLBACK = "💇";
+
+function parseServicios(value: string | null | undefined): string[] {
+  if (!value) return [];
+  return value
+    .split(/\s*,\s*|\s*;\s*|\s+\u00B7\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function serializeServicios(arr: string[]): string {
+  return arr.map((s) => s.trim()).filter(Boolean).join(", ");
+}
 
 /** Turnos cargados en Empleados → Turnos para colorear el mes (días sin turno = descanso). */
 type CalTurnosEstado =
@@ -283,7 +300,9 @@ export function CitasPage() {
 
   const [inicio, setInicio] = useState("");
   const [duracionStr, setDuracionStr] = useState("60");
-  const [servicio, setServicio] = useState("");
+  const [servicios, setServicios] = useState<string[]>([]);
+  const [serviciosCatalogo, setServiciosCatalogo] = useState<CategoriaServicio[]>([]);
+  const [serviciosCatalogoLoading, setServiciosCatalogoLoading] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -297,7 +316,8 @@ export function CitasPage() {
   /** Nueva cita: datos mínimos (no hace falta cliente registrado). */
   const [citaClienteNombre, setCitaClienteNombre] = useState("");
   const [citaClienteTelefono, setCitaClienteTelefono] = useState("");
-  const [citaClienteCedula, setCitaClienteCedula] = useState("");
+  const [modoClienteNuevo, setModoClienteNuevo] = useState<"existente" | "nuevo">("existente");
+  const [citaClienteExistenteId, setCitaClienteExistenteId] = useState<number | "">("");
 
   const [filtroProf, setFiltroProf] = useState<number | "todos">("todos");
 
@@ -623,7 +643,7 @@ export function CitasPage() {
   function reset() {
     setInicio("");
     setDuracionStr("60");
-    setServicio("");
+    setServicios([]);
     setEditingId(null);
     setProfesionalId(miUsuarioId ?? "");
     setCitaSolapeTurno(null);
@@ -631,7 +651,8 @@ export function CitasPage() {
     setClienteId("");
     setCitaClienteNombre("");
     setCitaClienteTelefono("");
-    setCitaClienteCedula("");
+    setModoClienteNuevo("existente");
+    setCitaClienteExistenteId("");
   }
 
   function cerrarModalHoras() {
@@ -647,16 +668,46 @@ export function CitasPage() {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
 
-  const servicioSugerencias = useMemo(() => {
-    const s = new Set<string>();
-    for (const c of citas) {
-      if (c.servicio && c.servicio.trim()) s.add(c.servicio.trim());
+  const cargarServiciosCatalogo = useCallback(async () => {
+    setServiciosCatalogoLoading(true);
+    try {
+      const res = await fetchCategoriasServicio({
+        estado: "activo",
+        page: 1,
+        page_size: 200,
+      });
+      setServiciosCatalogo(res.items ?? []);
+    } catch {
+      setServiciosCatalogo([]);
+    } finally {
+      setServiciosCatalogoLoading(false);
     }
-    return [...s].slice(0, 12);
-  }, [citas]);
+  }, []);
 
   useEffect(() => {
-    if (!drawerOpen || editingId == null) return;
+    if (!drawerOpen) return;
+    void cargarServiciosCatalogo();
+  }, [drawerOpen, cargarServiciosCatalogo]);
+
+  const servicioOpciones = useMemo(() => {
+    const opts = serviciosCatalogo.map((s) => {
+      const nombre = s.nombre_categoria;
+      const emoji = (s.emoji && s.emoji.trim()) || SERVICIO_EMOJI_FALLBACK;
+      return { value: nombre, emoji, nombre };
+    });
+    const seen = new Set(opts.map((o) => o.value.toLowerCase()));
+    const extras = servicios
+      .filter((s) => s.trim() && !seen.has(s.trim().toLowerCase()))
+      .map((s) => ({
+        value: s.trim(),
+        emoji: SERVICIO_EMOJI_FALLBACK,
+        nombre: s.trim(),
+      }));
+    return [...extras, ...opts];
+  }, [serviciosCatalogo, servicios]);
+
+  useEffect(() => {
+    if (!drawerOpen) return;
     let cancelled = false;
     void (async () => {
       setClientesPickLoading(true);
@@ -672,7 +723,7 @@ export function CitasPage() {
     return () => {
       cancelled = true;
     };
-  }, [drawerOpen, editingId]);
+  }, [drawerOpen]);
 
   useEffect(() => {
     if (!drawerOpen) return;
@@ -698,6 +749,17 @@ export function CitasPage() {
     }
     return out;
   }, [clientesPickList, editingId, citas]);
+
+  const opcionesClienteExistente = useMemo(() => {
+    return clientesPickList
+      .slice()
+      .filter((c) => c.activo !== 0)
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, "es", { sensitivity: "base" }))
+      .map((c) => ({
+        value: String(c.id),
+        label: c.telefono ? `${c.nombre} · ${c.telefono}` : c.nombre,
+      }));
+  }, [clientesPickList]);
 
   /** Solo lo que devuelve el servidor; no depende de «Inicio» para no reordenar huecos al cambiar la hora manualmente. */
   const slotsVisibles = useMemo(() => {
@@ -818,23 +880,39 @@ export function CitasPage() {
           cliente_id: Number(clienteId),
           inicio: inicioIso,
           duracion_min: duracionMin,
-          servicio: servicio.trim() || null,
+          servicio: serializeServicios(servicios) || null,
         });
       } else {
-        const nom = citaClienteNombre.trim();
-        const tel = citaClienteTelefono.trim();
-        const doc = citaClienteCedula.trim();
-        if (!nom || !tel || !doc) {
-          setError("Completá nombre, teléfono y cédula del cliente para agendar la cita.");
-          return;
+        if (modoClienteNuevo === "existente") {
+          if (
+            citaClienteExistenteId === "" ||
+            !Number.isFinite(Number(citaClienteExistenteId))
+          ) {
+            setError("Elegí un cliente existente o cambiá a «Cliente nuevo».");
+            return;
+          }
+          await createCita({
+            usuario_id: pid,
+            inicio: inicioIso,
+            duracion_min: duracionMin,
+            servicio: serializeServicios(servicios) || null,
+            cliente_id: Number(citaClienteExistenteId),
+          });
+        } else {
+          const nom = citaClienteNombre.trim();
+          const tel = citaClienteTelefono.trim();
+          if (!nom || !tel) {
+            setError("Completá nombre y teléfono del cliente para agendar la cita.");
+            return;
+          }
+          await createCita({
+            usuario_id: pid,
+            inicio: inicioIso,
+            duracion_min: duracionMin,
+            servicio: serializeServicios(servicios) || null,
+            cliente_datos: { nombre: nom, telefono: tel },
+          });
         }
-        await createCita({
-          usuario_id: pid,
-          inicio: inicioIso,
-          duracion_min: duracionMin,
-          servicio: servicio.trim() || null,
-          cliente_datos: { nombre: nom, telefono: tel, cedula: doc },
-        });
       }
       reset();
       setDrawerOpen(false);
@@ -855,11 +933,12 @@ export function CitasPage() {
     setProfesionalId(x.usuario_id != null ? x.usuario_id : miUsuarioId ?? "");
     setInicio(toLocalInput(x.inicio));
     setDuracionStr(String(x.duracion_min));
-    setServicio(x.servicio ?? "");
+    setServicios(parseServicios(x.servicio));
     setClienteId(x.cliente_id);
     setCitaClienteNombre("");
     setCitaClienteTelefono("");
-    setCitaClienteCedula("");
+    setModoClienteNuevo("existente");
+    setCitaClienteExistenteId("");
     setDrawerOpen(true);
   }
 
@@ -1128,44 +1207,93 @@ export function CitasPage() {
       ) : null}
       {editingId == null ? (
         <div className="drawer-cita-datos-contacto" role="group" aria-label="Datos del cliente">
-          <p className="muted small drawer-cita-datos-contacto-hint">
-            Solo hace falta nombre, teléfono y cédula. No es obligatorio tener al cliente dado de alta antes.
-          </p>
-          <div className="grid-2 drawer-cita-datos-contacto-grid">
-            <label className="field">
-              <span>Nombre *</span>
-              <input
-                type="text"
-                autoComplete="name"
-                required
-                value={citaClienteNombre}
-                onChange={(e) => setCitaClienteNombre(e.target.value)}
-                placeholder="Nombre completo"
-              />
-            </label>
-            <label className="field">
-              <span>Teléfono *</span>
-              <input
-                type="tel"
-                autoComplete="tel"
-                required
-                value={citaClienteTelefono}
-                onChange={(e) => setCitaClienteTelefono(e.target.value)}
-                placeholder="Celular o fijo"
-              />
-            </label>
-            <label className="field drawer-cita-datos-contacto-cedula">
-              <span>Cédula *</span>
-              <input
-                type="text"
-                autoComplete="off"
-                required
-                value={citaClienteCedula}
-                onChange={(e) => setCitaClienteCedula(e.target.value)}
-                placeholder="Número de documento"
-              />
-            </label>
+          <div
+            className="cita-cliente-modo-toggle"
+            role="tablist"
+            aria-label="Modo de cliente"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={modoClienteNuevo === "existente"}
+              className={`cita-cliente-modo-toggle__opt ${
+                modoClienteNuevo === "existente" ? "is-active" : ""
+              }`}
+              onClick={() => setModoClienteNuevo("existente")}
+            >
+              Cliente existente
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={modoClienteNuevo === "nuevo"}
+              className={`cita-cliente-modo-toggle__opt ${
+                modoClienteNuevo === "nuevo" ? "is-active" : ""
+              }`}
+              onClick={() => setModoClienteNuevo("nuevo")}
+            >
+              Cliente nuevo
+            </button>
           </div>
+          {modoClienteNuevo === "existente" ? (
+            <SearchableSelect
+              label="Cliente *"
+              value={
+                citaClienteExistenteId === "" ? "" : String(citaClienteExistenteId)
+              }
+              onChange={(v) =>
+                setCitaClienteExistenteId(v === "" ? "" : Number(v))
+              }
+              options={opcionesClienteExistente}
+              placeholder="Buscar por nombre o teléfono…"
+              idleTextWhenEmpty={
+                clientesPickLoading
+                  ? "Cargando clientes…"
+                  : "Seleccioná un cliente…"
+              }
+              emptySlot={
+                <div className="searchable-select__empty-actions">
+                  <p className="muted small" style={{ marginBottom: "0.5rem" }}>
+                    No hay clientes registrados.
+                  </p>
+                  <Link to="/clientes/nuevo" className="btn secondary small">
+                    Registrar cliente
+                  </Link>
+                </div>
+              }
+              hint="¿No está en la lista? Cambiá a «Cliente nuevo» o registralo en Clientes."
+            />
+          ) : (
+            <>
+              <p className="muted small drawer-cita-datos-contacto-hint">
+                Solo hace falta nombre y teléfono.
+              </p>
+              <div className="grid-2 drawer-cita-datos-contacto-grid">
+                <label className="field">
+                  <span>Nombre *</span>
+                  <input
+                    type="text"
+                    autoComplete="name"
+                    required
+                    value={citaClienteNombre}
+                    onChange={(e) => setCitaClienteNombre(e.target.value)}
+                    placeholder="Nombre completo"
+                  />
+                </label>
+                <label className="field">
+                  <span>Teléfono *</span>
+                  <input
+                    type="tel"
+                    autoComplete="tel"
+                    required
+                    value={citaClienteTelefono}
+                    onChange={(e) => setCitaClienteTelefono(e.target.value)}
+                    placeholder="Celular o fijo"
+                  />
+                </label>
+              </div>
+            </>
+          )}
         </div>
       ) : null}
       <div className="drawer-sugerencias">
@@ -1173,7 +1301,7 @@ export function CitasPage() {
           <p className="muted small">Buscando horarios libres…</p>
         ) : slotsVisibles.length > 0 ? (
           <>
-            <p className="muted small">
+            <p className="muted drawer-sugerencias-hint">
               Sugerencias cada hora en punto. En la grilla mantené presionado y arrastrá para elegir la hora
               (cada 5 min), usá el campo «Hora de inicio» o editá la cita.
             </p>
@@ -1283,20 +1411,63 @@ export function CitasPage() {
           </label>
         </div>
       )}
-      <label className="field">
-        <span>Servicio</span>
-        <input
-          list="agenda-servicios-datalist"
-          value={servicio}
-          onChange={(e) => setServicio(e.target.value)}
-          placeholder="Corte, tinte…"
-        />
-        <datalist id="agenda-servicios-datalist">
-          {servicioSugerencias.map((s) => (
-            <option key={s} value={s} />
-          ))}
-        </datalist>
-      </label>
+      <div className="field servicios-multi-field">
+        <span className="servicios-multi-field__label">
+          Servicios
+          {servicios.length > 0 ? (
+            <span className="servicios-multi-field__count">({servicios.length})</span>
+          ) : null}
+        </span>
+        {servicioOpciones.length === 0 ? (
+          <p className="muted small servicios-multi-field__empty">
+            {serviciosCatalogoLoading ? (
+              "Cargando servicios…"
+            ) : (
+              <>
+                No hay servicios activos.{" "}
+                <Link to="/configuracion/parametros">Crear en Configuración</Link>.
+              </>
+            )}
+          </p>
+        ) : (
+          <ul className="servicios-multi-check" role="group" aria-label="Servicios">
+            {servicioOpciones.map((opt) => {
+              const checked = servicios.some(
+                (s) => s.toLowerCase() === opt.value.toLowerCase()
+              );
+              return (
+                <li key={opt.value} className="servicios-multi-check__row">
+                  <label
+                    className={`servicios-multi-check__item ${checked ? "is-checked" : ""}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setServicios((prev) =>
+                            prev.some((s) => s.toLowerCase() === opt.value.toLowerCase())
+                              ? prev
+                              : [...prev, opt.value]
+                          );
+                        } else {
+                          setServicios((prev) =>
+                            prev.filter((s) => s.toLowerCase() !== opt.value.toLowerCase())
+                          );
+                        }
+                      }}
+                    />
+                    <span className="servicios-multi-check__emoji" aria-hidden>
+                      {opt.emoji}
+                    </span>
+                    <span className="servicios-multi-check__name">{opt.nombre}</span>
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
       <div className="drawer-actions">
         <button
           type="submit"

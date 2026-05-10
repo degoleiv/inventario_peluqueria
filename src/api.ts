@@ -47,9 +47,8 @@ export type Producto = {
   precio_venta: number | null;
   stock_minimo: number | null;
   fecha_vencimiento: string | null;
-  /** Proveedor preferente (catálogo / alta desde pedido). */
+  /** Si está definido, el ítem se asocia a ese proveedor (catálogo de pedidos). */
   proveedor_id?: number | null;
-  estado?: "activo" | "inactivo";
   created_at: string;
   updated_at: string;
 };
@@ -60,22 +59,11 @@ export type Cliente = {
   telefono: string | null;
   email: string | null;
   notas: string | null;
-  tipo_documento?: string | null;
-  numero_documento?: string | null;
-  direccion?: string | null;
-  cedula?: string | null;
   puntos?: number;
   tipo_cliente?: "registrado" | "temporal";
   activo?: number;
   created_at: string;
   updated_at: string;
-};
-
-/** Datos mínimos del cliente al crear una cita sin elegir uno registrado. */
-export type CitaClienteDatos = {
-  nombre: string;
-  telefono: string;
-  cedula: string;
 };
 
 export type Cita = {
@@ -87,6 +75,8 @@ export type Cita = {
   servicio: string | null;
   estado: string;
   notas: string | null;
+  /** Cobrado por el servicio; obligatorio al pasar la cita a realizada (base de comisión). */
+  importe_servicio?: number | null;
   created_at: string;
   updated_at: string;
   cliente_nombre: string;
@@ -310,16 +300,6 @@ export async function fetchUsuarios(): Promise<UsuarioListado[]> {
   return requestJson("/api/usuarios");
 }
 
-/** Opcional en POST /usuarios: genera filas en Turnos para el nuevo empleado. */
-export type TurnoPlantillaInicial = {
-  fecha_desde: string;
-  fecha_hasta: string;
-  /** 0 = domingo … 6 = sábado (como `Date.getDay()`). */
-  dias_semana: number[];
-  hora_inicio: string;
-  hora_fin: string;
-};
-
 export async function createUsuario(body: {
   email: string;
   password: string;
@@ -330,8 +310,7 @@ export async function createUsuario(body: {
   foto_url?: string | null;
   tipo_comision?: string;
   valor_comision?: number;
-  turno_inicial?: TurnoPlantillaInicial;
-}): Promise<UsuarioListado & { turnos_creados?: number }> {
+}): Promise<UsuarioListado> {
   return requestJson("/api/usuarios", { method: "POST", body: JSON.stringify(body) });
 }
 
@@ -389,127 +368,6 @@ export async function updateSistemaPrefs(body: Partial<SistemaPrefs>): Promise<S
   });
 }
 
-export type CategoriaProducto = {
-  id: number;
-  nombre_categoria: string;
-  descripcion: string | null;
-  /** Emoji guardado para el listado; si es null se usa uno por defecto según el nombre. */
-  emoji: string | null;
-  estado: "activo" | "inactivo";
-  fecha_creacion: string;
-  updated_at: string;
-  /** Cantidad de productos con la misma categoría (texto en inventario). */
-  productos_count: number;
-};
-
-export type CategoriasProductoListResponse = {
-  items: CategoriaProducto[];
-  total: number;
-  page: number;
-  page_size: number;
-};
-
-export async function fetchCategoriasProducto(params?: {
-  q?: string;
-  estado?: "activo" | "inactivo" | "todos";
-  page?: number;
-  page_size?: number;
-}): Promise<CategoriasProductoListResponse> {
-  const sp = new URLSearchParams();
-  if (params?.q?.trim()) sp.set("q", params.q.trim());
-  if (params?.estado) sp.set("estado", params.estado);
-  if (params?.page != null && Number.isFinite(params.page)) sp.set("page", String(Math.floor(params.page)));
-  if (params?.page_size != null && Number.isFinite(params.page_size)) {
-    sp.set("page_size", String(Math.floor(params.page_size)));
-  }
-  const suffix = sp.toString() ? `?${sp.toString()}` : "";
-  return requestJson(`/api/configuracion/categorias-producto${suffix}`);
-}
-
-export async function createCategoriaProducto(body: {
-  nombre_categoria: string;
-  descripcion?: string | null;
-  estado?: "activo" | "inactivo";
-  emoji?: string | null;
-}): Promise<CategoriaProducto> {
-  return requestJson("/api/configuracion/categorias-producto", {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-}
-
-export async function updateCategoriaProducto(
-  id: number,
-  body: Partial<{
-    nombre_categoria: string;
-    descripcion: string | null;
-    estado: "activo" | "inactivo";
-    emoji: string | null;
-  }>
-): Promise<CategoriaProducto> {
-  return requestJson(`/api/configuracion/categorias-producto/${id}`, {
-    method: "PATCH",
-    body: JSON.stringify(body),
-  });
-}
-
-export async function deleteCategoriaProducto(id: number): Promise<void> {
-  await requestJson(`/api/configuracion/categorias-producto/${id}`, { method: "DELETE" });
-}
-
-/** Misma forma que `CategoriaProducto`; `productos_count` = citas con ese `servicio`. */
-export type CategoriaServicio = CategoriaProducto;
-
-export type CategoriasServicioListResponse = CategoriasProductoListResponse;
-
-export async function fetchCategoriasServicio(params?: {
-  q?: string;
-  estado?: "activo" | "inactivo" | "todos";
-  page?: number;
-  page_size?: number;
-}): Promise<CategoriasServicioListResponse> {
-  const sp = new URLSearchParams();
-  if (params?.q?.trim()) sp.set("q", params.q.trim());
-  if (params?.estado) sp.set("estado", params.estado);
-  if (params?.page != null && Number.isFinite(params.page)) sp.set("page", String(Math.floor(params.page)));
-  if (params?.page_size != null && Number.isFinite(params.page_size)) {
-    sp.set("page_size", String(Math.floor(params.page_size)));
-  }
-  const suffix = sp.toString() ? `?${sp.toString()}` : "";
-  return requestJson(`/api/configuracion/categorias-servicio${suffix}`);
-}
-
-export async function createCategoriaServicio(body: {
-  nombre_categoria: string;
-  descripcion?: string | null;
-  estado?: "activo" | "inactivo";
-  emoji?: string | null;
-}): Promise<CategoriaServicio> {
-  return requestJson("/api/configuracion/categorias-servicio", {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-}
-
-export async function updateCategoriaServicio(
-  id: number,
-  body: Partial<{
-    nombre_categoria: string;
-    descripcion: string | null;
-    estado: "activo" | "inactivo";
-    emoji: string | null;
-  }>
-): Promise<CategoriaServicio> {
-  return requestJson(`/api/configuracion/categorias-servicio/${id}`, {
-    method: "PATCH",
-    body: JSON.stringify(body),
-  });
-}
-
-export async function deleteCategoriaServicio(id: number): Promise<void> {
-  await requestJson(`/api/configuracion/categorias-servicio/${id}`, { method: "DELETE" });
-}
-
 export async function deleteUsuario(id: number): Promise<void> {
   await requestJson(`/api/usuarios/${id}`, { method: "DELETE" });
 }
@@ -523,41 +381,8 @@ export async function fetchProductos(): Promise<Producto[]> {
   return requestJson("/api/productos");
 }
 
-export async function fetchProductosPorProveedor(
-  proveedorId: number,
-  opts?: { q?: string; limit?: number }
-): Promise<Producto[]> {
-  const q = new URLSearchParams();
-  if (opts?.q?.trim()) q.set("q", opts.q.trim());
-  if (opts?.limit != null && Number.isFinite(opts.limit)) q.set("limit", String(Math.floor(opts.limit)));
-  const suffix = q.toString() ? `?${q.toString()}` : "";
-  return requestJson(`/api/proveedores/${proveedorId}/productos${suffix}`);
-}
-
-export type InventarioCatalogoCategoria = { id: number; nombre_categoria: string };
-export type InventarioCatalogoProveedor = { id: number; nombre: string };
-export type InventarioCatalogo = {
-  categorias: InventarioCatalogoCategoria[];
-  proveedores: InventarioCatalogoProveedor[];
-};
-
-export async function fetchInventarioCatalogo(): Promise<InventarioCatalogo> {
-  return requestJson("/api/inventario/catalogo");
-}
-
 export async function createProducto(body: Partial<Producto>): Promise<Producto> {
   return requestJson("/api/productos", { method: "POST", body: JSON.stringify(body) });
-}
-
-/** Alta desde flujo de pedidos: asocia `proveedor_id` al proveedor de la URL (permiso `pedidos`). */
-export async function createProductoRapidoDesdePedido(
-  proveedorId: number,
-  body: Record<string, unknown>
-): Promise<Producto> {
-  return requestJson(`/api/proveedores/${proveedorId}/productos-rapido`, {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
 }
 
 export async function updateProducto(id: number, body: Partial<Producto>): Promise<Producto> {
@@ -566,16 +391,6 @@ export async function updateProducto(id: number, body: Partial<Producto>): Promi
 
 export async function deleteProducto(id: number): Promise<void> {
   await requestJson(`/api/productos/${id}`, { method: "DELETE" });
-}
-
-export async function patchProductoEstado(
-  id: number,
-  estado: "activo" | "inactivo"
-): Promise<Producto> {
-  return requestJson(`/api/productos/${id}/estado`, {
-    method: "PATCH",
-    body: JSON.stringify({ estado }),
-  });
 }
 
 export async function lookupBarcode(codigo: string): Promise<LookupOk | LookupManual> {
@@ -676,78 +491,11 @@ export async function convertirClienteRegistrado(
 }
 
 /* Citas */
-export async function fetchCitas(params?: {
-  desde?: string;
-  hasta?: string;
-  usuario_id?: number;
-}): Promise<Cita[]> {
-  const q = new URLSearchParams();
-  if (params?.desde) q.set("desde", params.desde);
-  if (params?.hasta) q.set("hasta", params.hasta);
-  if (params?.usuario_id != null) q.set("usuario_id", String(params.usuario_id));
-  const suffix = q.toString() ? `?${q}` : "";
-  return requestJson(`/api/citas${suffix}`);
+export async function fetchCitas(): Promise<Cita[]> {
+  return requestJson("/api/citas");
 }
 
-/** Indica si el empleado ya tiene turno solapado en ese horario (todas las citas activas en servidor). */
-export async function fetchCitaSolape(params: {
-  usuario_id: number;
-  inicio: string;
-  duracion_min: number;
-  exclude_cita_id?: number | null;
-}): Promise<{ solapa: boolean; cita: Cita | null }> {
-  const q = new URLSearchParams();
-  q.set("usuario_id", String(params.usuario_id));
-  q.set("inicio", params.inicio);
-  q.set("duracion_min", String(params.duracion_min));
-  if (params.exclude_cita_id != null) q.set("exclude_cita_id", String(params.exclude_cita_id));
-  return requestJson(`/api/citas/solape?${q}`);
-}
-
-export async function fetchCitasConfigAgenda(): Promise<{ open: number; close: number }> {
-  return requestJson("/api/citas/config-agenda");
-}
-
-export async function fetchCitasEmpleadoAgendaDia(
-  usuario_id: number,
-  fecha: string
-): Promise<{
-  fecha: string;
-  usuario_id: number;
-  segmentos: Array<{ hora_inicio: string; hora_fin: string }>;
-}> {
-  const q = new URLSearchParams({ usuario_id: String(usuario_id), fecha });
-  return requestJson(`/api/citas/empleado-agenda-dia?${q}`);
-}
-
-/** Turnos de trabajo (Empleados → Turnos) en un rango; requiere permiso `citas` (no admin). */
-export async function fetchCitasEmpleadoTurnosRango(params: {
-  usuario_id: number;
-  desde: string;
-  hasta: string;
-}): Promise<
-  Array<{
-    id: number;
-    empleado_id: number;
-    fecha: string;
-    hora_inicio: string;
-    hora_fin: string;
-    estado: string;
-    created_at: string;
-    empleado_nombre?: string | null;
-  }>
-> {
-  const q = new URLSearchParams({
-    usuario_id: String(params.usuario_id),
-    desde: params.desde,
-    hasta: params.hasta,
-  });
-  return requestJson(`/api/citas/empleado-turnos-rango?${q}`);
-}
-
-export async function createCita(
-  body: Partial<Cita> & { cliente_datos?: CitaClienteDatos }
-): Promise<Cita> {
+export async function createCita(body: Partial<Cita>): Promise<Cita> {
   return requestJson("/api/citas", { method: "POST", body: JSON.stringify(body) });
 }
 
@@ -1138,12 +886,17 @@ export async function fetchAuditoria(limit = 100): Promise<AuditoriaRow[]> {
 export type ComisionRow = {
   id: number;
   empleado_id: number;
-  venta_id: number;
+  venta_id: number | null;
+  cita_id?: number | null;
   monto: number;
   fecha: string;
   created_at: string;
+  base_calculo?: number | null;
   empleado_nombre?: string | null;
   venta_total?: number | null;
+  cita_servicio?: string | null;
+  cita_inicio?: string | null;
+  cita_cliente_nombre?: string | null;
 };
 
 export async function fetchEmpleadosComisiones(params?: {
@@ -1159,6 +912,51 @@ export async function fetchEmpleadosComisiones(params?: {
   return requestJson(`/api/empleados/comisiones${suffix}`);
 }
 
+export type LiquidacionComisionLinea = {
+  comision_id: number;
+  fecha: string;
+  origen: "venta" | "cita";
+  detalle: string;
+  base: number | null;
+  monto: number;
+  venta_id: number | null;
+  cita_id: number | null;
+};
+
+export type LiquidacionTurnoAgenda = {
+  id: number;
+  empleado_id: number;
+  fecha: string;
+  hora_inicio: string;
+  hora_fin: string;
+  estado: string;
+  empleado_nombre?: string | null;
+};
+
+export type LiquidacionEmpleado = {
+  empleado_id: number;
+  empleado_nombre: string | null;
+  tipo_comision: string;
+  valor_comision: number;
+  total_comisiones: number;
+  lineas: LiquidacionComisionLinea[];
+  turnos_agenda: LiquidacionTurnoAgenda[];
+};
+
+export type LiquidacionComisionesResponse = {
+  periodo: { desde: string; hasta: string };
+  total_general: number;
+  empleados: LiquidacionEmpleado[];
+};
+
+export async function fetchEmpleadoLiquidacionComisiones(
+  desde: string,
+  hasta: string
+): Promise<LiquidacionComisionesResponse> {
+  const q = new URLSearchParams({ desde, hasta });
+  return requestJson(`/api/empleados/liquidacion-comisiones?${q}`);
+}
+
 export type TurnoEmpleado = {
   id: number;
   empleado_id: number;
@@ -1169,19 +967,6 @@ export type TurnoEmpleado = {
   created_at: string;
   empleado_nombre?: string | null;
 };
-
-/** Crea un turno de trabajo para una fecha (horas opcionales; si no, franja del negocio). Requiere permiso citas. */
-export async function createCitaEmpleadoTurnoDia(body: {
-  usuario_id: number;
-  fecha: string;
-  hora_inicio?: string;
-  hora_fin?: string;
-}): Promise<TurnoEmpleado> {
-  return requestJson("/api/citas/empleado-turno-dia", {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-}
 
 export async function fetchEmpleadosTurnos(params?: {
   desde?: string;

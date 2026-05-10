@@ -1,23 +1,15 @@
 import { Navigate, useParams } from "react-router-dom";
+import { PEDIDOS_TABS, readPedidosTab, type PedidosTab } from "../lib/moduleRoutes";
 import { PedidosProveedoresPage } from "./PedidosProveedoresPage";
+import { ProveedoresPage } from "./ProveedoresPage";
 
 export function PedidosModulePage() {
-  const { tab: tabParam } = useParams<{ tab?: string }>();
-  const normalized = (tabParam ?? "").trim().toLowerCase();
+  const { tab: tabParam } = useParams<{ tab: string }>();
+  const tabOk = tabParam != null && PEDIDOS_TABS.includes(tabParam as PedidosTab);
+  if (!tabOk) {
+    return <Navigate to={`/pedidos/${readPedidosTab()}`} replace />;
+  }
+  const tab = tabParam as PedidosTab;
 
-  if (normalized === "proveedores") {
-    return <Navigate to="/proveedores" replace />;
-  }
-  if (normalized === "pedidos_proveedores" || normalized === "compras") {
-    return <Navigate to="/pedidos" replace />;
-  }
-  if (normalized !== "" && normalized !== "pedidos-proveedores") {
-    return <Navigate to="/pedidos" replace />;
-  }
-
-  return (
-    <div className="page-pedidos">
-      <PedidosProveedoresPage />
-    </div>
-  );
+  return tab === "proveedores" ? <ProveedoresPage /> : <PedidosProveedoresPage />;
 }

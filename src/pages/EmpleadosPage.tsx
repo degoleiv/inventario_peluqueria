@@ -10,6 +10,7 @@ import {
   deleteUsuario,
   downloadCertificadoLaboral,
   fetchAuthMe,
+  fetchEmpleadoLiquidacionComisiones,
   fetchEmpleadoResumen,
   fetchEmpleadosMovimientos,
   fetchEmpleadosTurnos,
@@ -21,6 +22,7 @@ import {
   type EmpleadoMovimiento,
   type EmpleadoResumen,
   type RolDefinicion,
+  type LiquidacionComisionesResponse,
   type TurnoEmpleado,
   type TurnoPlantillaInicial,
   type UsuarioListado,
@@ -73,6 +75,13 @@ const TURNO_DIAS_SEMANA_OPTS: { v: number; lab: string }[] = [
 function isoMonthStart() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+}
+
+/** Inicio de ventana de N días hacia atrás desde hoy (inclusive). */
+function isoDesdeHaceDiasInclusive(dias: number) {
+  const d = new Date();
+  d.setDate(d.getDate() - (dias - 1));
+  return d.toISOString().slice(0, 10);
 }
 
 function formatMoney(n: number) {
@@ -130,6 +139,11 @@ export function EmpleadosPage({ onChanged }: Props) {
   const [filtDesde, setFiltDesde] = useState(isoMonthStart);
   const [filtHasta, setFiltHasta] = useState(isoToday);
   const [filtUsuario, setFiltUsuario] = useState<number | "">("");
+
+  const [liqDesde, setLiqDesde] = useState(() => isoDesdeHaceDiasInclusive(15));
+  const [liqHasta, setLiqHasta] = useState(isoToday);
+  const [liqData, setLiqData] = useState<LiquidacionComisionesResponse | null>(null);
+  const [liqLoading, setLiqLoading] = useState(false);
 
   const [turnosRows, setTurnosRows] = useState<TurnoEmpleado[]>([]);
   const [movimientosRows, setMovimientosRows] = useState<EmpleadoMovimiento[]>([]);
@@ -533,6 +547,24 @@ export function EmpleadosPage({ onChanged }: Props) {
     void loadMovimientosTab();
   }, [tabParam, loadMovimientosTab]);
 
+  const loadLiquidacion = useCallback(async () => {
+    setLiqLoading(true);
+    try {
+      const data = await fetchEmpleadoLiquidacionComisiones(liqDesde, liqHasta);
+      setLiqData(data);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Error", "error");
+      setLiqData(null);
+    } finally {
+      setLiqLoading(false);
+    }
+  }, [liqDesde, liqHasta, toast]);
+
+  useEffect(() => {
+    if (tabParam !== "liquidacion") return;
+    void loadLiquidacion();
+  }, [tabParam, loadLiquidacion]);
+
   const tabOk =
     tabParam != null &&
     (EMPLEADOS_TABS.includes(tabParam as EmpleadosTab) || tabParam === "nuevo");
@@ -549,6 +581,7 @@ export function EmpleadosPage({ onChanged }: Props) {
           { id: "lista", label: "Empleados", to: "/empleados/lista" },
           { id: "turnos", label: "Turnos", to: "/empleados/turnos" },
           { id: "movimientos", label: "Movimientos", to: "/empleados/movimientos" },
+          { id: "liquidacion", label: "Liquidación", to: "/empleados/liquidacion" },
           { id: "roles", label: "Roles", to: "/empleados/roles" },
         ]}
       />
@@ -1159,6 +1192,197 @@ export function EmpleadosPage({ onChanged }: Props) {
               </tbody>
             </table>
           </div>
+        </section>
+      ) : null}
+
+      {tab === "liquidacion" ? (
+        <section className="card">
+          <div className="card-head">
+            <h2 className="card-title">Liquidación de comisiones</h2>
+            <button type="button" className="btn ghost small" onClick={() => void loadLiquidacion()}>
+              Actualizar
+            </button>
+          </div>
+          <p className="hint">
+            Las citas en estado <strong>realizado</strong> con importe cobrado generan comisión con el porcentaje
+            o monto fijo configurado en cada empleado (igual que las ventas en POS). Acá ves el total a pagar por
+            persona, el detalle por venta/cita y los bloques de turno de agenda registrados en el mismo período.
+          </p>
+          <div className="field-row" style={{ marginBottom: "1rem", flexWrap: "wrap", alignItems: "flex-end" }}>
+            <label className="field">
+              <span>Desde</span>
+              <input type="date" value={liqDesde} max={liqHasta} onChange={(e) => setLiqDesde(e.target.value)} />
+            </label>
+            <label className="field">
+              <span>Hasta</span>
+              <input type="date" value={liqHasta} min={liqDesde} onChange={(e) => setLiqHasta(e.target.value)} />
+            </label>
+            <button
+              type="button"
+              className="btn secondary"
+              onClick={() => {
+                setLiqDesde(isoDesdeHaceDiasInclusive(15));
+                setLiqHasta(isoToday());
+              }}
+            >
+              Últimos 15 días
+            </button>
+            <button type="button" className="btn primary" onClick={() => void loadLiquidacion()}>
+              Aplicar rango
+            </button>
+          </div>
+          {liqLoading ? (
+            <p className="muted">Cargando…</p>
+          ) : liqData ? (
+            <>
+              <div
+                className="panel-like"
+                style={{
+                  padding: "1rem",
+                  marginBottom: "1.25rem",
+                  border: "1px solid var(--border)",
+                  borderRadius: "8px",
+                  background: "var(--panel)",
+                }}
+              >
+                <div className="muted small">
+                  Período {liqData.periodo.desde} — {liqData.periodo.hasta}
+                </div>
+                <div style={{ fontSize: "1.25rem", marginTop: "0.35rem" }}>
+                  Total comisiones (todas):{" "}
+                  <strong>
+                    {new Intl.NumberFormat("es-AR", {
+                      style: "currency",
+                      currency: "ARS",
+                      minimumFractionDigits: 2,
+                    }).format(liqData.total_general)}
+                  </strong>
+                </div>
+              </div>
+              {liqData.empleados.length === 0 ? (
+                <p className="muted">No hay datos en este rango.</p>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+                  {liqData.empleados.map((emp) => (
+                    <div
+                      key={emp.empleado_id}
+                      style={{
+                        border: "1px solid var(--border)",
+                        borderRadius: "8px",
+                        padding: "1rem",
+                      }}
+                    >
+                      <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: "0.5rem" }}>
+                        <div>
+                          <strong>{emp.empleado_nombre ?? `Empleado #${emp.empleado_id}`}</strong>
+                          {emp.tipo_comision ? (
+                            <div className="muted small">
+                              Comisión:{" "}
+                              {emp.tipo_comision === "fijo"
+                                ? `fijo ${formatMoney(emp.valor_comision)} por operación`
+                                : `${emp.valor_comision} % sobre base`}
+                            </div>
+                          ) : null}
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                          <div className="muted small">A pagar (comisiones período)</div>
+                          <div style={{ fontSize: "1.15rem" }}>
+                            <strong>
+                              {new Intl.NumberFormat("es-AR", {
+                                style: "currency",
+                                currency: "ARS",
+                                minimumFractionDigits: 2,
+                              }).format(emp.total_comisiones)}
+                            </strong>
+                          </div>
+                        </div>
+                      </div>
+                      {emp.lineas.length > 0 ? (
+                        <>
+                          <h3 className="card-title" style={{ fontSize: "0.95rem", marginTop: "1rem" }}>
+                            Detalle comisiones
+                          </h3>
+                          <div className="table-wrap">
+                            <table className="table">
+                              <thead>
+                                <tr>
+                                  <th>Fecha</th>
+                                  <th>Origen</th>
+                                  <th>Detalle</th>
+                                  <th>Base</th>
+                                  <th>Comisión</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {emp.lineas.map((ln) => (
+                                  <tr key={ln.comision_id}>
+                                    <td className="mono small">{ln.fecha}</td>
+                                    <td>{ln.origen === "venta" ? "Venta" : "Cita"}</td>
+                                    <td>{ln.detalle}</td>
+                                    <td>
+                                      {ln.base != null
+                                        ? new Intl.NumberFormat("es-AR", {
+                                            style: "currency",
+                                            currency: "ARS",
+                                            minimumFractionDigits: 2,
+                                          }).format(ln.base)
+                                        : "—"}
+                                    </td>
+                                    <td>
+                                      {new Intl.NumberFormat("es-AR", {
+                                        style: "currency",
+                                        currency: "ARS",
+                                        minimumFractionDigits: 2,
+                                      }).format(ln.monto)}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </>
+                      ) : (
+                        <p className="muted small" style={{ marginTop: "0.75rem" }}>
+                          Sin líneas de comisión en el período.
+                        </p>
+                      )}
+                      {emp.turnos_agenda.length > 0 ? (
+                        <>
+                          <h3 className="card-title" style={{ fontSize: "0.95rem", marginTop: "1rem" }}>
+                            Turnos de agenda (bloques horarios)
+                          </h3>
+                          <div className="table-wrap">
+                            <table className="table">
+                              <thead>
+                                <tr>
+                                  <th>Fecha</th>
+                                  <th>Inicio</th>
+                                  <th>Fin</th>
+                                  <th>Estado</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {emp.turnos_agenda.map((t) => (
+                                  <tr key={t.id}>
+                                    <td className="mono small">{t.fecha}</td>
+                                    <td>{t.hora_inicio}</td>
+                                    <td>{t.hora_fin}</td>
+                                    <td>{t.estado}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="muted">Sin datos.</p>
+          )}
         </section>
       ) : null}
 

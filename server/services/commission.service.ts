@@ -1,4 +1,5 @@
 import { db } from "../db.js";
+import { AppError } from "../lib/AppError.js";
 
 export function calcularMontoComision(totalVenta: number, tipo: string, valor: number): number {
   const t = (tipo || "porcentaje").toLowerCase();
@@ -26,9 +27,33 @@ export const commissionService = {
     const fecha = fechaVenta.slice(0, 10);
     await db
       .prepare(
-        `INSERT INTO comisiones (empleado_id, venta_id, monto, fecha, created_at) VALUES (?,?,?,?,?)`
+        `INSERT INTO comisiones (empleado_id, venta_id, cita_id, monto, base_calculo, fecha, created_at)
+         VALUES (?,?,NULL,?,?,?,?)`
       )
-      .run(empleadoId, ventaId, monto, fecha, now);
+      .run(empleadoId, ventaId, monto, totalVenta, fecha, now);
+    return monto;
+  },
+
+  async insertForCita(
+    citaId: number,
+    empleadoId: number,
+    importeServicio: number,
+    inicioIso: string
+  ): Promise<number | null> {
+    const u = (await db
+      .prepare(`SELECT tipo_comision, valor_comision FROM usuarios WHERE id = ?`)
+      .get(empleadoId)) as { tipo_comision: string; valor_comision: number } | undefined;
+    if (!u) return null;
+    const monto = calcularMontoComision(importeServicio, u.tipo_comision, Number(u.valor_comision));
+    if (monto <= 0) return null;
+    const now = new Date().toISOString();
+    const fecha = inicioIso.slice(0, 10);
+    await db
+      .prepare(
+        `INSERT INTO comisiones (empleado_id, venta_id, cita_id, monto, base_calculo, fecha, created_at)
+         VALUES (?,NULL,?,?,?,?,?)`
+      )
+      .run(empleadoId, citaId, monto, importeServicio, fecha, now);
     return monto;
   },
 
@@ -36,11 +61,19 @@ export const commissionService = {
     await db.prepare(`DELETE FROM comisiones WHERE venta_id = ?`).run(ventaId);
   },
 
+  async deleteByCitaId(citaId: number): Promise<void> {
+    await db.prepare(`DELETE FROM comisiones WHERE cita_id = ?`).run(citaId);
+  },
+
   async list(desde?: string, hasta?: string, empleadoId?: number) {
-    let sql = `SELECT c.*, u.nombre AS empleado_nombre, v.total AS venta_total
+    let sql = `SELECT c.*, u.nombre AS empleado_nombre, v.total AS venta_total,
+                      ci.servicio AS cita_servicio, ci.inicio AS cita_inicio,
+                      cl.nombre AS cita_cliente_nombre
                FROM comisiones c
                JOIN usuarios u ON u.id = c.empleado_id
                LEFT JOIN ventas v ON v.id = c.venta_id
+               LEFT JOIN citas ci ON ci.id = c.cita_id
+               LEFT JOIN clientes cl ON cl.id = ci.cliente_id
                WHERE 1=1`;
     const params: (string | number)[] = [];
     if (empleadoId != null) {
@@ -57,5 +90,163 @@ export const commissionService = {
     }
     sql += ` ORDER BY c.fecha DESC, c.id DESC`;
     return await db.prepare(sql).all(...params);
+  },
+
+  /** Liquidación por rango de días (YYYY-MM-DD): comisiones agrupadas + turnos de agenda del período. */
+  async liquidacion(desdeDia: string, hastaDia: string) {
+    const d0 = desdeDia.trim().slice(0, 10);
+    const d1 = hastaDia.trim().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d0) || !/^\d{4}-\d{2}-\d{2}$/.test(d1)) {
+      throw new AppError("desde y hasta deben ser fechas YYYY-MM-DD", 400);
+    }
+
+    const rows = (await db
+      .prepare(
+        `SELECT c.id AS comision_id, c.empleado_id, c.monto, c.fecha, c.base_calculo,
+                c.venta_id, c.cita_id,
+                u.nombre AS empleado_nombre, u.tipo_comision, u.valor_comision AS valor_comision_empl,
+                v.total AS venta_total,
+                ci.inicio AS cita_inicio, ci.servicio AS cita_servicio, ci.importe_servicio AS cita_importe,
+                cl.nombre AS cita_cliente_nombre
+         FROM comisiones c
+         JOIN usuarios u ON u.id = c.empleado_id
+         LEFT JOIN ventas v ON v.id = c.venta_id
+         LEFT JOIN citas ci ON ci.id = c.cita_id
+         LEFT JOIN clientes cl ON cl.id = ci.cliente_id
+         WHERE c.fecha >= ? AND c.fecha <= ?
+         ORDER BY u.nombre COLLATE NOCASE, c.fecha ASC, c.id ASC`
+      )
+      .all(d0, d1)) as Array<{
+      comision_id: number;
+      empleado_id: number;
+      monto: number;
+      fecha: string;
+      base_calculo: number | null;
+      venta_id: number | null;
+      cita_id: number | null;
+      empleado_nombre: string | null;
+      tipo_comision: string;
+      valor_comision_empl: number;
+      venta_total: number | null;
+      cita_inicio: string | null;
+      cita_servicio: string | null;
+      cita_importe: number | null;
+      cita_cliente_nombre: string | null;
+    }>;
+
+    const turnos = (await db
+      .prepare(
+        `SELECT t.id, t.empleado_id, t.fecha, t.hora_inicio, t.hora_fin, t.estado, u.nombre AS empleado_nombre
+         FROM turnos_empleado t
+         JOIN usuarios u ON u.id = t.empleado_id
+         WHERE t.fecha >= ? AND t.fecha <= ?
+         ORDER BY t.fecha ASC, t.hora_inicio ASC`
+      )
+      .all(d0, d1)) as Array<{
+      id: number;
+      empleado_id: number;
+      fecha: string;
+      hora_inicio: string;
+      hora_fin: string;
+      estado: string;
+      empleado_nombre: string | null;
+    }>;
+
+    type Linea = {
+      comision_id: number;
+      fecha: string;
+      origen: "venta" | "cita";
+      detalle: string;
+      base: number | null;
+      monto: number;
+      venta_id: number | null;
+      cita_id: number | null;
+    };
+
+    const byEmp = new Map<
+      number,
+      {
+        empleado_id: number;
+        empleado_nombre: string | null;
+        tipo_comision: string;
+        valor_comision: number;
+        total_comisiones: number;
+        lineas: Linea[];
+      }
+    >();
+
+    let totalGeneral = 0;
+    for (const r of rows) {
+      totalGeneral += Number(r.monto) || 0;
+      let g = byEmp.get(r.empleado_id);
+      if (!g) {
+        g = {
+          empleado_id: r.empleado_id,
+          empleado_nombre: r.empleado_nombre,
+          tipo_comision: r.tipo_comision,
+          valor_comision: Number(r.valor_comision_empl) || 0,
+          total_comisiones: 0,
+          lineas: [],
+        };
+        byEmp.set(r.empleado_id, g);
+      }
+      g.total_comisiones = Math.round((g.total_comisiones + Number(r.monto)) * 100) / 100;
+
+      const origen = r.cita_id != null ? ("cita" as const) : ("venta" as const);
+      let detalle = "";
+      if (origen === "venta") {
+        detalle = `Venta #${r.venta_id ?? "—"}`;
+      } else {
+        const svc = r.cita_servicio ? ` · ${r.cita_servicio}` : "";
+        detalle = `Cita ${r.cita_cliente_nombre ?? "Cliente"}${svc}`;
+      }
+      g.lineas.push({
+        comision_id: r.comision_id,
+        fecha: r.fecha,
+        origen,
+        detalle,
+        base: r.base_calculo != null ? Number(r.base_calculo) : r.venta_total ?? r.cita_importe,
+        monto: Number(r.monto),
+        venta_id: r.venta_id,
+        cita_id: r.cita_id,
+      });
+    }
+
+    const turnosPorEmpleado = new Map<number, typeof turnos>();
+    for (const t of turnos) {
+      const arr = turnosPorEmpleado.get(t.empleado_id) ?? [];
+      arr.push(t);
+      turnosPorEmpleado.set(t.empleado_id, arr);
+    }
+
+    const empleados = [...byEmp.values()].map((g) => ({
+      ...g,
+      turnos_agenda: turnosPorEmpleado.get(g.empleado_id) ?? [],
+    }));
+
+    const empleadosSinComisionPeroConTurnos = [...turnosPorEmpleado.keys()]
+      .filter((id) => !byEmp.has(id))
+      .map((id) => {
+        const t0 = turnos.find((x) => x.empleado_id === id);
+        return {
+          empleado_id: id,
+          empleado_nombre: t0?.empleado_nombre ?? null,
+          tipo_comision: "",
+          valor_comision: 0,
+          total_comisiones: 0,
+          lineas: [] as Linea[],
+          turnos_agenda: turnosPorEmpleado.get(id) ?? [],
+        };
+      });
+
+    return {
+      periodo: { desde: d0, hasta: d1 },
+      total_general: Math.round(totalGeneral * 100) / 100,
+      empleados: [...empleados, ...empleadosSinComisionPeroConTurnos].sort((a, b) =>
+        (a.empleado_nombre ?? "").localeCompare(b.empleado_nombre ?? "", "es", {
+          sensitivity: "base",
+        })
+      ),
+    };
   },
 };

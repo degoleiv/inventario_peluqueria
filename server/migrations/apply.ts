@@ -97,11 +97,6 @@ export async function applyMigrations(database: SqliteDb) {
   if (!pNames.has("fecha_vencimiento")) {
     await database.exec(`ALTER TABLE productos ADD COLUMN fecha_vencimiento TEXT`);
   }
-  if (!pNames.has("estado")) {
-    await database.exec(
-      `ALTER TABLE productos ADD COLUMN estado TEXT NOT NULL DEFAULT 'activo'`
-    );
-  }
 
   if (pNames.has("precio")) {
     await database.exec(
@@ -268,16 +263,6 @@ export async function applyMigrations(database: SqliteDb) {
     await database.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_proveedores_nit_unique ON proveedores(nit)`);
     if (!prNames.has("icono_url")) {
       await database.exec(`ALTER TABLE proveedores ADD COLUMN icono_url TEXT`);
-    }
-
-    const prodProvCols = (await database.prepare(`PRAGMA table_info(productos)`).all()) as {
-      name: string;
-    }[];
-    const prodProvNames = new Set(prodProvCols.map((c) => c.name));
-    if (!prodProvNames.has("proveedor_id")) {
-      await database.exec(
-        `ALTER TABLE productos ADD COLUMN proveedor_id INTEGER REFERENCES proveedores(id) ON DELETE SET NULL`
-      );
     }
   }
 
@@ -565,53 +550,61 @@ export async function applyMigrations(database: SqliteDb) {
   if (!cliGuestNames.has("activo")) {
     await database.exec(`ALTER TABLE clientes ADD COLUMN activo INTEGER NOT NULL DEFAULT 1`);
   }
-  for (const { col, ddl } of [
-    { col: "tipo_documento", ddl: `ALTER TABLE clientes ADD COLUMN tipo_documento TEXT` },
-    { col: "numero_documento", ddl: `ALTER TABLE clientes ADD COLUMN numero_documento TEXT` },
-    { col: "direccion", ddl: `ALTER TABLE clientes ADD COLUMN direccion TEXT` },
-    { col: "cedula", ddl: `ALTER TABLE clientes ADD COLUMN cedula TEXT` },
-  ] as const) {
-    const cliExtra = (await database.prepare(`PRAGMA table_info(clientes)`).all()) as {
-      name: string;
-    }[];
-    if (!cliExtra.some((c) => c.name === col)) {
-      await database.exec(ddl);
-    }
+
+  const prodColsProv = (await database.prepare(`PRAGMA table_info(productos)`).all()) as { name: string }[];
+  const prodProvNames = new Set(prodColsProv.map((c) => c.name));
+  if (!prodProvNames.has("proveedor_id")) {
+    await database.exec(
+      `ALTER TABLE productos ADD COLUMN proveedor_id INTEGER REFERENCES proveedores(id) ON DELETE SET NULL`
+    );
+    await database.exec(`CREATE INDEX IF NOT EXISTS idx_productos_proveedor ON productos(proveedor_id)`);
   }
+
   await migrateRolesModuloPedidosUnificado(database);
 
-  await database.exec(`
-    CREATE TABLE IF NOT EXISTS categorias_producto (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      nombre_categoria TEXT NOT NULL,
-      descripcion TEXT,
-      emoji TEXT,
-      estado TEXT NOT NULL DEFAULT 'activo',
-      fecha_creacion TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_cat_producto_nombre_ci
-      ON categorias_producto (nombre_categoria COLLATE NOCASE);
-  `);
-
-  const catCols = (await database.prepare(`PRAGMA table_info(categorias_producto)`).all()) as {
-    name: string;
-  }[];
-  if (!catCols.some((c) => c.name === "emoji")) {
-    await database.exec(`ALTER TABLE categorias_producto ADD COLUMN emoji TEXT`);
+  const citaColsImp = (await database.prepare(`PRAGMA table_info(citas)`).all()) as { name: string }[];
+  const citaImpNames = new Set(citaColsImp.map((c) => c.name));
+  if (!citaImpNames.has("importe_servicio")) {
+    await database.exec(`ALTER TABLE citas ADD COLUMN importe_servicio REAL`);
   }
 
-  await database.exec(`
-    CREATE TABLE IF NOT EXISTS categorias_servicio (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      nombre_categoria TEXT NOT NULL,
-      descripcion TEXT,
-      emoji TEXT,
-      estado TEXT NOT NULL DEFAULT 'activo',
-      fecha_creacion TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+  const comColsLiq = (await database.prepare(`PRAGMA table_info(comisiones)`).all()) as { name: string }[];
+  const comLiqNames = new Set(comColsLiq.map((c) => c.name));
+  if (!comLiqNames.has("cita_id")) {
+    await database.exec(`PRAGMA foreign_keys = OFF`);
+    await database.exec(`
+      CREATE TABLE comisiones_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        empleado_id INTEGER NOT NULL REFERENCES usuarios(id),
+        venta_id INTEGER REFERENCES ventas(id) ON DELETE CASCADE,
+        cita_id INTEGER REFERENCES citas(id) ON DELETE CASCADE,
+        monto REAL NOT NULL,
+        base_calculo REAL,
+        fecha TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        CHECK (
+          (venta_id IS NOT NULL AND cita_id IS NULL) OR
+          (cita_id IS NOT NULL AND venta_id IS NULL)
+        )
+      )
+    `);
+    await database.exec(`
+      INSERT INTO comisiones_new (id, empleado_id, venta_id, cita_id, monto, base_calculo, fecha, created_at)
+      SELECT c.id, c.empleado_id, c.venta_id, NULL, c.monto,
+             (SELECT v.total FROM ventas v WHERE v.id = c.venta_id),
+             c.fecha, c.created_at
+      FROM comisiones c
+    `);
+    await database.exec(`DROP TABLE comisiones`);
+    await database.exec(`ALTER TABLE comisiones_new RENAME TO comisiones`);
+    await database.exec(`CREATE INDEX IF NOT EXISTS idx_comisiones_empleado ON comisiones(empleado_id)`);
+    await database.exec(`CREATE INDEX IF NOT EXISTS idx_comisiones_fecha ON comisiones(fecha)`);
+    await database.exec(
+      `CREATE UNIQUE INDEX IF NOT EXISTS uq_comisiones_venta ON comisiones(venta_id) WHERE venta_id IS NOT NULL`
     );
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_cat_servicio_nombre_ci
-      ON categorias_servicio (nombre_categoria COLLATE NOCASE);
-  `);
+    await database.exec(
+      `CREATE UNIQUE INDEX IF NOT EXISTS uq_comisiones_cita ON comisiones(cita_id) WHERE cita_id IS NOT NULL`
+    );
+    await database.exec(`PRAGMA foreign_keys = ON`);
+  }
 }

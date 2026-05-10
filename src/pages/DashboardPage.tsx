@@ -11,18 +11,18 @@ import {
   formatDecimalForInput,
   parseDecimalLoose,
 } from "../lib/decimalInput";
+import { useToast } from "../context/ToastContext";
 
 export function DashboardPage() {
+  const toast = useToast();
   const [data, setData] = useState<DashboardStats | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+  const [dashLoadFailed, setDashLoadFailed] = useState(false);
   const [puntosCfg, setPuntosCfg] = useState<PuntosConfig | null>(null);
   const [puntosDraft, setPuntosDraft] = useState({
     activo: false,
     ratioStr: "1",
     valorRedStr: "0",
   });
-  const [puntosMsg, setPuntosMsg] = useState<string | null>(null);
-  const [puntosErr, setPuntosErr] = useState<string | null>(null);
   const [puntosSaving, setPuntosSaving] = useState(false);
 
   useEffect(() => {
@@ -30,15 +30,36 @@ export function DashboardPage() {
     (async () => {
       try {
         const d = await fetchDashboard();
-        if (!cancel) setData(d);
+        if (!cancel) {
+          setData(d);
+          setDashLoadFailed(false);
+        }
       } catch (e) {
-        if (!cancel) setErr(e instanceof Error ? e.message : "Error");
+        if (!cancel) {
+          setDashLoadFailed(true);
+          toast(e instanceof Error ? e.message : "Error", "error");
+        }
       }
     })();
     return () => {
       cancel = true;
     };
-  }, []);
+  }, [toast]);
+
+  function retryDashboard() {
+    setDashLoadFailed(false);
+    setData(null);
+    void (async () => {
+      try {
+        const d = await fetchDashboard();
+        setData(d);
+        setDashLoadFailed(false);
+      } catch (e) {
+        setDashLoadFailed(true);
+        toast(e instanceof Error ? e.message : "Error", "error");
+      }
+    })();
+  }
 
   useEffect(() => {
     let cancel = false;
@@ -64,8 +85,6 @@ export function DashboardPage() {
 
   async function guardarPuntos(e: React.FormEvent) {
     e.preventDefault();
-    setPuntosErr(null);
-    setPuntosMsg(null);
     setPuntosSaving(true);
     try {
       const p = await updatePuntosConfig({
@@ -74,26 +93,27 @@ export function DashboardPage() {
         valor_redencion_moneda: parseDecimalLoose(puntosDraft.valorRedStr),
       });
       setPuntosCfg(p);
-      setPuntosMsg("Configuración guardada.");
+      toast("Configuración guardada.", "success");
     } catch (e) {
-      setPuntosErr(e instanceof Error ? e.message : "Error al guardar");
+      toast(e instanceof Error ? e.message : "Error al guardar", "error");
     } finally {
       setPuntosSaving(false);
     }
   }
 
-  if (err) {
-    return (
-      <div className="banner banner-error" role="alert">
-        {err}
-      </div>
-    );
-  }
-
   if (!data) {
     return (
       <div className="clay-empty" role="status">
-        Cargando resumen del negocio…
+        {dashLoadFailed ? (
+          <>
+            <p>No pudimos cargar el resumen.</p>
+            <button type="button" className="btn" onClick={retryDashboard}>
+              Reintentar
+            </button>
+          </>
+        ) : (
+          "Cargando resumen del negocio…"
+        )}
       </div>
     );
   }
@@ -201,16 +221,6 @@ export function DashboardPage() {
           <p className="muted">Cargando configuración…</p>
         ) : (
           <form className="form" onSubmit={guardarPuntos}>
-            {puntosErr ? (
-              <div className="banner banner-error" role="alert">
-                {puntosErr}
-              </div>
-            ) : null}
-            {puntosMsg ? (
-              <div className="banner banner-info" role="status">
-                {puntosMsg}
-              </div>
-            ) : null}
             <label className="field inline-check">
               <input
                 type="checkbox"

@@ -1074,6 +1074,20 @@ export function registerHttpRoutes(app: Express) {
   );
 
   api.get(
+    "/empleados/liquidacion-comisiones",
+    requireAdmin,
+    asyncHandler(async (req, res) => {
+      const desde = typeof req.query.desde === "string" ? req.query.desde : "";
+      const hasta = typeof req.query.hasta === "string" ? req.query.hasta : "";
+      if (!desde || !hasta) {
+        res.status(400).json({ error: "desde y hasta requeridos (YYYY-MM-DD)" });
+        return;
+      }
+      res.json(await commissionService.liquidacion(desde, hasta));
+    })
+  );
+
+  api.get(
     "/empleados/turnos",
     requireAdmin,
     asyncHandler(async (req, res) => {

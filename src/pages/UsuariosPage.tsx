@@ -21,7 +21,6 @@ export function UsuariosPage({ onChanged }: Props) {
   const [roles, setRoles] = useState<RolDefinicion[]>([]);
   const [usuarios, setUsuarios] = useState<UsuarioListado[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   const [newUsuario, setNewUsuario] = useState({
     email: "",
@@ -37,18 +36,17 @@ export function UsuariosPage({ onChanged }: Props) {
   });
 
   const load = useCallback(async () => {
-    setError(null);
     setLoading(true);
     try {
       const [r, u] = await Promise.all([fetchRoles(), fetchUsuarios()]);
       setRoles(r);
       setUsuarios(u);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
+      toast(e instanceof Error ? e.message : "Error", "error");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     void load();
@@ -80,7 +78,7 @@ export function UsuariosPage({ onChanged }: Props) {
       }
       const uniq = [...new Set(permisos)];
       if (uniq.length === 0) {
-        toast.push("Seleccioná al menos un módulo.", "warning");
+        toast("Seleccioná al menos un módulo.", "warning");
         return;
       }
       permisos = uniq;
@@ -90,11 +88,11 @@ export function UsuariosPage({ onChanged }: Props) {
         nombre: nombre.trim(),
         permisos: r.slug === "admin" ? ["*"] : permisos,
       });
-      toast.push("Rol actualizado.", "success");
+      toast("Rol actualizado.", "success");
       void load();
       onChanged?.();
     } catch (err) {
-      toast.push(err instanceof Error ? err.message : "Error", "error");
+      toast(err instanceof Error ? err.message : "Error", "error");
     }
   }
 
@@ -103,7 +101,7 @@ export function UsuariosPage({ onChanged }: Props) {
     const slug = newRol.slug.trim().toLowerCase();
     const nombre = newRol.nombre.trim();
     if (!slug || !nombre) {
-      toast.push("Slug y nombre requeridos.", "warning");
+      toast("Slug y nombre requeridos.", "warning");
       return;
     }
     let permisos: string[];
@@ -112,13 +110,13 @@ export function UsuariosPage({ onChanged }: Props) {
     } else {
       permisos = PERMISO_MODULOS.filter((m) => newRol.mods[m]);
       if (permisos.length === 0) {
-        toast.push("Marcá al menos un módulo o «Acceso total».", "warning");
+        toast("Marcá al menos un módulo o «Acceso total».", "warning");
         return;
       }
     }
     try {
       await createRole({ slug, nombre, permisos });
-      toast.push("Rol creado.", "success");
+      toast("Rol creado.", "success");
       setNewRol({
         slug: "",
         nombre: "",
@@ -128,7 +126,7 @@ export function UsuariosPage({ onChanged }: Props) {
       void load();
       onChanged?.();
     } catch (err) {
-      toast.push(err instanceof Error ? err.message : "Error", "error");
+      toast(err instanceof Error ? err.message : "Error", "error");
     }
   }
 
@@ -141,12 +139,12 @@ export function UsuariosPage({ onChanged }: Props) {
         nombre: newUsuario.nombre.trim() || undefined,
         rol: newUsuario.rol,
       });
-      toast.push("Usuario creado.", "success");
+      toast("Usuario creado.", "success");
       setNewUsuario({ email: "", password: "", nombre: "", rol: newUsuario.rol });
       void load();
       onChanged?.();
     } catch (err) {
-      toast.push(err instanceof Error ? err.message : "Error", "error");
+      toast(err instanceof Error ? err.message : "Error", "error");
     }
   }
 
@@ -154,22 +152,22 @@ export function UsuariosPage({ onChanged }: Props) {
     if (!window.confirm(`¿Eliminar el rol «${slug}»?`)) return;
     try {
       await deleteRole(slug);
-      toast.push("Rol eliminado.", "success");
+      toast("Rol eliminado.", "success");
       void load();
       onChanged?.();
     } catch (err) {
-      toast.push(err instanceof Error ? err.message : "Error", "error");
+      toast(err instanceof Error ? err.message : "Error", "error");
     }
   }
 
   async function cambiarRolUsuario(u: UsuarioListado, rol: string) {
     try {
       await updateUsuario(u.id, { rol });
-      toast.push("Rol de usuario actualizado.", "success");
+      toast("Rol de usuario actualizado.", "success");
       void load();
       onChanged?.();
     } catch (err) {
-      toast.push(err instanceof Error ? err.message : "Error", "error");
+      toast(err instanceof Error ? err.message : "Error", "error");
     }
   }
 
@@ -177,11 +175,11 @@ export function UsuariosPage({ onChanged }: Props) {
     if (!window.confirm(`¿Eliminar usuario ${u.email}?`)) return;
     try {
       await deleteUsuario(u.id);
-      toast.push("Usuario eliminado.", "success");
+      toast("Usuario eliminado.", "success");
       void load();
       onChanged?.();
     } catch (err) {
-      toast.push(err instanceof Error ? err.message : "Error", "error");
+      toast(err instanceof Error ? err.message : "Error", "error");
     }
   }
 
@@ -191,12 +189,6 @@ export function UsuariosPage({ onChanged }: Props) {
 
   return (
     <>
-      {error ? (
-        <div className="banner banner-error" role="alert">
-          {error}
-        </div>
-      ) : null}
-
       <section className="card" style={{ marginBottom: "1rem" }}>
         <div className="card-head">
           <h2 className="card-title">Roles</h2>

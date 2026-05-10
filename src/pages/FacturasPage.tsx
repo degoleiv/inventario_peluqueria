@@ -16,7 +16,6 @@ export function FacturasPage() {
   const toast = useToast();
   const [rows, setRows] = useState<FacturaElectronica[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [smtpCfg, setSmtpCfg] = useState<SmtpPublicConfig | null>(null);
   const [smtpDraft, setSmtpDraft] = useState({
@@ -31,16 +30,15 @@ export function FacturasPage() {
   const [sendingId, setSendingId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
-    setError(null);
     setLoading(true);
     try {
       setRows(await fetchFacturasElectronicas());
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
+      toast(e instanceof Error ? e.message : "Error", "error");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     void load();
@@ -91,9 +89,9 @@ export function FacturasPage() {
         from: smtpDraft.from,
       });
       setSmtpCfg(cfg);
-      toast.push("Configuración SMTP guardada en base local.", "success");
+      toast("Configuración SMTP guardada en base local.", "success");
     } catch (err) {
-      toast.push(err instanceof Error ? err.message : "No se pudo guardar", "error");
+      toast(err instanceof Error ? err.message : "No se pudo guardar", "error");
     } finally {
       setSmtpSaving(false);
     }
@@ -103,14 +101,14 @@ export function FacturasPage() {
     e.preventDefault();
     const to = smtpTestEmail.trim();
     if (!to) {
-      toast.push("Indicá un email para la prueba.", "warning");
+      toast("Indicá un email para la prueba.", "warning");
       return;
     }
     try {
       await probarSmtpEmail(to);
-      toast.push("Correo de prueba enviado.", "success");
+      toast("Correo de prueba enviado.", "success");
     } catch (err) {
-      toast.push(err instanceof Error ? err.message : "Error SMTP", "error");
+      toast(err instanceof Error ? err.message : "Error SMTP", "error");
     }
   }
 
@@ -124,10 +122,10 @@ export function FacturasPage() {
     setSendingId(f.id);
     try {
       const out = await enviarFacturaPorEmail(f.id, email || undefined);
-      toast.push(`Enviado a ${out.to}.`, "success");
+      toast(`Enviado a ${out.to}.`, "success");
       void load();
     } catch (err) {
-      toast.push(err instanceof Error ? err.message : "Error al enviar", "error");
+      toast(err instanceof Error ? err.message : "Error al enviar", "error");
     } finally {
       setSendingId(null);
     }
@@ -135,12 +133,6 @@ export function FacturasPage() {
 
   return (
     <>
-      {error ? (
-        <div className="banner banner-error" role="alert">
-          {error}
-        </div>
-      ) : null}
-
       {isAdmin ? (
         <section className="card" style={{ marginBottom: "1rem" }}>
           <div className="card-head">

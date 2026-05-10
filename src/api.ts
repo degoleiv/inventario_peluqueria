@@ -75,7 +75,7 @@ export type Cliente = {
 export type CitaClienteDatos = {
   nombre: string;
   telefono: string;
-  cedula: string;
+  cedula?: string | null;
 };
 
 export type Cita = {

@@ -267,6 +267,12 @@ export async function applyMigrations(database: SqliteDb) {
     if (!prNames.has("icono_url")) {
       await database.exec(`ALTER TABLE proveedores ADD COLUMN icono_url TEXT`);
     }
+    if (!prNames.has("vendedor_nombre")) {
+      await database.exec(`ALTER TABLE proveedores ADD COLUMN vendedor_nombre TEXT`);
+    }
+    if (!prNames.has("vendedor_celular")) {
+      await database.exec(`ALTER TABLE proveedores ADD COLUMN vendedor_celular TEXT`);
+    }
   }
 
   const movCols = (await database.prepare(`PRAGMA table_info(movimientos_inventario)`).all()) as {
@@ -632,6 +638,15 @@ export async function applyMigrations(database: SqliteDb) {
       `CREATE INDEX IF NOT EXISTS idx_gastos_categoria_finanza ON gastos_operativos(categoria_finanza_id)`
     );
   }
+  if (!gastoFinNames.has("pagado")) {
+    await database.exec(`ALTER TABLE gastos_operativos ADD COLUMN pagado INTEGER NOT NULL DEFAULT 0`);
+  }
+  if (!gastoFinNames.has("pagado_at")) {
+    await database.exec(`ALTER TABLE gastos_operativos ADD COLUMN pagado_at TEXT`);
+  }
+  if (!gastoFinNames.has("comprobante_url")) {
+    await database.exec(`ALTER TABLE gastos_operativos ADD COLUMN comprobante_url TEXT`);
+  }
 
   const catFinCols = (await database.prepare(`PRAGMA table_info(categorias_finanza_concepto)`).all()) as {
     name: string;
@@ -654,4 +669,33 @@ export async function applyMigrations(database: SqliteDb) {
       `UPDATE categorias_finanza_concepto SET updated_at = created_at WHERE updated_at IS NULL`
     );
   }
+
+  /* ── Cobrar cita en POS: vincular venta ↔ cita y persistir servicios realizados ── */
+  const ventColsCita = (await database.prepare(`PRAGMA table_info(ventas)`).all()) as {
+    name: string;
+  }[];
+  const vCitaNames = new Set(ventColsCita.map((c) => c.name));
+  if (!vCitaNames.has("cita_id")) {
+    await database.exec(
+      `ALTER TABLE ventas ADD COLUMN cita_id INTEGER REFERENCES citas(id) ON DELETE SET NULL`
+    );
+    await database.exec(
+      `CREATE UNIQUE INDEX IF NOT EXISTS uq_ventas_cita ON ventas(cita_id) WHERE cita_id IS NOT NULL`
+    );
+  }
+  await database.exec(`
+    CREATE TABLE IF NOT EXISTS venta_servicios (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      venta_id INTEGER NOT NULL REFERENCES ventas(id) ON DELETE CASCADE,
+      cita_id INTEGER REFERENCES citas(id) ON DELETE SET NULL,
+      servicio_nombre TEXT NOT NULL,
+      usuario_id INTEGER REFERENCES usuarios(id),
+      cantidad INTEGER NOT NULL DEFAULT 1,
+      valor_unitario REAL NOT NULL DEFAULT 0,
+      subtotal REAL NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_venta_servicios_venta ON venta_servicios(venta_id);
+    CREATE INDEX IF NOT EXISTS idx_venta_servicios_cita ON venta_servicios(cita_id);
+  `);
 }

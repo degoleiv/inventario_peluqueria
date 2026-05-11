@@ -11,6 +11,8 @@ export type ProveedorDto = {
   email: string | null;
   direccion: string | null;
   icono_url: string | null;
+  vendedor_nombre: string | null;
+  vendedor_celular: string | null;
   estado: "activo" | "inactivo";
   fecha_creacion: string;
   fecha_actualizacion: string;
@@ -26,6 +28,8 @@ function toDto(r: ProveedorRow): ProveedorDto {
     email: r.email,
     direccion: r.direccion,
     icono_url: r.icono_url ?? null,
+    vendedor_nombre: r.vendedor_nombre ?? null,
+    vendedor_celular: r.vendedor_celular ?? null,
     estado: est,
     fecha_creacion: r.fecha_creacion,
     fecha_actualizacion: r.fecha_actualizacion,
@@ -65,6 +69,24 @@ function parseDireccion(body: Record<string, unknown>): string | null {
   if (typeof body.direccion !== "string") return null;
   const t = body.direccion.trim();
   return t || null;
+}
+
+function parseVendedorNombre(body: Record<string, unknown>): string | null {
+  if (body.vendedor_nombre == null || body.vendedor_nombre === "") return null;
+  if (typeof body.vendedor_nombre !== "string") return null;
+  const t = body.vendedor_nombre.trim();
+  if (!t) return null;
+  if (t.length > 200) throw new AppError("El nombre del vendedor es demasiado largo");
+  return t;
+}
+
+function parseVendedorCelular(body: Record<string, unknown>): string | null {
+  if (body.vendedor_celular == null || body.vendedor_celular === "") return null;
+  if (typeof body.vendedor_celular !== "string") return null;
+  const t = body.vendedor_celular.trim();
+  if (!t) return null;
+  if (t.length > 60) throw new AppError("El celular del vendedor es demasiado largo");
+  return t;
 }
 
 function parseIconoUrl(value: unknown): string | null {
@@ -147,6 +169,8 @@ export const proveedoresService = {
     const telefono = parseTelefono(body);
     const direccion = parseDireccion(body);
     const icono_url = parseIconoUrl(body.icono_url);
+    const vendedor_nombre = parseVendedorNombre(body);
+    const vendedor_celular = parseVendedorCelular(body);
     const estado = parseEstado(body, "activo");
     const now = new Date().toISOString();
 
@@ -162,6 +186,8 @@ export const proveedoresService = {
         email,
         direccion,
         icono_url,
+        vendedor_nombre,
+        vendedor_celular,
         estado,
         fecha_creacion: now,
         fecha_actualizacion: now,
@@ -192,6 +218,12 @@ export const proveedoresService = {
     const direccion = body.direccion !== undefined ? parseDireccion(body) : cur.direccion;
     const icono_url =
       body.icono_url !== undefined ? parseIconoUrl(body.icono_url) : (cur.icono_url ?? null);
+    const vendedor_nombre =
+      body.vendedor_nombre !== undefined ? parseVendedorNombre(body) : (cur.vendedor_nombre ?? null);
+    const vendedor_celular =
+      body.vendedor_celular !== undefined
+        ? parseVendedorCelular(body)
+        : (cur.vendedor_celular ?? null);
     const estadoCur: "activo" | "inactivo" = cur.estado === "inactivo" ? "inactivo" : "activo";
     const estado = body.estado !== undefined ? parseEstado(body, estadoCur) : estadoCur;
     const now = new Date().toISOString();
@@ -207,6 +239,8 @@ export const proveedoresService = {
         email,
         direccion,
         icono_url,
+        vendedor_nombre,
+        vendedor_celular,
         estado,
         fecha_actualizacion: now,
       });

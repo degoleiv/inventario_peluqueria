@@ -48,13 +48,45 @@ export const ventaService = {
          WHERE vl.venta_id = ?`
       )
       .all(id);
-    return { ...venta, lineas };
+    const servicios = await db
+      .prepare(
+        `SELECT vs.*, u.nombre AS profesional_nombre
+         FROM venta_servicios vs
+         LEFT JOIN usuarios u ON u.id = vs.usuario_id
+         WHERE vs.venta_id = ?`
+      )
+      .all(id);
+    return { ...venta, lineas, servicios };
   },
 
   async create(body: Record<string, unknown>) {
-    const lineasIn = body.lineas;
-    if (!Array.isArray(lineasIn) || lineasIn.length === 0) {
-      throw new AppError("Debe incluir al menos una línea de venta");
+    const lineasIn = Array.isArray(body.lineas) ? body.lineas : [];
+    const serviciosIn = Array.isArray(body.servicios) ? body.servicios : [];
+    if (lineasIn.length === 0 && serviciosIn.length === 0) {
+      throw new AppError("Debe incluir al menos un producto o un servicio realizado");
+    }
+
+    const citaIdRaw = body.cita_id;
+    const citaIdPre =
+      citaIdRaw != null && Number.isFinite(Number(citaIdRaw)) && Number(citaIdRaw) > 0
+        ? Math.floor(Number(citaIdRaw))
+        : null;
+
+    if (citaIdPre != null) {
+      const yaVenta = (await db
+        .prepare(
+          `SELECT id FROM ventas WHERE cita_id = ? AND IFNULL(estado,'confirmada') != 'cancelada' LIMIT 1`
+        )
+        .get(citaIdPre)) as { id: number } | undefined;
+      if (yaVenta) {
+        throw new AppError(
+          `Esta cita ya fue cobrada en la venta #${yaVenta.id}. Anulá esa venta primero si necesitás re-cobrarla.`
+        );
+      }
+      const existeCita = (await db
+        .prepare(`SELECT id FROM citas WHERE id = ?`)
+        .get(citaIdPre)) as { id: number } | undefined;
+      if (!existeCita) throw new AppError("La cita asociada no existe", 404);
     }
     const now = new Date().toISOString();
     const fechaVenta =
@@ -74,8 +106,12 @@ export const ventaService = {
     if (!vu) throw new AppError("Vendedor no encontrado o inactivo");
 
     const insVenta = db.prepare(
-      `INSERT INTO ventas (cliente_id, fecha, total, metodo_pago, notas, created_at, descuento_puntos, puntos_canjeados, usuario_id)
-       VALUES (?,?,?,?,?,?,?,?,?)`
+      `INSERT INTO ventas (cliente_id, fecha, total, metodo_pago, notas, created_at, descuento_puntos, puntos_canjeados, usuario_id, cita_id)
+       VALUES (?,?,?,?,?,?,?,?,?,?)`
+    );
+    const insServicio = db.prepare(
+      `INSERT INTO venta_servicios (venta_id, cita_id, servicio_nombre, usuario_id, cantidad, valor_unitario, subtotal, created_at)
+       VALUES (?,?,?,?,?,?,?,?)`
     );
     const insMov = db.prepare(
       `INSERT INTO movimientos_inventario (producto_id, tipo, cantidad, venta_id, referencia, created_at)
@@ -90,8 +126,46 @@ export const ventaService = {
         precio_unitario: number;
         subtotal: number;
       }[] = [];
+      const preparedServicios: {
+        servicio_nombre: string;
+        usuario_id: number | null;
+        cantidad: number;
+        valor_unitario: number;
+        subtotal: number;
+      }[] = [];
 
       const today = todayISODate();
+
+      for (const sv of serviciosIn as Record<string, unknown>[]) {
+        const nombre =
+          typeof sv.servicio_nombre === "string"
+            ? sv.servicio_nombre.trim()
+            : typeof sv.nombre === "string"
+              ? sv.nombre.trim()
+              : "";
+        if (!nombre) {
+          throw new AppError("Cada servicio realizado debe tener un nombre");
+        }
+        const cantidad = Math.max(1, Math.floor(Number(sv.cantidad ?? 1)));
+        const valorUnitario = Math.max(0, Number(sv.valor_unitario ?? 0));
+        if (!Number.isFinite(valorUnitario)) {
+          throw new AppError(`Valor inválido para el servicio «${nombre}»`);
+        }
+        let usuarioServ: number | null = null;
+        if (sv.usuario_id != null && sv.usuario_id !== "") {
+          const n = Number(sv.usuario_id);
+          if (Number.isFinite(n)) usuarioServ = Math.floor(n);
+        }
+        const subtotalServ = valorUnitario * cantidad;
+        totalBruto += subtotalServ;
+        preparedServicios.push({
+          servicio_nombre: nombre,
+          usuario_id: usuarioServ,
+          cantidad,
+          valor_unitario: valorUnitario,
+          subtotal: subtotalServ,
+        });
+      }
 
       for (const ln of lineasIn as Record<string, unknown>[]) {
         const producto_id = Number(ln.producto_id);
@@ -184,7 +258,8 @@ export const ventaService = {
         now,
         descuentoPuntos,
         puntosCanjeadosEfectivos,
-        usuario_id
+        usuario_id,
+        citaIdPre
       );
       const vid = Number(info.lastInsertRowid);
 
@@ -204,6 +279,19 @@ export const ventaService = {
           pl.cantidad,
           vid,
           `venta:${vid}`,
+          now
+        );
+      }
+
+      for (const sv of preparedServicios) {
+        await insServicio.run(
+          vid,
+          citaIdPre,
+          sv.servicio_nombre,
+          sv.usuario_id,
+          sv.cantidad,
+          sv.valor_unitario,
+          sv.subtotal,
           now
         );
       }
@@ -228,10 +316,12 @@ export const ventaService = {
 
       await recordSyncEvent("venta", "creada", {
         venta_id: vid,
+        cita_id: citaIdPre,
         total: totalFinal,
         total_bruto: totalBruto,
         descuento_puntos: descuentoPuntos,
         lineas: prepared.length,
+        servicios: preparedServicios.length,
         puntos_otorgados: puntosOtorgados,
         puntos_canjeados: puntosCanjeadosEfectivos,
       });

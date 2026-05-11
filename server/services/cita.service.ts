@@ -472,6 +472,138 @@ export const citaService = {
     return { fecha: fechaDia, duracion_min: dur, slots };
   },
 
+  /**
+   * Devuelve la información necesaria para cobrar una cita en el POS:
+   * cliente, profesional, servicios sueltos (parseados del texto guardado)
+   * y el flag `ya_cobrada` con el id de la venta original (anti doble cobro).
+   */
+  async getCobroData(id: number) {
+    const cita = (await db
+      .prepare(`${rowSql} WHERE c.id = ?`)
+      .get(id)) as Record<string, unknown> | undefined;
+    if (!cita) throw new AppError("Cita no encontrada", 404);
+
+    const ventaPrev = (await db
+      .prepare(
+        `SELECT id, fecha, total, estado FROM ventas WHERE cita_id = ? ORDER BY id DESC LIMIT 1`
+      )
+      .get(id)) as
+      | { id: number; fecha: string; total: number; estado?: string | null }
+      | undefined;
+
+    const yaCobrada = !!ventaPrev && String(ventaPrev.estado ?? "confirmada") !== "cancelada";
+
+    const servicioRaw = typeof cita.servicio === "string" ? cita.servicio : "";
+    const nombres = servicioRaw
+      .split(/\s*,\s*|\s*;\s*|\s+\u00B7\s+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const usuarioId =
+      cita.usuario_id != null && Number.isFinite(Number(cita.usuario_id))
+        ? Number(cita.usuario_id)
+        : null;
+
+    const servicios = (nombres.length > 0 ? nombres : [servicioRaw.trim()])
+      .filter(Boolean)
+      .map((nombre) => ({
+        nombre,
+        usuario_id: usuarioId,
+        cantidad: 1,
+        valor_unitario: 0,
+      }));
+
+    return {
+      cita,
+      servicios,
+      ya_cobrada: yaCobrada,
+      venta_id: ventaPrev?.id ?? null,
+    };
+  },
+
+  /**
+   * Citas pendientes/confirmadas sin venta activa, en un rango de días (para asociar desde el POS con permiso ventas).
+   */
+  async listParaAsociarVentaPos(query: { desde: string; hasta: string; usuario_id?: number }) {
+    const desde = query.desde.trim();
+    const hasta = query.hasta.trim();
+    if (!FECHA_DIA_RE.test(desde) || !FECHA_DIA_RE.test(hasta)) {
+      throw new AppError("desde y hasta deben ser YYYY-MM-DD", 400);
+    }
+    const params: unknown[] = [desde, hasta];
+    let filtroProf = "";
+    if (query.usuario_id != null && Number.isFinite(query.usuario_id)) {
+      filtroProf = " AND c.usuario_id = ?";
+      params.push(Math.floor(Number(query.usuario_id)));
+    }
+    return (await db
+      .prepare(
+        `${rowSql}
+         WHERE date(c.inicio) >= date(?) AND date(c.inicio) <= date(?)
+           AND c.estado IN ('pendiente', 'confirmado')
+           AND NOT EXISTS (
+             SELECT 1 FROM ventas v
+             WHERE v.cita_id = c.id AND IFNULL(v.estado,'confirmada') != 'cancelada'
+           )
+         ${filtroProf}
+         ORDER BY c.inicio ASC
+         LIMIT 300`
+      )
+      .all(...params)) as Record<string, unknown>[];
+  },
+
+  /**
+   * Actualiza solo el texto `citas.servicio` desde el POS (nombres separados por coma).
+   * No altera horario ni estado; rechaza citas canceladas, realizadas o ya cobradas.
+   */
+  async syncServiciosDesdePos(id: number, body: Record<string, unknown>) {
+    const existing = (await db.prepare(`SELECT * FROM citas WHERE id = ?`).get(id)) as
+      | Record<string, unknown>
+      | undefined;
+    if (!existing) throw new AppError("Cita no encontrada", 404);
+
+    const estado = String(existing.estado ?? "");
+    if (estado === "cancelado") throw new AppError("No se puede editar una cita cancelada", 400);
+    if (estado === "realizado") throw new AppError("No se puede editar una cita ya realizada", 400);
+
+    const yaVenta = (await db
+      .prepare(
+        `SELECT id FROM ventas WHERE cita_id = ? AND IFNULL(estado,'confirmada') != 'cancelada' LIMIT 1`
+      )
+      .get(id)) as { id: number } | undefined;
+    if (yaVenta) {
+      throw new AppError(
+        `Esta cita ya fue cobrada (venta #${yaVenta.id}). No se pueden sincronizar servicios desde el POS.`,
+        400
+      );
+    }
+
+    const raw = body.nombres ?? body.servicios;
+    const nombres: string[] = [];
+    if (Array.isArray(raw)) {
+      for (const item of raw) {
+        if (typeof item === "string") {
+          const t = item.trim();
+          if (t) nombres.push(t);
+        } else if (item && typeof item === "object") {
+          const n = (item as { nombre?: unknown }).nombre;
+          if (typeof n === "string") {
+            const t = n.trim();
+            if (t) nombres.push(t);
+          }
+        }
+      }
+    }
+
+    const servicioTexto = nombres.length > 0 ? nombres.join(", ") : null;
+    const now = new Date().toISOString();
+    await db.prepare(`UPDATE citas SET servicio = ?, updated_at = ? WHERE id = ?`).run(servicioTexto, now, id);
+
+    const row = await db.prepare(`${rowSql} WHERE c.id = ?`).get(id);
+    await recordSyncEvent("cita", "actualizada", row);
+    return row;
+  },
+
   async crearSerieRecurrente(body: Record<string, unknown>) {
     const reps = Math.min(52, Math.max(1, Math.floor(Number(body.repeticiones ?? 6))));
     const intervalo = Math.max(1, Math.floor(Number(body.intervalo_dias ?? 14)));

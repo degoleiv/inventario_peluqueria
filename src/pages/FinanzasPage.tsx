@@ -1,6 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ChartLineUp, Check, CurrencyCircleDollar, Trash } from "@phosphor-icons/react";
+import {
+  ArrowCounterClockwise,
+  CalendarBlank,
+  CaretLeft,
+  CaretRight,
+  ChartLineUp,
+  Check,
+  CurrencyCircleDollar,
+  FileArrowUp,
+  Paperclip,
+  Plus,
+  Trash,
+  X,
+} from "@phosphor-icons/react";
 import {
   createCobranza,
   createGasto,
@@ -11,12 +24,14 @@ import {
   fetchCobranzas,
   fetchFlujoCaja,
   fetchGastos,
+  marcarGastoPago,
   registrarPagoCobranza,
   type CategoriaFinanzaConcepto,
   type Cliente,
   type GastoOperativo,
 } from "../api";
 import { useToast } from "../context/ToastContext";
+import { SearchableSelect } from "../components/SearchableSelect";
 
 type FinanzasTab = "flujo" | "gastos" | "cobrar";
 
@@ -67,6 +82,58 @@ function cobranzaVencimientoBadge(vencimiento: string | null): VencBadge {
   return "vigente";
 }
 
+function isoDay(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const da = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${da}`;
+}
+
+const FIN_CAL_WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+const FIN_CAL_MONTH_NAMES = [
+  "Enero",
+  "Febrero",
+  "Marzo",
+  "Abril",
+  "Mayo",
+  "Junio",
+  "Julio",
+  "Agosto",
+  "Septiembre",
+  "Octubre",
+  "Noviembre",
+  "Diciembre",
+];
+
+type FinCalCell = {
+  date: Date;
+  iso: string;
+  inMonth: boolean;
+  isToday: boolean;
+};
+
+/** Devuelve 6×7 = 42 celdas; primer día de la semana = lunes. */
+function buildFinanzasCalendarCells(viewDate: Date): FinCalCell[] {
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+  const firstOfMonth = new Date(year, month, 1);
+  const dayJs = firstOfMonth.getDay();
+  const offset = (dayJs + 6) % 7;
+  const start = new Date(year, month, 1 - offset);
+  const todayIso = isoDay(new Date());
+  const cells: FinCalCell[] = [];
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+    cells.push({
+      date: d,
+      iso: isoDay(d),
+      inMonth: d.getMonth() === month,
+      isToday: isoDay(d) === todayIso,
+    });
+  }
+  return cells;
+}
+
 export function FinanzasPage() {
   const toast = useToast();
   const [tab, setTab] = useState<FinanzasTab>("flujo");
@@ -79,12 +146,18 @@ export function FinanzasPage() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(false);
   const [gastoDeletingId, setGastoDeletingId] = useState<number | null>(null);
+  const [gastoPagoBusyId, setGastoPagoBusyId] = useState<number | null>(null);
 
-  const [gConcepto, setGConcepto] = useState("");
   const [gMonto, setGMonto] = useState<number | "">("");
   const [gCatId, setGCatId] = useState<number | "">("");
   const [finanzasCategorias, setFinanzasCategorias] = useState<CategoriaFinanzaConcepto[]>([]);
   const [gFecha, setGFecha] = useState(() => new Date().toISOString().slice(0, 10));
+
+  const [calMes, setCalMes] = useState<Date>(() => {
+    const n = new Date();
+    return new Date(n.getFullYear(), n.getMonth(), 1);
+  });
+  const [diaDetalleIso, setDiaDetalleIso] = useState<string | null>(null);
 
   const [cCliente, setCCliente] = useState<number | "">("");
   const [cDesc, setCDesc] = useState("");
@@ -101,6 +174,86 @@ export function FinanzasPage() {
       cobranzas.reduce((acc, c) => acc + (Number.isFinite(c.saldo_pendiente) ? c.saldo_pendiente : 0), 0),
     [cobranzas]
   );
+
+  const calCells = useMemo(() => buildFinanzasCalendarCells(calMes), [calMes]);
+
+  /** Mapa de categoría (por nombre, lower) → emoji para usarlo como etiqueta. */
+  const emojiPorCategoria = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of finanzasCategorias) {
+      if (c.emoji && c.emoji.trim()) m.set(c.nombre.trim().toLowerCase(), c.emoji.trim());
+    }
+    return m;
+  }, [finanzasCategorias]);
+
+  /**
+   * Opciones del combobox de categoría para el form de gasto.
+   * Cada opción muestra "emoji  nombre" (con fallback 💸 si la categoría no tiene).
+   * Solo categorías activas; la categoría es obligatoria (define el concepto).
+   */
+  const categoriasGastoOptions = useMemo(
+    () =>
+      finanzasCategorias
+        .filter((c) => c.estado !== "inactivo")
+        .map((c) => {
+          const emoji = c.emoji && c.emoji.trim() ? c.emoji.trim() : "💸";
+          return { value: String(c.id), label: `${emoji}  ${c.nombre}` };
+        }),
+    [finanzasCategorias]
+  );
+
+  /** Agrupa los gastos por fecha YYYY-MM-DD. */
+  const gastosPorDia = useMemo(() => {
+    const m = new Map<string, GastoOperativo[]>();
+    for (const g of gastos) {
+      const k = (g.fecha || "").slice(0, 10);
+      if (!k) continue;
+      const arr = m.get(k) ?? [];
+      arr.push(g);
+      m.set(k, arr);
+    }
+    return m;
+  }, [gastos]);
+
+  const totalDelMes = useMemo(() => {
+    const ym = `${calMes.getFullYear()}-${String(calMes.getMonth() + 1).padStart(2, "0")}`;
+    return gastos
+      .filter((g) => (g.fecha || "").slice(0, 7) === ym)
+      .reduce((a, g) => a + (Number.isFinite(g.monto) ? g.monto : 0), 0);
+  }, [gastos, calMes]);
+
+  const gastosDelDia = useMemo(() => {
+    if (!diaDetalleIso) return [] as GastoOperativo[];
+    return gastosPorDia.get(diaDetalleIso) ?? [];
+  }, [diaDetalleIso, gastosPorDia]);
+
+  const totalDelDia = useMemo(
+    () => gastosDelDia.reduce((a, g) => a + (Number.isFinite(g.monto) ? g.monto : 0), 0),
+    [gastosDelDia]
+  );
+
+  const goPrevMes = useCallback(
+    () => setCalMes((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1)),
+    []
+  );
+  const goNextMes = useCallback(
+    () => setCalMes((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1)),
+    []
+  );
+  const goHoyMes = useCallback(() => {
+    const n = new Date();
+    setCalMes(new Date(n.getFullYear(), n.getMonth(), 1));
+  }, []);
+
+  const abrirRapidoEnDia = useCallback((iso: string) => {
+    setGFecha(iso);
+    setDiaDetalleIso(null);
+    setGMonto("");
+    requestAnimationFrame(() => {
+      const el = document.getElementById("finanzas-gastos-form-anchor");
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -142,6 +295,15 @@ export function FinanzasPage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!diaDetalleIso) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setDiaDetalleIso(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [diaDetalleIso]);
+
   async function cargarFlujo() {
     const d = desde.trim();
     const h = hasta.trim();
@@ -159,15 +321,27 @@ export function FinanzasPage() {
 
   async function onGasto(e: React.FormEvent) {
     e.preventDefault();
-    if (!gConcepto.trim() || gMonto === "") return;
+    if (gMonto === "") {
+      toast("Ingresá el monto del gasto.", "warning");
+      return;
+    }
+    if (gCatId === "") {
+      toast("Elegí una categoría: define el concepto del gasto.", "warning");
+      return;
+    }
+    const cat = finanzasCategorias.find((c) => c.id === Number(gCatId));
+    const concepto = cat?.nombre.trim();
+    if (!concepto) {
+      toast("La categoría seleccionada no es válida.", "error");
+      return;
+    }
     try {
       await createGasto({
-        concepto: gConcepto.trim(),
+        concepto,
         monto: Number(gMonto),
         fecha: gFecha,
-        ...(gCatId === "" ? {} : { categoria_finanza_id: Number(gCatId) }),
+        categoria_finanza_id: Number(gCatId),
       });
-      setGConcepto("");
       setGMonto("");
       setGCatId("");
       toast("Gasto registrado correctamente.", "success");
@@ -221,6 +395,139 @@ export function FinanzasPage() {
     } finally {
       setGastoDeletingId(null);
     }
+  }
+
+  /**
+   * Marca un gasto como pagado y, opcionalmente, adjunta un comprobante.
+   * Abre un input de archivo dinámico (JPG/PNG/WEBP/PDF, máx 1.5 MB).
+   * Si el usuario cancela, igualmente queda como pagado pero sin comprobante.
+   */
+  function pagarGasto(g: GastoOperativo) {
+    if (gastoPagoBusyId !== null) return;
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/png,image/jpeg,image/webp,application/pdf";
+    input.style.display = "none";
+    document.body.appendChild(input);
+
+    let handled = false;
+    const cleanup = () => {
+      if (input.parentNode) input.parentNode.removeChild(input);
+    };
+
+    const proceed = async (dataUrl: string | null) => {
+      if (handled) return;
+      handled = true;
+      cleanup();
+      setGastoPagoBusyId(g.id);
+      try {
+        await marcarGastoPago(g.id, {
+          pagado: true,
+          ...(dataUrl ? { comprobante_url: dataUrl } : {}),
+        });
+        toast(
+          dataUrl
+            ? "Gasto marcado como pagado y comprobante adjuntado."
+            : "Gasto marcado como pagado.",
+          "success"
+        );
+        await load();
+      } catch (err) {
+        toast(err instanceof Error ? err.message : "No se pudo registrar el pago", "error");
+      } finally {
+        setGastoPagoBusyId(null);
+      }
+    };
+
+    input.addEventListener("change", () => {
+      const file = input.files?.[0];
+      if (!file) {
+        void proceed(null);
+        return;
+      }
+      const tipoOk =
+        file.type.startsWith("image/") || file.type === "application/pdf";
+      if (!tipoOk) {
+        toast("Adjuntá una imagen (JPG/PNG/WEBP) o un PDF.", "warning");
+        cleanup();
+        return;
+      }
+      if (file.size > 1.5 * 1024 * 1024) {
+        toast("El comprobante es muy grande (máx. 1.5 MB).", "warning");
+        cleanup();
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const r = reader.result;
+        void proceed(typeof r === "string" ? r : null);
+      };
+      reader.onerror = () => {
+        toast("No se pudo leer el archivo.", "error");
+        cleanup();
+      };
+      reader.readAsDataURL(file);
+    });
+
+    /* Si el usuario cierra el diálogo nativo sin seleccionar archivo, no hay
+       evento "change". Marcamos como pagado sin comprobante tras refocus. */
+    let pickGuard: ReturnType<typeof setTimeout> | null = null;
+    const onFocus = () => {
+      pickGuard = setTimeout(() => {
+        if (!handled && !input.files?.length) void proceed(null);
+        window.removeEventListener("focus", onFocus);
+      }, 350);
+    };
+    window.addEventListener("focus", onFocus, { once: true });
+    void pickGuard;
+
+    input.click();
+  }
+
+  async function anularPagoGasto(g: GastoOperativo) {
+    if (gastoPagoBusyId !== null) return;
+    if (
+      !window.confirm(
+        `¿Anular el pago de «${g.concepto}»?\n\nSe quitará la fecha de pago y el comprobante adjunto (si lo hay).`
+      )
+    )
+      return;
+    setGastoPagoBusyId(g.id);
+    try {
+      await marcarGastoPago(g.id, { pagado: false, comprobante_url: null });
+      toast("Pago anulado.", "success");
+      await load();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "No se pudo anular el pago", "error");
+    } finally {
+      setGastoPagoBusyId(null);
+    }
+  }
+
+  function abrirComprobante(g: GastoOperativo) {
+    if (!g.comprobante_url) return;
+    const w = window.open();
+    if (!w) {
+      toast("Permití abrir ventanas para ver el comprobante.", "warning");
+      return;
+    }
+    /* Para data URLs grandes Chrome bloquea el navegador → embebemos en HTML. */
+    const isPdf = g.comprobante_url.toLowerCase().startsWith("data:application/pdf");
+    const safeName = (g.concepto || `gasto-${g.id}`).replace(/[<>"']/g, "");
+    if (isPdf) {
+      w.document.write(
+        `<!doctype html><html><head><title>${safeName}</title></head><body style="margin:0">` +
+          `<embed src="${g.comprobante_url}" type="application/pdf" width="100%" height="100%" style="height:100vh"/>` +
+          `</body></html>`
+      );
+    } else {
+      w.document.write(
+        `<!doctype html><html><head><title>${safeName}</title></head><body style="margin:0;display:grid;place-items:center;background:#111">` +
+          `<img src="${g.comprobante_url}" alt="" style="max-width:100vw;max-height:100vh;object-fit:contain"/>` +
+          `</body></html>`
+      );
+    }
+    w.document.close();
   }
 
   return (
@@ -345,14 +652,18 @@ export function FinanzasPage() {
 
       {tab === "gastos" ? (
         <>
-          <section className="pedidos-wizard-card finanzas-tab-panel" aria-labelledby="finanzas-gastos-title">
+          <section
+            id="finanzas-gastos-form-anchor"
+            className="pedidos-wizard-card finanzas-tab-panel"
+            aria-labelledby="finanzas-gastos-title"
+          >
             <div className="pedidos-wizard-card__intro">
               <h2 id="finanzas-gastos-title" className="pedidos-wizard-card__title">
                 Registrar gasto
               </h2>
               <p className="pedidos-wizard-card__subtitle">
-                Arriendo, servicios, insumos administrativos, etc. Solo administrador. Las categorías se gestionan
-                en{" "}
+                Arriendo, servicios, insumos administrativos, etc. Solo administrador. La{" "}
+                <strong>categoría</strong> define el concepto del gasto. Las categorías se gestionan en{" "}
                 <Link to="/configuracion/parametros" className="finanzas-inline-link">
                   Parámetros generales
                 </Link>
@@ -362,18 +673,27 @@ export function FinanzasPage() {
             {loading ? <p className="pedidos-inline-hint">Cargando lista…</p> : null}
             <form className="finanzas-form-card" onSubmit={onGasto}>
               <div className="pedidos-form-grid">
-                <div className="pedidos-field">
-                  <span className="pedidos-field__label">Concepto</span>
-                  <input
-                    className="pedidos-input"
-                    value={gConcepto}
-                    onChange={(e) => setGConcepto(e.target.value)}
-                    placeholder="Ej: Arriendo local"
-                    required
+                <div className="pedidos-field finanzas-cat-field">
+                  <SearchableSelect
+                    label="Categoría *"
+                    value={gCatId === "" ? "" : String(gCatId)}
+                    onChange={(v) => setGCatId(v === "" ? "" : Number(v))}
+                    options={categoriasGastoOptions}
+                    placeholder="Buscar categoría…"
+                    idleTextWhenEmpty="Elegí una categoría…"
+                    emptySlot={
+                      <p className="muted small">
+                        Aún no hay categorías. Creá una en{" "}
+                        <Link to="/configuracion/parametros" className="finanzas-inline-link">
+                          Parámetros generales
+                        </Link>
+                        .
+                      </p>
+                    }
                   />
                 </div>
                 <div className="pedidos-field">
-                  <span className="pedidos-field__label">Monto</span>
+                  <span className="pedidos-field__label">Monto *</span>
                   <input
                     className="pedidos-input"
                     type="number"
@@ -384,22 +704,6 @@ export function FinanzasPage() {
                     placeholder="Ej: 450000"
                     required
                   />
-                </div>
-                <div className="pedidos-field">
-                  <span className="pedidos-field__label">Categoría</span>
-                  <select
-                    className="pedidos-select"
-                    value={gCatId === "" ? "" : String(gCatId)}
-                    onChange={(e) => setGCatId(e.target.value === "" ? "" : Number(e.target.value))}
-                    aria-label="Categoría"
-                  >
-                    <option value="">Sin categoría</option>
-                    {finanzasCategorias.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.nombre}
-                      </option>
-                    ))}
-                  </select>
                 </div>
                 <div className="pedidos-field">
                   <span className="pedidos-field__label">Fecha</span>
@@ -419,6 +723,121 @@ export function FinanzasPage() {
             </form>
           </section>
 
+          <section
+            className="pedidos-wizard-card finanzas-tab-panel"
+            aria-labelledby="finanzas-gastos-cal"
+          >
+            <div className="pedidos-wizard-card__intro fin-cal-intro">
+              <div>
+                <h2 id="finanzas-gastos-cal" className="pedidos-wizard-card__title">
+                  Calendario de gastos
+                </h2>
+                <p className="pedidos-wizard-card__subtitle">
+                  Cada gasto aparece como etiqueta en el día. Tocá un día para ver el detalle o registrar
+                  uno nuevo.
+                </p>
+              </div>
+              <div className="fin-cal-total" aria-live="polite">
+                <span className="fin-cal-total__label">Total del mes</span>
+                <span className="fin-cal-total__value">{totalDelMes.toFixed(2)}</span>
+              </div>
+            </div>
+
+            <div className="fin-cal-toolbar">
+              <button
+                type="button"
+                className="fin-cal-nav"
+                onClick={goPrevMes}
+                aria-label="Mes anterior"
+                title="Mes anterior"
+              >
+                <CaretLeft size={18} weight="bold" aria-hidden />
+              </button>
+              <div className="fin-cal-title" aria-live="polite">
+                {FIN_CAL_MONTH_NAMES[calMes.getMonth()]} {calMes.getFullYear()}
+              </div>
+              <button
+                type="button"
+                className="fin-cal-nav"
+                onClick={goNextMes}
+                aria-label="Mes siguiente"
+                title="Mes siguiente"
+              >
+                <CaretRight size={18} weight="bold" aria-hidden />
+              </button>
+              <button
+                type="button"
+                className="fin-cal-today"
+                onClick={goHoyMes}
+                title="Ir al mes actual"
+              >
+                Hoy
+              </button>
+            </div>
+
+            <div
+              className="fin-cal-grid"
+              role="grid"
+              aria-label={`Calendario de ${FIN_CAL_MONTH_NAMES[calMes.getMonth()]} ${calMes.getFullYear()}`}
+            >
+              {FIN_CAL_WEEKDAYS.map((wd) => (
+                <div key={`wd-${wd}`} className="fin-cal-weekday" role="columnheader">
+                  {wd}
+                </div>
+              ))}
+              {calCells.map((cell) => {
+                const items = gastosPorDia.get(cell.iso) ?? [];
+                const visibles = items.slice(0, 3);
+                const restantes = items.length - visibles.length;
+                const totalDay = items.reduce(
+                  (a, g) => a + (Number.isFinite(g.monto) ? g.monto : 0),
+                  0
+                );
+                return (
+                  <button
+                    key={cell.iso}
+                    type="button"
+                    role="gridcell"
+                    className={`fin-cal-day ${cell.inMonth ? "" : "fin-cal-day--out"} ${
+                      cell.isToday ? "fin-cal-day--today" : ""
+                    } ${items.length > 0 ? "fin-cal-day--has" : ""}`}
+                    onClick={() => {
+                      if (items.length > 0) setDiaDetalleIso(cell.iso);
+                      else abrirRapidoEnDia(cell.iso);
+                    }}
+                    aria-label={
+                      items.length > 0
+                        ? `${cell.iso}: ${items.length} gasto${items.length === 1 ? "" : "s"}, total ${totalDay.toFixed(2)}`
+                        : `${cell.iso}: sin gastos. Tocar para registrar uno`
+                    }
+                  >
+                    <span className="fin-cal-day__num">{cell.date.getDate()}</span>
+                    {items.length > 0 ? (
+                      <ul className="fin-cal-day__chips" aria-hidden>
+                        {visibles.map((g) => {
+                          const emoji = g.categoria
+                            ? emojiPorCategoria.get(g.categoria.trim().toLowerCase())
+                            : null;
+                          return (
+                            <li key={g.id} className="fin-cal-chip" title={`${g.concepto} · ${g.monto.toFixed(2)}`}>
+                              <span className="fin-cal-chip__emoji" aria-hidden>
+                                {emoji ?? "💸"}
+                              </span>
+                              <span className="fin-cal-chip__txt">{g.concepto}</span>
+                            </li>
+                          );
+                        })}
+                        {restantes > 0 ? (
+                          <li className="fin-cal-chip fin-cal-chip--more">+{restantes} más</li>
+                        ) : null}
+                      </ul>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
           <section className="pedidos-wizard-card finanzas-tab-panel" aria-labelledby="finanzas-gastos-lista">
             <h2 id="finanzas-gastos-lista" className="pedidos-wizard-card__title">
               Historial de gastos
@@ -433,36 +852,101 @@ export function FinanzasPage() {
                       <th>Concepto</th>
                       <th>Categoría</th>
                       <th className="finanzas-table__th-monto">Monto</th>
-                      {isAdmin ? <th className="finanzas-table__th-accion" aria-label="Eliminar" /> : null}
+                      <th>Estado</th>
+                      <th aria-label="Acciones" />
                     </tr>
                   </thead>
                   <tbody>
-                    {gastos.map((g) => (
-                      <tr key={g.id}>
-                        <td className="finanzas-table__mono">{g.fecha}</td>
-                        <td>{g.concepto}</td>
-                        <td>{g.categoria ?? "—"}</td>
-                        <td className="finanzas-monto-out">{g.monto.toFixed(2)}</td>
-                        {isAdmin ? (
-                          <td className="finanzas-table__td-accion">
-                            <button
-                              type="button"
-                              className="finanzas-icon-btn"
-                              title="Eliminar gasto"
-                              disabled={gastoDeletingId === g.id}
-                              onClick={() => void onEliminarGasto(g.id)}
-                              aria-label="Eliminar gasto"
-                            >
-                              <Trash size={18} weight="bold" />
-                            </button>
+                    {gastos.map((g) => {
+                      const pagado = g.pagado === 1;
+                      const pagoBusy = gastoPagoBusyId === g.id;
+                      return (
+                        <tr key={g.id}>
+                          <td className="finanzas-table__mono">{g.fecha}</td>
+                          <td>{g.concepto}</td>
+                          <td>{g.categoria ?? "—"}</td>
+                          <td className="finanzas-monto-out">{g.monto.toFixed(2)}</td>
+                          <td>
+                            {pagado ? (
+                              <span className="fin-cal-day-item__badge fin-cal-day-item__badge--paid">
+                                <Check size={11} weight="bold" aria-hidden /> Pagado
+                              </span>
+                            ) : (
+                              <span className="fin-cal-day-item__badge fin-cal-day-item__badge--pending">
+                                Pendiente
+                              </span>
+                            )}
                           </td>
-                        ) : null}
-                      </tr>
-                    ))}
+                          <td className="finanzas-table__td-accion">
+                            <div className="fin-cal-day-item__acts">
+                              {g.comprobante_url ? (
+                                <button
+                                  type="button"
+                                  className="finanzas-icon-btn"
+                                  title="Ver comprobante"
+                                  aria-label="Ver comprobante"
+                                  onClick={() => abrirComprobante(g)}
+                                >
+                                  <Paperclip size={16} weight="bold" />
+                                </button>
+                              ) : null}
+                              {isAdmin && !pagado ? (
+                                <button
+                                  type="button"
+                                  className="finanzas-icon-btn finanzas-icon-btn--accent"
+                                  title="Marcar como pagado (opcional: subir comprobante)"
+                                  aria-label="Marcar como pagado"
+                                  disabled={pagoBusy}
+                                  onClick={() => pagarGasto(g)}
+                                >
+                                  <FileArrowUp size={16} weight="bold" />
+                                </button>
+                              ) : null}
+                              {isAdmin && pagado ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="finanzas-icon-btn"
+                                    title="Cambiar comprobante"
+                                    aria-label="Cambiar comprobante"
+                                    disabled={pagoBusy}
+                                    onClick={() => pagarGasto(g)}
+                                  >
+                                    <FileArrowUp size={16} weight="bold" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="finanzas-icon-btn"
+                                    title="Anular pago"
+                                    aria-label="Anular pago"
+                                    disabled={pagoBusy}
+                                    onClick={() => void anularPagoGasto(g)}
+                                  >
+                                    <ArrowCounterClockwise size={16} weight="bold" />
+                                  </button>
+                                </>
+                              ) : null}
+                              {isAdmin ? (
+                                <button
+                                  type="button"
+                                  className="finanzas-icon-btn"
+                                  title="Eliminar gasto"
+                                  aria-label="Eliminar gasto"
+                                  disabled={gastoDeletingId === g.id}
+                                  onClick={() => void onEliminarGasto(g.id)}
+                                >
+                                  <Trash size={16} weight="bold" />
+                                </button>
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                     <tr className="finanzas-total-row">
                       <td colSpan={3}>Total</td>
                       <td className="finanzas-monto-out">{totalGastosMonto.toFixed(2)}</td>
-                      {isAdmin ? <td /> : null}
+                      <td colSpan={2} />
                     </tr>
                   </tbody>
                 </table>
@@ -475,6 +959,179 @@ export function FinanzasPage() {
             )}
           </section>
         </>
+      ) : null}
+
+      {diaDetalleIso ? (
+        <div
+          className="drawer-overlay fin-cal-day-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="fin-cal-day-title"
+          onClick={() => setDiaDetalleIso(null)}
+        >
+          <div
+            className="card drawer-overlay-card fin-cal-day-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <header className="fin-cal-day-modal__head">
+              <div className="fin-cal-day-modal__head-text">
+                <p className="fin-cal-day-modal__eyebrow">
+                  <CalendarBlank size={14} weight="bold" aria-hidden /> Gastos del día
+                </p>
+                <h3 id="fin-cal-day-title" className="fin-cal-day-modal__title">
+                  {diaDetalleIso}
+                </h3>
+              </div>
+              <button
+                type="button"
+                className="fin-cal-day-modal__close"
+                onClick={() => setDiaDetalleIso(null)}
+                aria-label="Cerrar"
+                title="Cerrar"
+              >
+                <X size={18} weight="bold" aria-hidden />
+              </button>
+            </header>
+
+            {gastosDelDia.length > 0 ? (
+              <ul className="fin-cal-day-list">
+                {gastosDelDia.map((g) => {
+                  const emoji = g.categoria
+                    ? emojiPorCategoria.get(g.categoria.trim().toLowerCase())
+                    : null;
+                  const pagado = g.pagado === 1;
+                  const pagoBusy = gastoPagoBusyId === g.id;
+                  return (
+                    <li
+                      key={g.id}
+                      className={`fin-cal-day-item ${pagado ? "fin-cal-day-item--paid" : ""}`}
+                    >
+                      <div className="fin-cal-day-item__main">
+                        <span className="fin-cal-day-item__emoji" aria-hidden>
+                          {emoji ?? "💸"}
+                        </span>
+                        <div className="fin-cal-day-item__txt">
+                          <div className="fin-cal-day-item__concept">{g.concepto}</div>
+                          <div className="fin-cal-day-item__sub">
+                            {g.categoria ? (
+                              <span className="muted small">{g.categoria}</span>
+                            ) : null}
+                            {pagado ? (
+                              <span className="fin-cal-day-item__badge fin-cal-day-item__badge--paid">
+                                <Check size={11} weight="bold" aria-hidden /> Pagado
+                              </span>
+                            ) : (
+                              <span className="fin-cal-day-item__badge fin-cal-day-item__badge--pending">
+                                Pendiente
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="fin-cal-day-item__monto">{g.monto.toFixed(2)}</div>
+                      <div className="fin-cal-day-item__acts">
+                        {g.comprobante_url ? (
+                          <button
+                            type="button"
+                            className="finanzas-icon-btn"
+                            title="Ver comprobante"
+                            aria-label="Ver comprobante"
+                            onClick={() => abrirComprobante(g)}
+                          >
+                            <Paperclip size={16} weight="bold" />
+                          </button>
+                        ) : null}
+                        {isAdmin && !pagado ? (
+                          <button
+                            type="button"
+                            className="finanzas-icon-btn finanzas-icon-btn--accent"
+                            title={
+                              g.comprobante_url
+                                ? "Marcar pagado y reemplazar comprobante"
+                                : "Marcar como pagado (opcional: subir comprobante)"
+                            }
+                            aria-label="Marcar como pagado"
+                            disabled={pagoBusy}
+                            onClick={() => pagarGasto(g)}
+                          >
+                            <FileArrowUp size={16} weight="bold" />
+                          </button>
+                        ) : null}
+                        {isAdmin && pagado ? (
+                          <>
+                            <button
+                              type="button"
+                              className="finanzas-icon-btn"
+                              title="Cambiar comprobante"
+                              aria-label="Cambiar comprobante"
+                              disabled={pagoBusy}
+                              onClick={() => pagarGasto(g)}
+                            >
+                              <FileArrowUp size={16} weight="bold" />
+                            </button>
+                            <button
+                              type="button"
+                              className="finanzas-icon-btn"
+                              title="Anular pago"
+                              aria-label="Anular pago"
+                              disabled={pagoBusy}
+                              onClick={() => void anularPagoGasto(g)}
+                            >
+                              <ArrowCounterClockwise size={16} weight="bold" />
+                            </button>
+                          </>
+                        ) : null}
+                        {isAdmin ? (
+                          <button
+                            type="button"
+                            className="finanzas-icon-btn fin-cal-day-item__del"
+                            title="Eliminar gasto"
+                            aria-label="Eliminar gasto"
+                            disabled={gastoDeletingId === g.id}
+                            onClick={() => void onEliminarGasto(g.id)}
+                          >
+                            <Trash size={16} weight="bold" />
+                          </button>
+                        ) : null}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <div className="finanzas-empty finanzas-empty--compact" role="status">
+                <p className="finanzas-empty__title">Sin gastos en este día</p>
+                <p className="finanzas-empty__text">
+                  Tocá «Registrar gasto en este día» para añadir uno.
+                </p>
+              </div>
+            )}
+
+            {gastosDelDia.length > 0 ? (
+              <div className="fin-cal-day-modal__total">
+                <span>Total del día</span>
+                <strong>{totalDelDia.toFixed(2)}</strong>
+              </div>
+            ) : null}
+
+            <div className="fin-cal-day-modal__actions">
+              <button
+                type="button"
+                className="pedidos-btn pedidos-btn--secondary"
+                onClick={() => setDiaDetalleIso(null)}
+              >
+                Cerrar
+              </button>
+              <button
+                type="button"
+                className="pedidos-btn pedidos-btn--primary"
+                onClick={() => abrirRapidoEnDia(diaDetalleIso)}
+              >
+                <Plus size={16} weight="bold" aria-hidden /> Registrar gasto en este día
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
 
       {tab === "cobrar" ? (

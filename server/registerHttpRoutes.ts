@@ -685,6 +685,17 @@ export function registerHttpRoutes(app: Express) {
     })
   );
 
+  /** Datos para cobrar la cita en POS: cliente, profesional, servicios y flag «ya_cobrada». */
+  api.get(
+    "/citas/:id/cobro",
+    requirePermiso("citas"),
+    asyncHandler(async (req, res) => {
+      const id = parseId(req, res);
+      if (id == null) return;
+      res.json(await citaService.getCobroData(id));
+    })
+  );
+
   api.get(
     "/ventas",
     requirePermiso("ventas"),
@@ -692,6 +703,34 @@ export function registerHttpRoutes(app: Express) {
       const desde = typeof req.query.desde === "string" ? req.query.desde : undefined;
       const hasta = typeof req.query.hasta === "string" ? req.query.hasta : undefined;
       res.json(await ventaService.list(desde, hasta));
+    })
+  );
+
+  api.get(
+    "/ventas/citas-asociar",
+    requirePermiso("ventas"),
+    asyncHandler(async (req, res) => {
+      const desde = typeof req.query.desde === "string" ? req.query.desde.trim() : "";
+      const hasta = typeof req.query.hasta === "string" ? req.query.hasta.trim() : "";
+      const uq = req.query.usuario_id;
+      let usuario_id: number | undefined;
+      if (uq != null && String(uq).trim() !== "") {
+        const n = Number(uq);
+        if (Number.isFinite(n)) usuario_id = Math.floor(n);
+      }
+      res.json(await citaService.listParaAsociarVentaPos({ desde, hasta, usuario_id }));
+    })
+  );
+
+  api.patch(
+    "/ventas/citas/:id/servicios-desde-pos",
+    requirePermiso("ventas"),
+    asyncHandler(async (req, res) => {
+      const id = parseId(req, res);
+      if (id == null) return;
+      const row = await citaService.syncServiciosDesdePos(id, req.body as Record<string, unknown>);
+      await auditService.log(req.user?.sub, "actualizar", "cita", id, { origen: "pos_servicios" });
+      res.json(row);
     })
   );
 
@@ -1098,6 +1137,23 @@ export function registerHttpRoutes(app: Express) {
       await finanzaService.deleteGasto(id);
       await auditService.log(req.user?.sub, "eliminar", "gasto", id, {});
       res.status(204).send();
+    })
+  );
+
+  api.patch(
+    "/gastos/:id/pago",
+    requireAdmin,
+    asyncHandler(async (req, res) => {
+      const id = parseId(req, res);
+      if (id == null) return;
+      const row = (await finanzaService.setGastoPago(
+        id,
+        req.body as Record<string, unknown>
+      )) as { id: number; pagado: number };
+      await auditService.log(req.user?.sub, "marcar_pagado", "gasto", id, {
+        pagado: row.pagado,
+      });
+      res.json(row);
     })
   );
 

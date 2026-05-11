@@ -279,6 +279,10 @@ export function InventarioPage() {
       toast("Seleccioná categoría y marca (proveedor activo)", "warning");
       return;
     }
+    if (precioVenta === "" || Number(precioVenta) <= 0) {
+      toast("Ingresá un precio de venta mayor a 0", "warning");
+      return;
+    }
     const body = catalogoFieldsToCreateBody(catalogoValues);
     setError(null);
     try {

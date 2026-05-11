@@ -143,6 +143,7 @@ export function EmpleadosPage({ onChanged }: Props) {
     foto_url: "",
     tipo_comision: "porcentaje" as "porcentaje" | "fijo",
     valor_comision: "0",
+    activo: true,
     registrar_turnos_plantilla: true,
     turno_fecha_desde: isoToday(),
     turno_fecha_hasta: addDaysIso(isoToday(), 55),
@@ -183,7 +184,6 @@ export function EmpleadosPage({ onChanged }: Props) {
   });
 
   const [puedeCertificado, setPuedeCertificado] = useState(false);
-  const [activoSavingId, setActivoSavingId] = useState<number | null>(null);
   /** Feedback UI mientras el API genera el PDF del certificado. */
   const [certBusy, setCertBusy] = useState<{ id: number } | null>(null);
   const certLockRef = useRef(false);
@@ -264,6 +264,7 @@ export function EmpleadosPage({ onChanged }: Props) {
       foto_url: "",
       tipo_comision: "porcentaje",
       valor_comision: "0",
+      activo: true,
       registrar_turnos_plantilla: true,
       turno_fecha_desde: isoToday(),
       turno_fecha_hasta: addDaysIso(isoToday(), 55),
@@ -287,6 +288,7 @@ export function EmpleadosPage({ onChanged }: Props) {
       tipo_comision:
         u.tipo_comision === "fijo" ? "fijo" : ("porcentaje" as const),
       valor_comision: String(u.valor_comision ?? 0),
+      activo: u.activo === 1,
       registrar_turnos_plantilla: true,
       turno_fecha_desde: isoToday(),
       turno_fecha_hasta: addDaysIso(isoToday(), 55),
@@ -322,6 +324,7 @@ export function EmpleadosPage({ onChanged }: Props) {
           foto_url: form.foto_url.trim() || null,
           tipo_comision: form.tipo_comision,
           valor_comision: Number.isFinite(vc) ? vc : 0,
+          activo: form.activo,
         });
         toast("Empleado actualizado.", "success");
       } else {
@@ -397,20 +400,6 @@ export function EmpleadosPage({ onChanged }: Props) {
     } finally {
       certLockRef.current = false;
       setCertBusy(null);
-    }
-  }
-
-  async function toggleActivo(u: UsuarioListado) {
-    setActivoSavingId(u.id);
-    try {
-      await updateUsuario(u.id, { activo: u.activo === 1 ? false : true });
-      toast(u.activo === 1 ? "Usuario desactivado." : "Usuario activado.", "success");
-      void load();
-      onChanged?.();
-    } catch (err) {
-      toast(err instanceof Error ? err.message : "Error", "error");
-    } finally {
-      setActivoSavingId(null);
     }
   }
 
@@ -669,139 +658,103 @@ export function EmpleadosPage({ onChanged }: Props) {
                   No se encontraron empleados
                 </p>
               ) : (
-            <div className="table-wrap">
-              <table className="table table--empleados-equipo">
-                <colgroup>
-                  <col className="col-emp-icono" />
-                  <col className="col-emp-nombre" />
-                  <col className="col-emp-email" />
-                  <col className="col-emp-rol" />
-                  <col className="col-emp-comision" />
-                  <col className="col-emp-estado" />
-                  <col className="col-emp-acciones" />
-                  <col className="col-emp-activo" />
-                </colgroup>
-                <thead>
-                  <tr>
-                    <th className="th-empleado-icono">Icono</th>
-                    <th>Nombre</th>
-                    <th>Email</th>
-                    <th>Rol</th>
-                    <th>Comisión</th>
-                    <th>Estado</th>
-                    <th className="th-empleados-acciones">Acciones</th>
-                    <th className="th-empleado-activo">Activo</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {usuariosFiltrados.map((u) => (
-                    <tr key={u.id}>
-                      <td className="td-empleado-icono">
-                        <div className="empleado-cell-icono">
-                          {u.foto_url ? (
-                            <img src={u.foto_url} alt="" className="empleado-avatar" width={40} height={40} />
-                          ) : (
-                            <span className="empleado-avatar empleado-avatar--ph">
-                              {(u.nombre || u.email).slice(0, 1).toUpperCase()}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td>{u.nombre || "—"}</td>
-                      <td className="mono small">{u.email}</td>
-                      <td>
-                        <span className="mono">{u.rol}</span>
-                      </td>
-                      <td className="small">
-                        {u.tipo_comision === "fijo"
-                          ? `Fijo ${formatMoney(Number(u.valor_comision ?? 0))}`
-                          : `${Number(u.valor_comision ?? 0)} %`}
-                      </td>
-                      <td>{u.activo === 1 ? <span className="badge-ok">Activo</span> : <span className="muted">Inactivo</span>}</td>
-                      <td className="td-empleados-acciones">
-                        <div className="empleado-cell-acciones">
-                          {certBusy?.id === u.id ? (
-                            <span className="cert-wait-msg" aria-live="polite">
-                              <CircleNotch
-                                className="empleado-cert-spinner"
-                                size={18}
-                                weight="bold"
-                                aria-hidden
-                              />
-                              Generando descarga…
-                            </span>
-                          ) : null}
-                          <div className="empleado-cell-acciones__buttons">
-                            <button
-                              type="button"
-                              className="btn-icon-row btn-icon-row--edit"
-                              title="Editar empleado"
-                              aria-label="Editar empleado"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                openEdit(u);
-                              }}
-                            >
-                              <PencilSimple size={20} weight="regular" aria-hidden />
-                            </button>
-                            {puedeCertificado ? (
-                              <button
-                                type="button"
-                                className="btn-icon-row btn-icon-row--download"
-                                title="Descargar certificado"
-                                aria-label="Descargar certificado"
-                                disabled={certBusy !== null}
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  void runCertificadoDescarga(u);
-                                }}
-                              >
-                                <Download size={20} weight="regular" aria-hidden />
-                              </button>
-                            ) : null}
-                            <button
-                              type="button"
-                              className="btn-icon-row btn-icon-row--delete"
-                              title="Eliminar empleado"
-                              aria-label="Eliminar empleado"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                void onDelete(u);
-                              }}
-                            >
-                              <Trash size={20} weight="regular" aria-hidden />
-                            </button>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="td-empleado-switch">
-                        <label
-                          className="ui-switch"
-                          title={u.activo === 1 ? "Empleado activo" : "Empleado inactivo"}
-                          onClick={(e) => e.stopPropagation()}
+            <ul className="empleados-cards-grid" role="list">
+              {usuariosFiltrados.map((u) => {
+                const inicial = (u.nombre || u.email).slice(0, 1).toUpperCase();
+                const activo = u.activo === 1;
+                return (
+                  <li
+                    key={u.id}
+                    className={`empleado-card ${activo ? "empleado-card--activo" : "empleado-card--inactivo"}`}
+                  >
+                    <div className="empleado-card__avatar">
+                      {u.foto_url ? (
+                        <img
+                          src={u.foto_url}
+                          alt=""
+                          className="empleado-avatar empleado-avatar--xl"
+                          width={96}
+                          height={96}
+                        />
+                      ) : (
+                        <span className="empleado-avatar empleado-avatar--ph empleado-avatar--xl">
+                          {inicial}
+                        </span>
+                      )}
+                    </div>
+
+                    <p className="empleado-card__nombre" title={u.nombre || u.email}>
+                      {u.nombre || "—"}
+                    </p>
+
+                    {activo ? (
+                      <span className="badge-ok empleado-card__estado">Activo</span>
+                    ) : (
+                      <span className="empleado-card__estado empleado-card__estado--off">
+                        Inactivo
+                      </span>
+                    )}
+
+                    {certBusy?.id === u.id ? (
+                      <p className="empleado-card__cert-wait" aria-live="polite">
+                        <CircleNotch
+                          className="empleado-cert-spinner"
+                          size={14}
+                          weight="bold"
+                          aria-hidden
+                        />
+                        Generando…
+                      </p>
+                    ) : null}
+
+                    <div className="empleado-card__acciones">
+                      <button
+                        type="button"
+                        className="btn-icon-row btn-icon-row--edit"
+                        title="Editar empleado"
+                        aria-label="Editar empleado"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          openEdit(u);
+                        }}
+                      >
+                        <PencilSimple size={18} weight="regular" aria-hidden />
+                      </button>
+                      {puedeCertificado ? (
+                        <button
+                          type="button"
+                          className="btn-icon-row btn-icon-row--download"
+                          title="Descargar certificado"
+                          aria-label="Descargar certificado"
+                          disabled={certBusy !== null}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            void runCertificadoDescarga(u);
+                          }}
                         >
-                          <input
-                            type="checkbox"
-                            className="ui-switch__input"
-                            checked={u.activo === 1}
-                            disabled={activoSavingId === u.id}
-                            aria-label={`${u.nombre || u.email}: empleado activo en el sistema`}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              void toggleActivo(u);
-                            }}
-                          />
-                          <span className="ui-switch__track" aria-hidden />
-                        </label>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                          <Download size={18} weight="regular" aria-hidden />
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        className="btn-icon-row btn-icon-row--delete"
+                        title="Eliminar empleado"
+                        aria-label="Eliminar empleado"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          void onDelete(u);
+                        }}
+                      >
+                        <Trash size={18} weight="regular" aria-hidden />
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
               )}
             </>
           )}
@@ -1677,6 +1630,29 @@ export function EmpleadosPage({ onChanged }: Props) {
             <p className="muted small">
               Foto cargada ({form.foto_url.length > 80 ? "data:image…" : form.foto_url})
             </p>
+          ) : null}
+          {editing ? (
+            <div className="field empleado-edit-activo-row">
+              <div className="empleado-edit-activo-row__text">
+                <span className="empleado-edit-activo-row__title">Empleado activo</span>
+                <span className="muted small">
+                  Si lo desactivás, no podrá iniciar sesión ni aparecerá en la agenda.
+                </span>
+              </div>
+              <label
+                className="ui-switch"
+                title={form.activo ? "Empleado activo" : "Empleado inactivo"}
+              >
+                <input
+                  type="checkbox"
+                  className="ui-switch__input"
+                  checked={form.activo}
+                  onChange={(e) => setForm((x) => ({ ...x, activo: e.target.checked }))}
+                  aria-label="Empleado activo en el sistema"
+                />
+                <span className="ui-switch__track" aria-hidden />
+              </label>
+            </div>
           ) : null}
           {!editing ? (
             <fieldset className="card" style={{ padding: "0.75rem", marginTop: "0.5rem", border: "1px solid var(--border)" }}>

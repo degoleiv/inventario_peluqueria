@@ -407,15 +407,17 @@ export function ProductoCatalogoForm({
         </label>
       ) : (
         <label className="field">
-          <span>Precio venta</span>
+          <span>Precio venta *</span>
           <input
             type="number"
             step="0.01"
             min={0}
+            required
             value={values.precioVenta}
             onChange={(e) =>
               onChange({ precioVenta: e.target.value === "" ? "" : Number(e.target.value) })
             }
+            placeholder="Ej. 15000"
           />
         </label>
       )}

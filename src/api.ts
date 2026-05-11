@@ -834,6 +834,14 @@ export async function fetchVenta(id: number): Promise<VentaDetalle> {
   return requestJson(`/api/ventas/${id}`);
 }
 
+/** Servicio realizado en una cita, cobrado dentro de una venta (no descuenta stock). */
+export type VentaServicioInput = {
+  servicio_nombre: string;
+  usuario_id?: number | null;
+  cantidad: number;
+  valor_unitario: number;
+};
+
 export async function createVenta(body: {
   cliente_id?: number | null;
   usuario_id?: number;
@@ -841,6 +849,10 @@ export async function createVenta(body: {
   metodo_pago?: string;
   notas?: string | null;
   lineas: Array<{ producto_id: number; cantidad: number; precio_unitario?: number }>;
+  /** Servicios realizados al cobrar una cita (opcional, no descuentan stock). */
+  servicios?: VentaServicioInput[];
+  /** Cita asociada (anti-doble-cobro): solo una venta activa por cita. */
+  cita_id?: number | null;
   emitir_factura?: boolean;
   condicion_iva_cliente?: string;
   factura_tipo?: string;
@@ -854,6 +866,44 @@ export async function createVenta(body: {
   }
 > {
   return requestJson("/api/ventas", { method: "POST", body: JSON.stringify(body) });
+}
+
+/** Datos para precargar el POS al cobrar una cita. */
+export type CitaCobroData = {
+  cita: Cita;
+  servicios: Array<{
+    nombre: string;
+    usuario_id: number | null;
+    cantidad: number;
+    valor_unitario: number;
+  }>;
+  ya_cobrada: boolean;
+  venta_id: number | null;
+};
+
+export async function fetchCitaCobro(citaId: number): Promise<CitaCobroData> {
+  return requestJson(`/api/citas/${citaId}/cobro`);
+}
+
+/** Citas pendientes/confirmadas sin venta activa (rango de días) para vincular desde el POS. Requiere permiso ventas. */
+export async function fetchCitasAsociarVentas(params: {
+  desde: string;
+  hasta: string;
+  usuario_id?: number;
+}): Promise<Cita[]> {
+  const q = new URLSearchParams();
+  q.set("desde", params.desde);
+  q.set("hasta", params.hasta);
+  if (params.usuario_id != null) q.set("usuario_id", String(params.usuario_id));
+  return requestJson(`/api/ventas/citas-asociar?${q}`);
+}
+
+/** Sincroniza el texto de servicios de la cita con las líneas del POS (solo nombres, separados por coma). */
+export async function patchCitaServiciosDesdePos(citaId: number, nombres: string[]): Promise<Cita> {
+  return requestJson(`/api/ventas/citas/${citaId}/servicios-desde-pos`, {
+    method: "PATCH",
+    body: JSON.stringify({ nombres }),
+  });
 }
 
 export async function emitFacturaElectronicaVenta(
@@ -874,6 +924,8 @@ export type Proveedor = {
   email: string | null;
   direccion: string | null;
   icono_url: string | null;
+  vendedor_nombre: string | null;
+  vendedor_celular: string | null;
   estado: "activo" | "inactivo";
   fecha_creacion: string;
   fecha_actualizacion: string;
@@ -908,7 +960,18 @@ export async function fetchProveedor(id: number): Promise<Proveedor> {
 
 export async function createProveedor(
   body: Pick<Proveedor, "nombre" | "nit"> &
-    Partial<Pick<Proveedor, "telefono" | "email" | "direccion" | "icono_url" | "estado">>
+    Partial<
+      Pick<
+        Proveedor,
+        | "telefono"
+        | "email"
+        | "direccion"
+        | "icono_url"
+        | "vendedor_nombre"
+        | "vendedor_celular"
+        | "estado"
+      >
+    >
 ): Promise<Proveedor> {
   return requestJson("/api/proveedores", { method: "POST", body: JSON.stringify(body) });
 }
@@ -916,7 +979,18 @@ export async function createProveedor(
 export async function updateProveedor(
   id: number,
   body: Partial<
-    Pick<Proveedor, "nombre" | "nit" | "telefono" | "email" | "direccion" | "icono_url" | "estado">
+    Pick<
+      Proveedor,
+      | "nombre"
+      | "nit"
+      | "telefono"
+      | "email"
+      | "direccion"
+      | "icono_url"
+      | "vendedor_nombre"
+      | "vendedor_celular"
+      | "estado"
+    >
   >
 ): Promise<Proveedor> {
   return requestJson(`/api/proveedores/${id}`, { method: "PUT", body: JSON.stringify(body) });
@@ -1159,6 +1233,9 @@ export type GastoOperativo = {
   fecha: string;
   notas: string | null;
   created_at: string;
+  pagado: number;
+  pagado_at: string | null;
+  comprobante_url: string | null;
 };
 
 export async function fetchGastos(desde?: string, hasta?: string): Promise<GastoOperativo[]> {
@@ -1175,6 +1252,16 @@ export async function createGasto(body: Partial<GastoOperativo>): Promise<GastoO
 
 export async function deleteGasto(id: number): Promise<void> {
   await requestJson<void>(`/api/gastos/${id}`, { method: "DELETE" });
+}
+
+export async function marcarGastoPago(
+  id: number,
+  body: { pagado: boolean; comprobante_url?: string | null }
+): Promise<GastoOperativo> {
+  return requestJson(`/api/gastos/${id}/pago`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
 }
 
 export async function fetchCobranzas(estado?: string): Promise<unknown[]> {

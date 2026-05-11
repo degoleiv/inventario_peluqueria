@@ -36,16 +36,16 @@ function matchesEstadoFiltro(p: Proveedor, filtro: EstadoFiltro): boolean {
 type DetailFormFields = {
   nombre: string;
   nit: string;
-  telefono: string;
-  email: string;
+  vendedorNombre: string;
+  vendedorCelular: string;
   iconoUrl: string;
 };
 
 const emptyDetailForm: DetailFormFields = {
   nombre: "",
   nit: "",
-  telefono: "",
-  email: "",
+  vendedorNombre: "",
+  vendedorCelular: "",
   iconoUrl: "",
 };
 
@@ -61,8 +61,8 @@ function serializeDetailForm(f: DetailFormFields): string {
   return JSON.stringify({
     nombre: f.nombre.trim(),
     nit: f.nit.trim(),
-    telefono: f.telefono.trim(),
-    email: f.email.trim(),
+    vendedorNombre: f.vendedorNombre.trim(),
+    vendedorCelular: f.vendedorCelular.trim(),
     iconoUrl: f.iconoUrl.trim(),
   });
 }
@@ -71,8 +71,8 @@ function proveedorToDetailForm(p: Proveedor): DetailFormFields {
   return {
     nombre: p.nombre,
     nit: p.nit,
-    telefono: p.telefono ?? "",
-    email: p.email ?? "",
+    vendedorNombre: p.vendedor_nombre ?? "",
+    vendedorCelular: p.vendedor_celular ?? "",
     iconoUrl: p.icono_url?.trim() ?? "",
   };
 }
@@ -194,8 +194,8 @@ export function ProveedoresPage() {
 
   const [nombre, setNombre] = useState("");
   const [nit, setNit] = useState("");
-  const [telefono, setTelefono] = useState("");
-  const [email, setEmail] = useState("");
+  const [vendedorNombre, setVendedorNombre] = useState("");
+  const [vendedorCelular, setVendedorCelular] = useState("");
   const [iconoUrl, setIconoUrl] = useState("");
   const [estado, setEstado] = useState<"activo" | "inactivo">("activo");
 
@@ -283,10 +283,10 @@ export function ProveedoresPage() {
         await updateProveedor(detailProveedor.id, {
           nombre: detailForm.nombre.trim(),
           nit: detailForm.nit.trim(),
-          telefono: detailForm.telefono.trim() || null,
-          email: detailForm.email.trim() || null,
           direccion: row.direccion?.trim() ? row.direccion.trim() : null,
           icono_url: detailForm.iconoUrl.trim() || null,
+          vendedor_nombre: detailForm.vendedorNombre.trim() || null,
+          vendedor_celular: detailForm.vendedorCelular.trim() || null,
           estado: row.estado,
         });
         toast("Cambios guardados.", "success");
@@ -327,8 +327,8 @@ export function ProveedoresPage() {
   function openCreate() {
     setNombre("");
     setNit("");
-    setTelefono("");
-    setEmail("");
+    setVendedorNombre("");
+    setVendedorCelular("");
     setIconoUrl("");
     setEstado("activo");
     setModalOpen(true);
@@ -345,10 +345,10 @@ export function ProveedoresPage() {
       await createProveedor({
         nombre: nombre.trim(),
         nit: nit.trim(),
-        telefono: telefono.trim() || null,
-        email: email.trim() || null,
         direccion: null,
         icono_url: iconoUrl.trim() || null,
+        vendedor_nombre: vendedorNombre.trim() || null,
+        vendedor_celular: vendedorCelular.trim() || null,
         estado,
       });
       toast("Proveedor creado", "success");
@@ -620,41 +620,53 @@ export function ProveedoresPage() {
                   />
                 </dd>
               </div>
-              <div className="prov-detail-row prov-detail-row--field">
-                <dt>
-                  <label htmlFor="prov-detail-tel">Teléfono</label>
-                </dt>
-                <dd>
-                  <input
-                    id="prov-detail-tel"
-                    className="prov-detail-input"
-                    value={detailForm.telefono}
-                    onChange={(e) => setDetailForm((f) => ({ ...f, telefono: e.target.value }))}
-                    autoComplete="off"
-                    disabled={detailSaveBusy}
-                  />
-                </dd>
-              </div>
-              <div className="prov-detail-row prov-detail-row--field">
-                <dt>
-                  <label htmlFor="prov-detail-email">Email</label>
-                </dt>
-                <dd>
-                  <input
-                    id="prov-detail-email"
-                    type="email"
-                    className="prov-detail-input"
-                    value={detailForm.email}
-                    onChange={(e) => setDetailForm((f) => ({ ...f, email: e.target.value }))}
-                    disabled={detailSaveBusy}
-                  />
-                </dd>
-              </div>
               <div className="prov-detail-row">
                 <dt>Actualizado</dt>
                 <dd className="muted small">{fmtFecha(detailDisplay.fecha_actualizacion)}</dd>
               </div>
             </dl>
+
+            <fieldset className="prov-detail-vendedor">
+              <legend className="prov-detail-vendedor__legend">Datos del vendedor</legend>
+              <dl className="prov-detail-dl prov-detail-dl--form">
+                <div className="prov-detail-row prov-detail-row--field">
+                  <dt>
+                    <label htmlFor="prov-detail-vend-nombre">Nombre</label>
+                  </dt>
+                  <dd>
+                    <input
+                      id="prov-detail-vend-nombre"
+                      className="prov-detail-input"
+                      value={detailForm.vendedorNombre}
+                      onChange={(e) =>
+                        setDetailForm((f) => ({ ...f, vendedorNombre: e.target.value }))
+                      }
+                      autoComplete="off"
+                      disabled={detailSaveBusy}
+                    />
+                  </dd>
+                </div>
+                <div className="prov-detail-row prov-detail-row--field">
+                  <dt>
+                    <label htmlFor="prov-detail-vend-cel">Celular</label>
+                  </dt>
+                  <dd>
+                    <input
+                      id="prov-detail-vend-cel"
+                      type="tel"
+                      inputMode="tel"
+                      className="prov-detail-input"
+                      value={detailForm.vendedorCelular}
+                      onChange={(e) =>
+                        setDetailForm((f) => ({ ...f, vendedorCelular: e.target.value }))
+                      }
+                      autoComplete="off"
+                      disabled={detailSaveBusy}
+                    />
+                  </dd>
+                </div>
+              </dl>
+            </fieldset>
             <div className="actions prov-detail-footer prov-detail-footer--solo">
               <button
                 type="button"
@@ -746,37 +758,46 @@ export function ProveedoresPage() {
                     />
                   </dd>
                 </div>
-                <div className="prov-detail-row prov-detail-row--field">
-                  <dt>
-                    <label htmlFor="prov-create-tel">Teléfono</label>
-                  </dt>
-                  <dd>
-                    <input
-                      id="prov-create-tel"
-                      className="prov-detail-input"
-                      value={telefono}
-                      onChange={(e) => setTelefono(e.target.value)}
-                      autoComplete="off"
-                      disabled={busy}
-                    />
-                  </dd>
-                </div>
-                <div className="prov-detail-row prov-detail-row--field">
-                  <dt>
-                    <label htmlFor="prov-create-email">Email</label>
-                  </dt>
-                  <dd>
-                    <input
-                      id="prov-create-email"
-                      type="email"
-                      className="prov-detail-input"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      disabled={busy}
-                    />
-                  </dd>
-                </div>
               </dl>
+
+              <fieldset className="prov-detail-vendedor">
+                <legend className="prov-detail-vendedor__legend">Datos del vendedor</legend>
+                <dl className="prov-detail-dl prov-detail-dl--form">
+                  <div className="prov-detail-row prov-detail-row--field">
+                    <dt>
+                      <label htmlFor="prov-create-vend-nombre">Nombre</label>
+                    </dt>
+                    <dd>
+                      <input
+                        id="prov-create-vend-nombre"
+                        className="prov-detail-input"
+                        value={vendedorNombre}
+                        onChange={(e) => setVendedorNombre(e.target.value)}
+                        autoComplete="off"
+                        disabled={busy}
+                      />
+                    </dd>
+                  </div>
+                  <div className="prov-detail-row prov-detail-row--field">
+                    <dt>
+                      <label htmlFor="prov-create-vend-cel">Celular</label>
+                    </dt>
+                    <dd>
+                      <input
+                        id="prov-create-vend-cel"
+                        type="tel"
+                        inputMode="tel"
+                        className="prov-detail-input"
+                        value={vendedorCelular}
+                        onChange={(e) => setVendedorCelular(e.target.value)}
+                        autoComplete="off"
+                        disabled={busy}
+                      />
+                    </dd>
+                  </div>
+                </dl>
+              </fieldset>
+
               <div className="actions prov-detail-footer prov-detail-footer--create">
                 <button type="button" className="btn ghost" disabled={busy} onClick={() => setModalOpen(false)}>
                   Cancelar

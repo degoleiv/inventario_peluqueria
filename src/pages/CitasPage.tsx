@@ -1022,6 +1022,13 @@ export function CitasPage() {
   }
 
   function irAVentaDesdeCita(c: Cita) {
+    const nombres = parseServicios(c.servicio);
+    const servicios = (nombres.length > 0 ? nombres : []).map((nombre) => ({
+      nombre,
+      usuarioId: c.usuario_id ?? null,
+      cantidad: 1,
+      valorUnitario: 0,
+    }));
     const payload: PosPreloadCitaPayload = {
       v: 1,
       clienteId: c.cliente_id,
@@ -1029,8 +1036,9 @@ export function CitasPage() {
       servicio: c.servicio?.trim() || null,
       inicioIso: c.inicio,
       usuarioId: c.usuario_id ?? null,
+      servicios,
     };
-    navigate("/ventas/pos", { state: { posPrecargaCita: payload } });
+    navigate("/ventas/ventas", { state: { posPrecargaCita: payload } });
   }
 
   useEffect(() => {

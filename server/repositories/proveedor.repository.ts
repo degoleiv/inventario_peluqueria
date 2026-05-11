@@ -10,6 +10,8 @@ export type ProveedorRow = {
   email: string | null;
   direccion: string | null;
   icono_url: string | null;
+  vendedor_nombre: string | null;
+  vendedor_celular: string | null;
   estado: string;
   fecha_creacion: string;
   fecha_actualizacion: string;
@@ -51,7 +53,9 @@ export const proveedorRepository = {
     }
 
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-    const sql = `SELECT id, nombre, nit, telefono, email, direccion, icono_url, estado, fecha_creacion, fecha_actualizacion
+    const sql = `SELECT id, nombre, nit, telefono, email, direccion, icono_url,
+                vendedor_nombre, vendedor_celular,
+                estado, fecha_creacion, fecha_actualizacion
          FROM proveedores ${where} ORDER BY nombre COLLATE NOCASE`;
     return (await db.prepare(sql).all(...params)) as ProveedorRow[];
   },
@@ -70,7 +74,9 @@ export const proveedorRepository = {
   async findById(id: number): Promise<ProveedorRow | undefined> {
     return (await db
       .prepare(
-        `SELECT id, nombre, nit, telefono, email, direccion, icono_url, estado, fecha_creacion, fecha_actualizacion
+        `SELECT id, nombre, nit, telefono, email, direccion, icono_url,
+                vendedor_nombre, vendedor_celular,
+                estado, fecha_creacion, fecha_actualizacion
          FROM proveedores WHERE id = ?`
       )
       .get(id)) as ProveedorRow | undefined;
@@ -95,6 +101,8 @@ export const proveedorRepository = {
     email: string | null;
     direccion: string | null;
     icono_url: string | null;
+    vendedor_nombre: string | null;
+    vendedor_celular: string | null;
     estado: string;
     fecha_creacion: string;
     fecha_actualizacion: string;
@@ -105,9 +113,10 @@ export const proveedorRepository = {
       return db
         .prepare(
           `INSERT INTO proveedores (
-            nombre, nit, telefono, email, direccion, icono_url, estado,
-            fecha_creacion, fecha_actualizacion, created_at
-          ) VALUES (?,?,?,?,?,?,?,?,?,?)`
+            nombre, nit, telefono, email, direccion, icono_url,
+            vendedor_nombre, vendedor_celular,
+            estado, fecha_creacion, fecha_actualizacion, created_at
+          ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`
         )
         .run(
           row.nombre,
@@ -116,6 +125,8 @@ export const proveedorRepository = {
           row.email,
           row.direccion,
           row.icono_url,
+          row.vendedor_nombre,
+          row.vendedor_celular,
           row.estado,
           row.fecha_creacion,
           row.fecha_actualizacion,
@@ -125,9 +136,10 @@ export const proveedorRepository = {
     return db
       .prepare(
         `INSERT INTO proveedores (
-          nombre, nit, telefono, email, direccion, icono_url, estado,
-          fecha_creacion, fecha_actualizacion
-        ) VALUES (?,?,?,?,?,?,?,?,?)`
+          nombre, nit, telefono, email, direccion, icono_url,
+          vendedor_nombre, vendedor_celular,
+          estado, fecha_creacion, fecha_actualizacion
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?)`
       )
       .run(
         row.nombre,
@@ -136,6 +148,8 @@ export const proveedorRepository = {
         row.email,
         row.direccion,
         row.icono_url,
+        row.vendedor_nombre,
+        row.vendedor_celular,
         row.estado,
         row.fecha_creacion,
         row.fecha_actualizacion
@@ -151,6 +165,8 @@ export const proveedorRepository = {
       email: string | null;
       direccion: string | null;
       icono_url: string | null;
+      vendedor_nombre: string | null;
+      vendedor_celular: string | null;
       estado: string;
       fecha_actualizacion: string;
     }
@@ -161,6 +177,7 @@ export const proveedorRepository = {
         .prepare(
           `UPDATE proveedores SET
             nombre = ?, nit = ?, telefono = ?, email = ?, direccion = ?, icono_url = ?,
+            vendedor_nombre = ?, vendedor_celular = ?,
             estado = ?, fecha_actualizacion = ?, created_at = ?
           WHERE id = ?`
         )
@@ -171,6 +188,8 @@ export const proveedorRepository = {
           patch.email,
           patch.direccion,
           patch.icono_url,
+          patch.vendedor_nombre,
+          patch.vendedor_celular,
           patch.estado,
           patch.fecha_actualizacion,
           patch.fecha_actualizacion,
@@ -182,6 +201,7 @@ export const proveedorRepository = {
       .prepare(
         `UPDATE proveedores SET
           nombre = ?, nit = ?, telefono = ?, email = ?, direccion = ?, icono_url = ?,
+          vendedor_nombre = ?, vendedor_celular = ?,
           estado = ?, fecha_actualizacion = ?
         WHERE id = ?`
       )
@@ -192,6 +212,8 @@ export const proveedorRepository = {
         patch.email,
         patch.direccion,
         patch.icono_url,
+        patch.vendedor_nombre,
+        patch.vendedor_celular,
         patch.estado,
         patch.fecha_actualizacion,
         id

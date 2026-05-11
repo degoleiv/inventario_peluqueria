@@ -1,0 +1,112 @@
+[
+  {
+    "scenario": "health-baseline",
+    "duration_s": 11.01,
+    "connections": 50,
+    "pipelining": 1,
+    "requests": {
+      "total": 194679,
+      "avg_per_sec": 17696.37,
+      "p99": 19039
+    },
+    "latency_ms": {
+      "avg": 2.22,
+      "p50": 2,
+      "p90": 3,
+      "p99": 5,
+      "max": 31
+    },
+    "throughput_bytes": 4584168.73,
+    "errors": 0,
+    "timeouts": 0,
+    "non2xx": 0
+  },
+  {
+    "scenario": "login-burst",
+    "duration_s": 10.09,
+    "connections": 20,
+    "pipelining": 1,
+    "requests": {
+      "total": 379,
+      "avg_per_sec": 37.9,
+      "p99": 51
+    },
+    "latency_ms": {
+      "avg": 505.71,
+      "p50": 465,
+      "p90": 703,
+      "p99": 817,
+      "max": 926
+    },
+    "throughput_bytes": 21872,
+    "errors": 0,
+    "timeouts": 0,
+    "non2xx": 0
+  },
+  {
+    "scenario": "productos-list-auth",
+    "duration_s": 10.01,
+    "connections": 50,
+    "pipelining": 1,
+    "requests": {
+      "total": 42634,
+      "avg_per_sec": 4263.7,
+      "p99": 4403
+    },
+    "latency_ms": {
+      "avg": 11.24,
+      "p50": 11,
+      "p90": 12,
+      "p99": 15,
+      "max": 35
+    },
+    "throughput_bytes": 1061555.2,
+    "errors": 0,
+    "timeouts": 0,
+    "non2xx": 0
+  },
+  {
+    "scenario": "clientes-list-auth",
+    "duration_s": 10.01,
+    "connections": 50,
+    "pipelining": 1,
+    "requests": {
+      "total": 44438,
+      "avg_per_sec": 4444.4,
+      "p99": 4551
+    },
+    "latency_ms": {
+      "avg": 10.72,
+      "p50": 10,
+      "p90": 12,
+      "p99": 16,
+      "max": 25
+    },
+    "throughput_bytes": 1106508.8,
+    "errors": 0,
+    "timeouts": 0,
+    "non2xx": 0
+  },
+  {
+    "scenario": "ventas-list-auth",
+    "duration_s": 10.01,
+    "connections": 50,
+    "pipelining": 1,
+    "requests": {
+      "total": 39757,
+      "avg_per_sec": 3976,
+      "p99": 4023
+    },
+    "latency_ms": {
+      "avg": 12.09,
+      "p50": 12,
+      "p90": 13,
+      "p99": 16,
+      "max": 22
+    },
+    "throughput_bytes": 990003.2,
+    "errors": 0,
+    "timeouts": 0,
+    "non2xx": 0
+  }
+]

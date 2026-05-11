@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Vitest (unit + integration) con cobertura
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      NODE_ENV: test
+      JWT_SECRET: ci-test-secret
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Run Vitest with coverage gate
+        # Falla si la cobertura no supera los umbrales definidos en vitest.config.ts
+        # (lines >= 45, statements >= 45, functions >= 40, branches >= 70)
+        run: npm run test:coverage
+
+      - name: Upload coverage HTML
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html
+          path: tests/results/coverage
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload vitest JSON
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitest-results
+          path: tests/results/vitest-results.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  e2e-pos:
+    name: E2E POS flow (Playwright API real)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: test
+
+    env:
+      NODE_ENV: test
+      JWT_SECRET: ci-e2e-secret
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Install Playwright browsers
+        # Sólo necesitamos los binarios que usa el config; chromium ya está pre-instalado en runner.
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E POS flow
+        run: npm run test:e2e:pos
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-pos-results
+          path: tests/results/playwright-pos-results.json
+          if-no-files-found: warn
+          retention-days: 14

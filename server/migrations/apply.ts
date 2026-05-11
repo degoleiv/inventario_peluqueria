@@ -553,6 +553,18 @@ export async function applyMigrations(database: SqliteDb) {
   if (!cliGuestNames.has("activo")) {
     await database.exec(`ALTER TABLE clientes ADD COLUMN activo INTEGER NOT NULL DEFAULT 1`);
   }
+  if (!cliGuestNames.has("tipo_documento")) {
+    await database.exec(`ALTER TABLE clientes ADD COLUMN tipo_documento TEXT`);
+  }
+  if (!cliGuestNames.has("numero_documento")) {
+    await database.exec(`ALTER TABLE clientes ADD COLUMN numero_documento TEXT`);
+  }
+  if (!cliGuestNames.has("direccion")) {
+    await database.exec(`ALTER TABLE clientes ADD COLUMN direccion TEXT`);
+  }
+  if (!cliGuestNames.has("cedula")) {
+    await database.exec(`ALTER TABLE clientes ADD COLUMN cedula TEXT`);
+  }
 
   const prodColsProv = (await database.prepare(`PRAGMA table_info(productos)`).all()) as { name: string }[];
   const prodProvNames = new Set(prodColsProv.map((c) => c.name));

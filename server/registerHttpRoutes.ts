@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import type { Express } from "express";
+import rateLimit from "express-rate-limit";
 import { db } from "./db.js";
 import { lookupBarcode } from "./barcode.js";
 import { requireAdmin, requireAlguno, requireAuth, requirePermiso } from "./middleware/auth.js";
@@ -68,8 +69,24 @@ export function registerHttpRoutes(app: Express) {
     })
   );
 
+  /**
+   * Limite de fuerza bruta sobre login: 10 intentos por IP cada 15 minutos.
+   * Sólo cuenta las respuestas fallidas (no consume cuota un login exitoso).
+   * Se deshabilita en NODE_ENV=test para no romper la batería de pruebas.
+   */
+  const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 10,
+    standardHeaders: "draft-7",
+    legacyHeaders: false,
+    skipSuccessfulRequests: true,
+    skip: () => process.env.NODE_ENV === "test",
+    message: { error: "Demasiados intentos de inicio de sesión. Probá en unos minutos.", code: "RATE_LIMITED" },
+  });
+
   app.post(
     "/api/auth/login",
+    loginLimiter,
     asyncHandler(async (req, res) => {
       const { email, password } = req.body as Record<string, unknown>;
       const out = await login(String(email ?? ""), String(password ?? ""));

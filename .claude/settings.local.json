@@ -2,7 +2,21 @@
   "permissions": {
     "allow": [
       "Bash(npm install *)",
-      "Bash(npx playwright *)"
+      "Bash(npx playwright *)",
+      "Bash(npx vitest *)",
+      "Bash(node *)",
+      "PowerShell(Join-Path *)",
+      "PowerShell($tries = 0; while \\($tries -lt 30\\) { try { $r = Invoke-WebRequest -Uri http://127.0.0.1:3010/api/health -UseBasicParsing -TimeoutSec 2; if \\($r.StatusCode -eq 200\\) { Write-Host \"ready\"; break } } catch { Start-Sleep -Seconds 1 }; $tries++ }; if \\($tries -ge 30\\) { Write-Host \"timeout\" })",
+      "PowerShell(Get-NetTCPConnection *)",
+      "PowerShell(try { $r = Invoke-WebRequest -Uri http://127.0.0.1:3010/api/health -UseBasicParsing -TimeoutSec 3; \"HTTP $\\($r.StatusCode\\): $\\($r.Content\\)\" } catch { \"no responde: $_\" })",
+      "PowerShell(try { $r = Invoke-WebRequest -Uri http://127.0.0.1:3010/api/auth/bootstrap-needed -UseBasicParsing -TimeoutSec 3; $r.Content } catch { \"err: $_\" })",
+      "PowerShell($tries = 0; while \\($tries -lt 20\\) { try { $r = Invoke-WebRequest -Uri http://127.0.0.1:3011/api/health -UseBasicParsing -TimeoutSec 2; if \\($r.StatusCode -eq 200\\) { \"ready\"; break } } catch { Start-Sleep -Seconds 1 }; $tries++ }; if \\($tries -ge 20\\) { \"timeout\" })",
+      "Bash(STRESS_BASE_URL=http://127.0.0.1:3011 node tests/stress/run-stress.mjs)",
+      "PowerShell(try { $r = Invoke-WebRequest -Uri http://127.0.0.1:1420 -UseBasicParsing -TimeoutSec 3; \"vite up: HTTP $\\($r.StatusCode\\)\" } catch { \"vite down: $_\" })",
+      "Bash(npx tsx */)",
+      "Bash(echo \"exit code: $?\")",
+      "Bash(echo \"exit: $?\")",
+      "Read(//tmp/**)"
     ]
   }
 }

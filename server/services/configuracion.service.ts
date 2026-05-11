@@ -131,6 +131,44 @@ export const configuracionService = {
     return await configuracionService.getBranding();
   },
 
+  /** Firma (PNG/JPEG base64), nombre de quien expide y ciudad del texto «en la ciudad de …» del PDF. */
+  async getCertificadoLaboral(): Promise<{
+    firma_data_url: string | null;
+    nombre_quien_expide: string;
+    ciudad_certificado: string;
+  }> {
+    const firma = await getValor("cert_laboral_firma_data_url");
+    const nombre = (await getValor("cert_laboral_nombre_expide"))?.trim() || "";
+    const ciudad = (await getValor("cert_laboral_ciudad"))?.trim() || "";
+    return {
+      firma_data_url: firma && firma.length > 0 ? firma : null,
+      nombre_quien_expide: nombre.slice(0, 120),
+      ciudad_certificado: ciudad.slice(0, 80),
+    };
+  },
+
+  async updateCertificadoLaboral(body: Record<string, unknown>) {
+    if (body.firma_data_url === null) {
+      await setValor("cert_laboral_firma_data_url", "");
+    } else if (typeof body.firma_data_url === "string") {
+      const raw = body.firma_data_url.trim();
+      if (raw.length > 450_000) {
+        throw new AppError("Firma demasiado grande (máx. ~300KB en base64)");
+      }
+      if (raw && !raw.startsWith("data:image/")) {
+        throw new AppError("Firma: usar imagen PNG o JPEG en base64 (data:image/…)");
+      }
+      await setValor("cert_laboral_firma_data_url", raw);
+    }
+    if (typeof body.nombre_quien_expide === "string") {
+      await setValor("cert_laboral_nombre_expide", body.nombre_quien_expide.trim().slice(0, 120));
+    }
+    if (typeof body.ciudad_certificado === "string") {
+      await setValor("cert_laboral_ciudad", body.ciudad_certificado.trim().slice(0, 80));
+    }
+    return await configuracionService.getCertificadoLaboral();
+  },
+
   async getTienda(): Promise<{
     nombre_comercial: string;
     direccion: string;

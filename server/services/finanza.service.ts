@@ -3,17 +3,21 @@ import { AppError } from "../lib/AppError.js";
 
 export const finanzaService = {
   async listGastos(desde?: string, hasta?: string) {
-    let sql = `SELECT * FROM gastos_operativos WHERE 1=1`;
+    let sql = `SELECT g.id, g.concepto, g.monto, g.fecha, g.notas, g.created_at, g.categoria_finanza_id,
+         COALESCE(cf.nombre, g.categoria) AS categoria
+         FROM gastos_operativos g
+         LEFT JOIN categorias_finanza_concepto cf ON cf.id = g.categoria_finanza_id
+         WHERE 1=1`;
     const p: string[] = [];
     if (desde) {
-      sql += ` AND fecha >= ?`;
+      sql += ` AND g.fecha >= ?`;
       p.push(desde);
     }
     if (hasta) {
-      sql += ` AND fecha <= ?`;
+      sql += ` AND g.fecha <= ?`;
       p.push(hasta);
     }
-    sql += ` ORDER BY fecha DESC, id DESC`;
+    sql += ` ORDER BY g.fecha DESC, g.id DESC`;
     return await db.prepare(sql).all(...p);
   },
 
@@ -27,20 +31,56 @@ export const finanzaService = {
         ? body.fecha.trim()
         : new Date().toISOString().slice(0, 10);
     const now = new Date().toISOString();
+
+    let categoriaText: string | null = null;
+    let categoriaFinanzaId: number | null = null;
+    const rawCatId = body.categoria_finanza_id;
+    if (rawCatId !== undefined && rawCatId !== null && rawCatId !== "") {
+      const id = Number(rawCatId);
+      if (!Number.isInteger(id) || id < 1) throw new AppError("categoria_finanza_id inválido");
+      const cat = (await db
+        .prepare(`SELECT nombre FROM categorias_finanza_concepto WHERE id = ?`)
+        .get(id)) as { nombre: string } | undefined;
+      if (!cat) throw new AppError("Categoría no encontrada", 400);
+      categoriaFinanzaId = id;
+      categoriaText = cat.nombre;
+    } else if (typeof body.categoria === "string" && body.categoria.trim()) {
+      categoriaText = body.categoria.trim();
+    }
+
     const info = await db
       .prepare(
-        `INSERT INTO gastos_operativos (concepto, categoria, monto, fecha, notas, created_at)
-         VALUES (?,?,?,?,?,?)`
+        `INSERT INTO gastos_operativos (concepto, categoria, categoria_finanza_id, monto, fecha, notas, created_at)
+         VALUES (?,?,?,?,?,?,?)`
       )
       .run(
         concepto,
-        typeof body.categoria === "string" ? body.categoria.trim() || null : null,
+        categoriaText,
+        categoriaFinanzaId,
         monto,
         fecha,
         typeof body.notas === "string" ? body.notas || null : null,
         now
       );
-    return await db.prepare(`SELECT * FROM gastos_operativos WHERE id = ?`).get(info.lastInsertRowid);
+    return await finanzaService.getGastoById(Number(info.lastInsertRowid));
+  },
+
+  async getGastoById(id: number) {
+    return await db
+      .prepare(
+        `SELECT g.id, g.concepto, g.monto, g.fecha, g.notas, g.created_at, g.categoria_finanza_id,
+         COALESCE(cf.nombre, g.categoria) AS categoria
+         FROM gastos_operativos g
+         LEFT JOIN categorias_finanza_concepto cf ON cf.id = g.categoria_finanza_id
+         WHERE g.id = ?`
+      )
+      .get(id);
+  },
+
+  async deleteGasto(id: number) {
+    if (!Number.isInteger(id) || id < 1) throw new AppError("id inválido", 400);
+    const info = await db.prepare(`DELETE FROM gastos_operativos WHERE id = ?`).run(id);
+    if (info.changes === 0) throw new AppError("Gasto no encontrado", 404);
   },
 
   /** Ingresos por ventas, egresos por gastos operativos + total pedidos a proveedores en el período. */

@@ -434,7 +434,7 @@ BellaSuite no es "un sistemita más". Es una **aplicación empresarial de últim
 | **Seguridad** | `bcrypt` para contraseñas, `jsonwebtoken` para sesiones |
 | **Empaquetado** | Vite 6 (build ultra rápido) |
 | **App de escritorio** | Tauri 2 (instalable como aplicación nativa Windows/macOS/Linux) |
-| **Generación de PDF** | Puppeteer (certificados, comprobantes con calidad profesional) |
+| **Generación de PDF** | pdf-lib (certificados laborales sin navegador headless) |
 | **Email** | Nodemailer con SMTP configurable |
 | **Iconografía** | Phosphor Icons + Emoji Mart |
 | **Arquitectura** | Servicios desacoplados, capas claras (rutas → controladores → servicios → DB) |

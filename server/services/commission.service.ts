@@ -192,13 +192,17 @@ export const commissionService = {
       }
       g.total_comisiones = Math.round((g.total_comisiones + Number(r.monto)) * 100) / 100;
 
-      const origen = r.cita_id != null ? ("cita" as const) : ("venta" as const);
+      const origen = r.cita_id != null && r.cita_id !== undefined ? ("cita" as const) : ("venta" as const);
       let detalle = "";
       if (origen === "venta") {
-        detalle = `Venta #${r.venta_id ?? "—"}`;
+        const vid = r.venta_id != null && Number.isFinite(Number(r.venta_id)) ? r.venta_id : null;
+        detalle = vid != null ? `Venta #${vid}` : "Venta (sin número)";
       } else {
         const svc = r.cita_servicio ? ` · ${r.cita_servicio}` : "";
-        detalle = `Cita ${r.cita_cliente_nombre ?? "Cliente"}${svc}`;
+        const nom = (r.cita_cliente_nombre ?? "").trim();
+        const cid = r.cita_id != null && Number.isFinite(Number(r.cita_id)) ? r.cita_id : null;
+        const etiquetaCliente = nom || (cid != null ? `Cliente (cita #${cid})` : "Cliente");
+        detalle = `Cita · ${etiquetaCliente}${svc}`;
       }
       g.lineas.push({
         comision_id: r.comision_id,

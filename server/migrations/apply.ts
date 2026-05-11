@@ -610,4 +610,48 @@ export async function applyMigrations(database: SqliteDb) {
     );
     await database.exec(`PRAGMA foreign_keys = ON`);
   }
+
+  await database.exec(`
+    CREATE TABLE IF NOT EXISTS categorias_finanza_concepto (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+  `);
+
+  const gastoColsFin = (await database.prepare(`PRAGMA table_info(gastos_operativos)`).all()) as {
+    name: string;
+  }[];
+  const gastoFinNames = new Set(gastoColsFin.map((c) => c.name));
+  if (!gastoFinNames.has("categoria_finanza_id")) {
+    await database.exec(`
+      ALTER TABLE gastos_operativos ADD COLUMN categoria_finanza_id INTEGER
+        REFERENCES categorias_finanza_concepto(id) ON DELETE SET NULL
+    `);
+    await database.exec(
+      `CREATE INDEX IF NOT EXISTS idx_gastos_categoria_finanza ON gastos_operativos(categoria_finanza_id)`
+    );
+  }
+
+  const catFinCols = (await database.prepare(`PRAGMA table_info(categorias_finanza_concepto)`).all()) as {
+    name: string;
+  }[];
+  const catFinNames = new Set(catFinCols.map((c) => c.name));
+  if (!catFinNames.has("descripcion")) {
+    await database.exec(`ALTER TABLE categorias_finanza_concepto ADD COLUMN descripcion TEXT`);
+  }
+  if (!catFinNames.has("emoji")) {
+    await database.exec(`ALTER TABLE categorias_finanza_concepto ADD COLUMN emoji TEXT`);
+  }
+  if (!catFinNames.has("estado")) {
+    await database.exec(
+      `ALTER TABLE categorias_finanza_concepto ADD COLUMN estado TEXT NOT NULL DEFAULT 'activo'`
+    );
+  }
+  if (!catFinNames.has("updated_at")) {
+    await database.exec(`ALTER TABLE categorias_finanza_concepto ADD COLUMN updated_at TEXT`);
+    await database.exec(
+      `UPDATE categorias_finanza_concepto SET updated_at = created_at WHERE updated_at IS NULL`
+    );
+  }
 }

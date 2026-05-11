@@ -32,7 +32,7 @@ import { SubNav } from "../components/SubNav";
 import { EMPLEADOS_TABS, readEmpleadosTab, type EmpleadosTab } from "../lib/moduleRoutes";
 import { NAV_LABEL, PERMISO_MODULOS, type PermisoModulo } from "../nav";
 import { useToast } from "../context/ToastContext";
-import { CircleNotch, Download, PencilSimple, Trash } from "@phosphor-icons/react";
+import { CircleNotch, Download, PencilSimple, Plus, Trash } from "@phosphor-icons/react";
 
 type Props = { onChanged?: () => void };
 
@@ -86,6 +86,22 @@ function isoDesdeHaceDiasInclusive(dias: number) {
 
 function formatMoney(n: number) {
   return new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 }).format(n);
+}
+
+function emptyPermMods(): Record<PermisoModulo, boolean> {
+  return PERMISO_MODULOS.reduce(
+    (acc, m) => ({ ...acc, [m]: false }),
+    {} as Record<PermisoModulo, boolean>
+  );
+}
+
+function permisosToMods(permisos: string[]): Record<PermisoModulo, boolean> {
+  const mods = emptyPermMods();
+  if (permisos.includes("*")) return mods;
+  for (const p of permisos) {
+    if (PERMISO_MODULOS.includes(p as PermisoModulo)) mods[p as PermisoModulo] = true;
+  }
+  return mods;
 }
 
 type EmpleadoEstadoFiltro = "todos" | "activo" | "inactivo";
@@ -168,15 +184,18 @@ export function EmpleadosPage({ onChanged }: Props) {
 
   const [puedeCertificado, setPuedeCertificado] = useState(false);
   const [activoSavingId, setActivoSavingId] = useState<number | null>(null);
-  /** Feedback UI mientras el API genera el PDF (Puppeteer puede tardar mucho). */
+  /** Feedback UI mientras el API genera el PDF del certificado. */
   const [certBusy, setCertBusy] = useState<{ id: number } | null>(null);
   const certLockRef = useRef(false);
 
-  const [newRol, setNewRol] = useState({
+  const [rolDrawerOpen, setRolDrawerOpen] = useState(false);
+  const [rolSaving, setRolSaving] = useState(false);
+  const [rolForm, setRolForm] = useState({
+    editingSlug: null as string | null,
     slug: "",
     nombre: "",
     todo: false,
-    mods: {} as Record<PermisoModulo, boolean>,
+    mods: emptyPermMods(),
   });
 
   const [empleadoBusqueda, setEmpleadoBusqueda] = useState("");
@@ -407,71 +426,83 @@ export function EmpleadosPage({ onChanged }: Props) {
     }
   }
 
-  async function editarRolSimple(r: RolDefinicion) {
-    const nombre = window.prompt("Nombre visible del rol", r.nombre);
-    if (nombre === null || !nombre.trim()) return;
-    const usarTodo = confirm(
-      "¿Acceso total (*) como administrador?\n\nCancelá para elegir módulos por número."
-    );
-    let permisos: string[];
-    if (usarTodo) {
-      permisos = ["*"];
-    } else {
-      const lines = PERMISO_MODULOS.map((m, i) => `${i + 1}. ${NAV_LABEL[m]} (${m})`).join("\n");
-      const sel = window.prompt(`Módulos (números separados por coma):\n\n${lines}`);
-      if (sel === null) return;
-      const nums = sel.split(/[,;\s]+/).map((x) => Number(x.trim()));
-      permisos = [];
-      for (const n of nums) {
-        if (Number.isFinite(n) && n >= 1 && n <= PERMISO_MODULOS.length) {
-          permisos.push(PERMISO_MODULOS[n - 1]!);
-        }
-      }
-      if (permisos.length === 0) {
-        toast("Seleccioná al menos un módulo.", "warning");
-        return;
-      }
-      permisos = [...new Set(permisos)];
-    }
-    try {
-      await updateRole(r.slug, {
-        nombre: nombre.trim(),
-        permisos: r.slug === "admin" ? ["*"] : permisos,
-      });
-      toast("Rol actualizado.", "success");
-      void load();
-      onChanged?.();
-    } catch (err) {
-      toast(err instanceof Error ? err.message : "Error", "error");
-    }
+  function openRolDrawerNuevo() {
+    setRolForm({
+      editingSlug: null,
+      slug: "",
+      nombre: "",
+      todo: false,
+      mods: emptyPermMods(),
+    });
+    setRolDrawerOpen(true);
   }
 
-  async function crearRolSubmit(ev: React.FormEvent) {
+  function openRolDrawerEditar(r: RolDefinicion) {
+    const todo = r.permisos.includes("*");
+    setRolForm({
+      editingSlug: r.slug,
+      slug: r.slug,
+      nombre: r.nombre,
+      todo,
+      mods: permisosToMods(r.permisos),
+    });
+    setRolDrawerOpen(true);
+  }
+
+  function cerrarRolDrawer() {
+    if (rolSaving) return;
+    setRolDrawerOpen(false);
+  }
+
+  async function onSubmitRolDrawer(ev: React.FormEvent) {
     ev.preventDefault();
-    const slug = newRol.slug.trim().toLowerCase();
-    const nombre = newRol.nombre.trim();
-    if (!slug || !nombre) {
-      toast("Slug y nombre requeridos.", "warning");
+    const nombre = rolForm.nombre.trim();
+    if (!nombre) {
+      toast("El nombre es obligatorio.", "warning");
       return;
     }
     let permisos: string[];
-    if (newRol.todo) {
+    if (rolForm.editingSlug === "admin" || rolForm.todo) {
       permisos = ["*"];
     } else {
-      permisos = PERMISO_MODULOS.filter((m) => newRol.mods[m]);
+      permisos = PERMISO_MODULOS.filter((m) => rolForm.mods[m]);
       if (permisos.length === 0) {
-        toast("Marcá al menos un módulo.", "warning");
+        toast("Marcá al menos un módulo o activá acceso total.", "warning");
         return;
       }
     }
+    setRolSaving(true);
     try {
-      await createRole({ slug, nombre, permisos });
-      toast("Rol creado.", "success");
-      setNewRol({ slug: "", nombre: "", todo: false, mods: {} as Record<PermisoModulo, boolean> });
+      if (rolForm.editingSlug) {
+        await updateRole(rolForm.editingSlug, {
+          nombre,
+          permisos: rolForm.editingSlug === "admin" ? ["*"] : permisos,
+        });
+        toast("Rol actualizado.", "success");
+      } else {
+        const slug = rolForm.slug.trim().toLowerCase();
+        if (!slug) {
+          toast("El slug es obligatorio.", "warning");
+          setRolSaving(false);
+          return;
+        }
+        await createRole({ slug, nombre, permisos });
+        toast("Rol creado.", "success");
+      }
+      setRolDrawerOpen(false);
+      setRolForm({
+        editingSlug: null,
+        slug: "",
+        nombre: "",
+        todo: false,
+        mods: emptyPermMods(),
+      });
       void load();
       onChanged?.();
     } catch (err) {
       toast(err instanceof Error ? err.message : "Error", "error");
+    } finally {
+      setRolSaving(false);
     }
   }
 
@@ -546,6 +577,10 @@ export function EmpleadosPage({ onChanged }: Props) {
     if (tabParam !== "movimientos") return;
     void loadMovimientosTab();
   }, [tabParam, loadMovimientosTab]);
+
+  useEffect(() => {
+    if (tabParam !== "roles") setRolDrawerOpen(false);
+  }, [tabParam]);
 
   const loadLiquidacion = useCallback(async () => {
     setLiqLoading(true);
@@ -1390,15 +1425,21 @@ export function EmpleadosPage({ onChanged }: Props) {
         <section className="card">
           <div className="card-head">
             <h2 className="card-title">Roles y permisos</h2>
-            <button type="button" className="btn ghost small" onClick={() => void load()}>
-              Actualizar
-            </button>
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.5rem" }}>
+              <button type="button" className="btn ghost small" onClick={() => void load()}>
+                Actualizar
+              </button>
+              <button type="button" className="btn primary small" onClick={openRolDrawerNuevo}>
+                <Plus size={18} weight="bold" aria-hidden style={{ verticalAlign: "middle", marginRight: 4 }} />
+                Nuevo rol
+              </button>
+            </div>
           </div>
           <p className="hint">
             Los permisos controlan qué módulos ve cada usuario. Solo quien tiene acceso total (<code>*</code>)
             puede abrir Configuración y Equipo.
           </p>
-          <table className="table table-wrap" style={{ marginBottom: "1rem" }}>
+          <table className="table table-wrap">
             <thead>
               <tr>
                 <th>Rol</th>
@@ -1417,7 +1458,7 @@ export function EmpleadosPage({ onChanged }: Props) {
                     {r.permisos.includes("*") ? <strong>*</strong> : r.permisos.join(", ")}
                   </td>
                   <td className="row-actions">
-                    <button type="button" className="link" onClick={() => void editarRolSimple(r)}>
+                    <button type="button" className="link" onClick={() => openRolDrawerEditar(r)}>
                       Editar
                     </button>
                     {r.slug !== "admin" ? (
@@ -1430,61 +1471,101 @@ export function EmpleadosPage({ onChanged }: Props) {
               ))}
             </tbody>
           </table>
-          <h3 className="card-title" style={{ fontSize: "1rem" }}>
-            Nuevo rol
-          </h3>
-          <form className="form" onSubmit={crearRolSubmit}>
-            <div className="field-row">
-              <label className="field">
-                <span>Slug</span>
-                <input
-                  value={newRol.slug}
-                  onChange={(e) => setNewRol((x) => ({ ...x, slug: e.target.value }))}
-                  placeholder="recepcion"
-                  autoComplete="off"
-                />
-              </label>
-              <label className="field">
-                <span>Nombre</span>
-                <input
-                  value={newRol.nombre}
-                  onChange={(e) => setNewRol((x) => ({ ...x, nombre: e.target.value }))}
-                />
-              </label>
-            </div>
-            <label className="field inline-check">
-              <input
-                type="checkbox"
-                checked={newRol.todo}
-                onChange={(e) => setNewRol((x) => ({ ...x, todo: e.target.checked }))}
-              />
-              <span>Acceso total (*)</span>
-            </label>
-            {!newRol.todo ? (
-              <div className="perm-grid" style={{ display: "grid", gap: "0.35rem", marginBottom: "0.75rem" }}>
-                {PERMISO_MODULOS.map((m) => (
-                  <label key={m} className="field inline-check">
-                    <input
-                      type="checkbox"
-                      checked={!!newRol.mods[m]}
-                      onChange={(e) =>
-                        setNewRol((x) => ({
-                          ...x,
-                          mods: { ...x.mods, [m]: e.target.checked },
-                        }))
-                      }
-                    />
-                    <span>{NAV_LABEL[m]}</span>
-                  </label>
-                ))}
-              </div>
-            ) : null}
-            <button type="submit" className="btn primary">
-              Crear rol
-            </button>
-          </form>
         </section>
       ) : null}
+
+      <Drawer
+        open={rolDrawerOpen}
+        onClose={cerrarRolDrawer}
+        title={rolForm.editingSlug ? "Editar rol" : "Nuevo rol"}
+        wide
+      >
+        <form className="form drawer-form" onSubmit={onSubmitRolDrawer}>
+          <p className="muted small" style={{ marginTop: 0 }}>
+            {rolForm.editingSlug
+              ? "Modificá el nombre visible y los permisos. El slug no se puede cambiar."
+              : "Definí un identificador único (slug), el nombre que verán los usuarios y los módulos permitidos."}
+          </p>
+          <label className="field">
+            <span>Slug *</span>
+            <input
+              value={rolForm.slug}
+              onChange={(e) => setRolForm((x) => ({ ...x, slug: e.target.value }))}
+              placeholder="recepcion"
+              autoComplete="off"
+              disabled={rolForm.editingSlug != null}
+              required={rolForm.editingSlug == null}
+            />
+            {rolForm.editingSlug ? (
+              <span className="muted small">No se puede modificar el identificador del rol.</span>
+            ) : (
+              <span className="muted small">Solo letras minúsculas, números y guiones. Se usa en el sistema.</span>
+            )}
+          </label>
+          <label className="field">
+            <span>Nombre visible *</span>
+            <input
+              value={rolForm.nombre}
+              onChange={(e) => setRolForm((x) => ({ ...x, nombre: e.target.value }))}
+              placeholder="Recepción"
+              required
+              autoComplete="off"
+            />
+          </label>
+          {rolForm.editingSlug === "admin" ? (
+            <p className="muted small" style={{ margin: "0.25rem 0 0.75rem" }}>
+              El rol administrador siempre tiene acceso total (<code>*</code>). Solo podés cambiar el nombre
+              visible.
+            </p>
+          ) : (
+            <>
+              <label className="field inline-check">
+                <input
+                  type="checkbox"
+                  checked={rolForm.todo}
+                  onChange={(e) => setRolForm((x) => ({ ...x, todo: e.target.checked }))}
+                />
+                <span>Acceso total (*)</span>
+              </label>
+              {!rolForm.todo ? (
+                <fieldset className="rol-perm-fieldset" style={{ border: "none", padding: 0, margin: 0 }}>
+                  <legend className="field-label-strong" style={{ marginBottom: "0.35rem" }}>
+                    Módulos permitidos
+                  </legend>
+                  <div
+                    className="perm-grid rol-perm-grid"
+                    style={{ display: "grid", gap: "0.35rem", marginBottom: "0.75rem" }}
+                  >
+                    {PERMISO_MODULOS.map((m) => (
+                      <label key={m} className="field inline-check">
+                        <input
+                          type="checkbox"
+                          checked={!!rolForm.mods[m]}
+                          onChange={(e) =>
+                            setRolForm((x) => ({
+                              ...x,
+                              mods: { ...x.mods, [m]: e.target.checked },
+                            }))
+                          }
+                        />
+                        <span>{NAV_LABEL[m]}</span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+              ) : null}
+            </>
+          )}
+          <div className="drawer-actions">
+            <button type="button" className="btn ghost" disabled={rolSaving} onClick={cerrarRolDrawer}>
+              Cancelar
+            </button>
+            <button type="submit" className="btn primary btn-lg" disabled={rolSaving}>
+              {rolSaving ? "Guardando…" : rolForm.editingSlug ? "Guardar cambios" : "Crear rol"}
+            </button>
+          </div>
+        </form>
+      </Drawer>
 
       {tab === "nuevo" ? (
         <section className="card">

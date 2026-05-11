@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Navigate, useParams } from "react-router-dom";
 import {
   fetchBranding,
+  fetchDashboard,
   fetchSistemaPrefs,
   updateBranding,
   updateSistemaPrefs,
@@ -12,6 +13,9 @@ import {
   CategoriasProductoPanel,
   CategoriasServicioPanel,
 } from "../components/config/CategoriasProductoPanel";
+import { CategoriasFinanzaConceptoPanel } from "../components/config/CategoriasFinanzaConceptoPanel";
+import { CertificadoLaboralEmisorPanel } from "../components/config/CertificadoLaboralEmisorPanel";
+import { PuntosFidelidadConfigSection } from "../components/config/PuntosFidelidadConfigSection";
 import { SubNav } from "../components/SubNav";
 import { applyBrandingToDocument } from "../lib/brandingDocument";
 import { CONFIG_TABS, readConfigTab, type ConfigTab } from "../lib/moduleRoutes";
@@ -26,6 +30,7 @@ export function ConfiguracionPage() {
 
   const [branding, setBranding] = useState<BrandingConfig | null>(null);
   const [sistema, setSistema] = useState<SistemaPrefs | null>(null);
+  const [syncColaPendiente, setSyncColaPendiente] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   /** Con icono cargado: el input file solo se muestra tras «Modificar icono». */
   const [iconoEditando, setIconoEditando] = useState(false);
@@ -57,6 +62,25 @@ export function ConfiguracionPage() {
       if (uiPrefsToastTimerRef.current) clearTimeout(uiPrefsToastTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (tabParam !== "sistema") {
+      setSyncColaPendiente(null);
+      return;
+    }
+    let cancel = false;
+    void (async () => {
+      try {
+        const d = await fetchDashboard();
+        if (!cancel) setSyncColaPendiente(d.sync_pendientes);
+      } catch {
+        if (!cancel) setSyncColaPendiente(null);
+      }
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [tabParam]);
 
   async function guardarBranding(partial: Partial<BrandingConfig>, mensajeExito = "Apariencia guardada.") {
     try {
@@ -185,7 +209,12 @@ export function ConfiguracionPage() {
           <div className="config-cat-board-wrap">
             <CategoriasProductoPanel />
             <CategoriasServicioPanel />
+            <div className="config-cat-board-full-row">
+              <CategoriasFinanzaConceptoPanel />
+            </div>
           </div>
+          <PuntosFidelidadConfigSection />
+          <CertificadoLaboralEmisorPanel />
         </section>
       ) : null}
 
@@ -357,6 +386,14 @@ export function ConfiguracionPage() {
             Preferencias almacenadas localmente en el servidor. Backup automático y modo offline
             amplían el comportamiento en futuras versiones.
           </p>
+          {syncColaPendiente != null ? (
+            <p className="muted small" style={{ marginBottom: "0.85rem" }}>
+              Cola de sincronización con la nube:{" "}
+              <strong className="mono">{syncColaPendiente}</strong> evento
+              {syncColaPendiente === 1 ? "" : "s"} pendiente
+              {syncColaPendiente === 1 ? "" : "s"}.
+            </p>
+          ) : null}
           <label className="field inline-check">
             <input
               type="checkbox"

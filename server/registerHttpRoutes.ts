@@ -15,6 +15,7 @@ import { facturaElectronicaService } from "./services/facturaElectronica.service
 import { configuracionService } from "./services/configuracion.service.js";
 import { categoriaProductoService } from "./services/categoriaProducto.service.js";
 import { categoriaServicioService } from "./services/categoriaServicio.service.js";
+import { categoriaFinanzaConceptoService } from "./services/categoriaFinanzaConcepto.service.js";
 import { smtpService } from "./services/smtp.service.js";
 import { reporteService } from "./services/reporte.service.js";
 import { notificacionService } from "./services/notificacion.service.js";
@@ -155,6 +156,22 @@ export function registerHttpRoutes(app: Express) {
     requireAdmin,
     asyncHandler(async (req, res) => {
       res.json(await configuracionService.updateSistemaPrefs(req.body as Record<string, unknown>));
+    })
+  );
+
+  api.get(
+    "/configuracion/certificado-laboral",
+    requireAdmin,
+    asyncHandler(async (_req, res) => {
+      res.json(await configuracionService.getCertificadoLaboral());
+    })
+  );
+
+  api.patch(
+    "/configuracion/certificado-laboral",
+    requireAdmin,
+    asyncHandler(async (req, res) => {
+      res.json(await configuracionService.updateCertificadoLaboral(req.body as Record<string, unknown>));
     })
   );
 
@@ -306,6 +323,45 @@ export function registerHttpRoutes(app: Express) {
       const id = parseId(req, res);
       if (id == null) return;
       await categoriaServicioService.delete(id);
+      res.status(204).send();
+    })
+  );
+
+  api.get(
+    "/configuracion/categorias-finanza-concepto",
+    requireAdmin,
+    asyncHandler(async (_req, res) => {
+      res.json(await categoriaFinanzaConceptoService.listAll());
+    })
+  );
+
+  api.post(
+    "/configuracion/categorias-finanza-concepto",
+    requireAdmin,
+    asyncHandler(async (req, res) => {
+      const row = await categoriaFinanzaConceptoService.create(req.body as Record<string, unknown>);
+      res.status(201).json(row);
+    })
+  );
+
+  api.patch(
+    "/configuracion/categorias-finanza-concepto/:id",
+    requireAdmin,
+    asyncHandler(async (req, res) => {
+      const id = parseId(req, res);
+      if (id == null) return;
+      const row = await categoriaFinanzaConceptoService.update(id, req.body as Record<string, unknown>);
+      res.json(row);
+    })
+  );
+
+  api.delete(
+    "/configuracion/categorias-finanza-concepto/:id",
+    requireAdmin,
+    asyncHandler(async (req, res) => {
+      const id = parseId(req, res);
+      if (id == null) return;
+      await categoriaFinanzaConceptoService.delete(id);
       res.status(204).send();
     })
   );
@@ -1004,6 +1060,14 @@ export function registerHttpRoutes(app: Express) {
   );
 
   api.get(
+    "/finanzas/categorias-concepto",
+    requirePermiso("finanzas"),
+    asyncHandler(async (_req, res) => {
+      res.json(await categoriaFinanzaConceptoService.listActivas());
+    })
+  );
+
+  api.get(
     "/gastos",
     requirePermiso("finanzas"),
     asyncHandler(async (req, res) => {
@@ -1022,6 +1086,18 @@ export function registerHttpRoutes(app: Express) {
       };
       await auditService.log(req.user?.sub, "crear", "gasto", row.id, row as Record<string, unknown>);
       res.status(201).json(row);
+    })
+  );
+
+  api.delete(
+    "/gastos/:id",
+    requireAdmin,
+    asyncHandler(async (req, res) => {
+      const id = parseId(req, res);
+      if (id == null) return;
+      await finanzaService.deleteGasto(id);
+      await auditService.log(req.user?.sub, "eliminar", "gasto", id, {});
+      res.status(204).send();
     })
   );
 

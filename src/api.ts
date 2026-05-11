@@ -2,8 +2,8 @@ import { getAccessToken } from "./auth/token";
 import { readResponseAsBlobYielding } from "./lib/readBlobYielding";
 import { yieldToMain } from "./lib/yieldToMain";
 
-/** Tiempo máximo de espera al API (Puppeteer puede tardar mucho). */
-const CERT_FETCH_MS = 180_000;
+/** Tiempo máximo de espera al generar el certificado PDF por API. */
+const CERT_FETCH_MS = 90_000;
 
 function certFetchSignal(): AbortSignal | undefined {
   try {
@@ -19,7 +19,7 @@ function certFetchSignal(): AbortSignal | undefined {
 function mapCertFetchError(e: unknown): Error {
   if (e instanceof DOMException && e.name === "AbortError") {
     return new Error(
-      "Tiempo de espera agotado al generar el PDF. Revisá que el API esté en marcha y la consola del servidor (Puppeteer / Chrome)."
+      "Tiempo de espera agotado al generar el PDF. Revisá que el API esté en marcha."
     );
   }
   if (e instanceof TypeError) {
@@ -117,6 +117,12 @@ export type VentaDetalle = Venta & {
   }>;
 };
 
+export type ProximaCitaDia = {
+  inicio: string;
+  cliente_nombre: string;
+  servicio: string;
+};
+
 export type DashboardStats = {
   ventas_mes_total: number;
   ventas_mes_cantidad: number;
@@ -129,6 +135,10 @@ export type DashboardStats = {
   clientes_total: number;
   ingresos_7d: Array<{ dia: string; ingresos: number; cantidad_ventas: number }>;
   top_productos: Array<{ nombre: string; unidades: number }>;
+  /** Servicios más frecuentes en citas (30 días). */
+  top_servicios: Array<{ nombre: string; unidades: number }>;
+  /** Citas de hoy ordenadas por hora. */
+  proximas_citas_hoy: ProximaCitaDia[];
 };
 
 export type PuntosConfig = {
@@ -435,6 +445,80 @@ export async function updatePuntosConfig(body: Partial<PuntosConfig>): Promise<P
     method: "PATCH",
     body: JSON.stringify(body),
   });
+}
+
+export type CertificadoLaboralConfig = {
+  firma_data_url: string | null;
+  nombre_quien_expide: string;
+  /** Ciudad en el párrafo «en la ciudad de …» del certificado PDF (Parámetros generales). */
+  ciudad_certificado: string;
+};
+
+export async function fetchCertificadoLaboral(): Promise<CertificadoLaboralConfig> {
+  return requestJson("/api/configuracion/certificado-laboral");
+}
+
+export async function updateCertificadoLaboral(
+  body: Partial<{
+    firma_data_url: string | null;
+    nombre_quien_expide: string;
+    ciudad_certificado: string;
+  }>
+): Promise<CertificadoLaboralConfig> {
+  return requestJson("/api/configuracion/certificado-laboral", {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+/** Categorías para gastos / conceptos en Finanzas (admin las gestiona en Parámetros generales). */
+export type CategoriaFinanzaConcepto = {
+  id: number;
+  nombre: string;
+  descripcion: string | null;
+  emoji: string | null;
+  estado: "activo" | "inactivo";
+  created_at: string;
+  updated_at: string | null;
+};
+
+export async function fetchCategoriasFinanzaConcepto(): Promise<CategoriaFinanzaConcepto[]> {
+  return requestJson("/api/finanzas/categorias-concepto");
+}
+
+export async function fetchCategoriasFinanzaConceptoAdmin(): Promise<CategoriaFinanzaConcepto[]> {
+  return requestJson("/api/configuracion/categorias-finanza-concepto");
+}
+
+export async function createCategoriaFinanzaConcepto(body: {
+  nombre: string;
+  descripcion?: string | null;
+  emoji?: string | null;
+  estado?: "activo" | "inactivo";
+}): Promise<CategoriaFinanzaConcepto> {
+  return requestJson("/api/configuracion/categorias-finanza-concepto", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function updateCategoriaFinanzaConcepto(
+  id: number,
+  body: Partial<{
+    nombre: string;
+    descripcion: string | null;
+    emoji: string | null;
+    estado: "activo" | "inactivo";
+  }>
+): Promise<CategoriaFinanzaConcepto> {
+  return requestJson(`/api/configuracion/categorias-finanza-concepto/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deleteCategoriaFinanzaConcepto(id: number): Promise<void> {
+  await requestJson(`/api/configuracion/categorias-finanza-concepto/${id}`, { method: "DELETE" });
 }
 
 /* Configuración: categorías de producto y servicios (admin) */
@@ -1070,6 +1154,7 @@ export type GastoOperativo = {
   id: number;
   concepto: string;
   categoria: string | null;
+  categoria_finanza_id?: number | null;
   monto: number;
   fecha: string;
   notas: string | null;
@@ -1086,6 +1171,10 @@ export async function fetchGastos(desde?: string, hasta?: string): Promise<Gasto
 
 export async function createGasto(body: Partial<GastoOperativo>): Promise<GastoOperativo> {
   return requestJson("/api/gastos", { method: "POST", body: JSON.stringify(body) });
+}
+
+export async function deleteGasto(id: number): Promise<void> {
+  await requestJson<void>(`/api/gastos/${id}`, { method: "DELETE" });
 }
 
 export async function fetchCobranzas(estado?: string): Promise<unknown[]> {

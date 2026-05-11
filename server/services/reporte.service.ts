@@ -66,6 +66,33 @@ export const reporteService = {
       )
       .all(desde30)) as { nombre: string; unidades: number }[];
 
+    const topServicios = (await db
+      .prepare(
+        `SELECT TRIM(c.servicio) AS nombre, COUNT(*) AS unidades
+         FROM citas c
+         WHERE c.inicio >= ?
+           AND c.servicio IS NOT NULL AND TRIM(c.servicio) != ''
+           AND c.estado NOT IN ('cancelado', 'cancelada')
+         GROUP BY LOWER(TRIM(c.servicio))
+         ORDER BY unidades DESC
+         LIMIT 5`
+      )
+      .all(desde30)) as { nombre: string; unidades: number }[];
+
+    const proximasCitasHoy = (await db
+      .prepare(
+        `SELECT c.inicio AS inicio,
+                COALESCE(cl.nombre, 'Cliente') AS cliente_nombre,
+                COALESCE(NULLIF(TRIM(c.servicio), ''), '—') AS servicio
+         FROM citas c
+         JOIN clientes cl ON cl.id = c.cliente_id
+         WHERE substr(c.inicio, 1, 10) = ?
+           AND c.estado NOT IN ('cancelado', 'cancelada')
+         ORDER BY c.inicio ASC
+         LIMIT 16`
+      )
+      .all(today)) as { inicio: string; cliente_nombre: string; servicio: string }[];
+
     return {
       ventas_mes_total: ventasMes.s,
       ventas_mes_cantidad: ventasMes.n,
@@ -78,6 +105,8 @@ export const reporteService = {
       clientes_total: clientesCount.n,
       ingresos_7d: ingresos7d,
       top_productos: topProductos,
+      top_servicios: topServicios,
+      proximas_citas_hoy: proximasCitasHoy,
     };
   },
 

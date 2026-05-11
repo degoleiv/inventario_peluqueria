@@ -404,10 +404,20 @@ body.ui-density-compact .field {
   }
 }
 
+/* Fila completa bajo producto + servicio (ej. categorías finanzas) */
+.config-cat-board-full-row {
+  grid-column: 1 / -1;
+}
+
 .config-cat-board-wrap > .config-cat-section--board-col {
   margin-top: 0;
   padding-top: 0;
   border-top: none;
+}
+
+/* Bloques bajo el tablero de categorías (puntos fidelidad, finanzas) */
+.config-param-extra {
+  margin-top: 1.25rem;
 }
 
 /* Tarjeta tablero (cabecera + lista + dentro: + crear) */
@@ -482,6 +492,10 @@ body.ui-density-compact .field {
   color: var(--secondary);
 }
 
+.cat-board-card__title--finanza {
+  color: color-mix(in srgb, var(--primary) 42%, var(--secondary) 58%);
+}
+
 .cat-board-card__paren {
   font-size: 0.85rem;
   font-weight: 600;
@@ -519,6 +533,11 @@ body.ui-density-compact .field {
 .cat-board-card__add--servicio {
   background: var(--secondary);
   box-shadow: 0 2px 8px color-mix(in srgb, var(--secondary) 38%, transparent);
+}
+
+.cat-board-card__add--finanza {
+  background: color-mix(in srgb, var(--primary) 45%, var(--secondary) 55%);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 30%, transparent);
 }
 
 .cat-board-card__body {

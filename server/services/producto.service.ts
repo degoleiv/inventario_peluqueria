@@ -19,7 +19,7 @@ export const productoService = {
       .prepare(
         `SELECT id, codigo_barras, nombre, marca, categoria, descripcion, imagen_url,
                 stock, precio, precio_compra, precio_venta, stock_minimo, fecha_vencimiento,
-                proveedor_id, created_at, updated_at
+                proveedor_id, estado, created_at, updated_at
          FROM productos ORDER BY updated_at DESC`
       )
       .all();
@@ -183,6 +183,20 @@ export const productoService = {
         now,
         id
       );
+    const row = await db.prepare(`SELECT * FROM productos WHERE id = ?`).get(id);
+    await recordSyncEvent("producto", "actualizado", row);
+    return row;
+  },
+
+  async setEstado(id: number, estado: "activo" | "inactivo") {
+    if (estado !== "activo" && estado !== "inactivo") {
+      throw new AppError("estado inválido", 400);
+    }
+    const now = new Date().toISOString();
+    const info = await db
+      .prepare(`UPDATE productos SET estado = ?, updated_at = ? WHERE id = ?`)
+      .run(estado, now, id);
+    if (info.changes === 0) throw new AppError("no encontrado", 404);
     const row = await db.prepare(`SELECT * FROM productos WHERE id = ?`).get(id);
     await recordSyncEvent("producto", "actualizado", row);
     return row;

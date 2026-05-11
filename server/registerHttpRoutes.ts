@@ -785,22 +785,19 @@ export function registerHttpRoutes(app: Express) {
     asyncHandler(async (req, res) => {
       const desde = typeof req.query.desde === "string" ? req.query.desde : undefined;
       const hasta = typeof req.query.hasta === "string" ? req.query.hasta : undefined;
-      const referencia = typeof req.query.referencia === "string" ? req.query.referencia : undefined;
-      let proveedor_id: number | undefined;
-      if (typeof req.query.proveedor_id === "string" && req.query.proveedor_id.trim() !== "") {
-        const n = Number(req.query.proveedor_id);
-        if (!Number.isFinite(n) || n <= 0) {
-          res.status(400).json({ error: "proveedor_id inválido" });
-          return;
-        }
-        proveedor_id = n;
-      }
+      const refQ = typeof req.query.referencia === "string" ? req.query.referencia : undefined;
+      const pidRaw = req.query.proveedor_id;
+      const proveedor_id =
+        typeof pidRaw === "string" && /^\d+$/.test(pidRaw.trim()) ? Number(pidRaw.trim()) : undefined;
       res.json(
         await pedidoProveedorService.list({
           desde,
           hasta,
-          proveedor_id,
-          referencia,
+          proveedor_id:
+            proveedor_id != null && Number.isFinite(proveedor_id) && proveedor_id > 0
+              ? proveedor_id
+              : undefined,
+          referencia: refQ?.trim() || undefined,
         })
       );
     })

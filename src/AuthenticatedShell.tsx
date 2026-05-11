@@ -42,7 +42,7 @@ import {
   readCitasTab,
   readConfigTab,
   readEmpleadosTab,
-  readLastTab,
+  readInventarioTab,
   readVentasTab,
 } from "./lib/moduleRoutes";
 export function AuthenticatedShell() {
@@ -336,7 +336,7 @@ export function AuthenticatedRoutes() {
         <Route
           path="inventario"
           element={
-            <Navigate to={`/inventario/${readLastTab("inventario", "productos")}`} replace />
+            <Navigate to={`/inventario/${readInventarioTab()}`} replace />
           }
         />
         <Route path="inventario/:tab" element={<InventarioPage />} />

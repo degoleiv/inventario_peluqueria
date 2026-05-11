@@ -31,21 +31,19 @@ type Linea = {
 
 type VistaTab = "pedido" | "proveedores" | "historial";
 
-type HistorialFiltrosSnap = {
+type HistorialFiltrosForm = {
   desde: string;
   hasta: string;
-  proveedor_id: number | "";
+  proveedorId: string;
   referencia: string;
 };
 
-function pedidosHistorialParams(s: HistorialFiltrosSnap): Parameters<typeof fetchPedidosProveedores>[0] | undefined {
-  const out: NonNullable<Parameters<typeof fetchPedidosProveedores>[0]> = {};
-  if (s.desde.trim()) out.desde = s.desde.trim();
-  if (s.hasta.trim()) out.hasta = s.hasta.trim();
-  if (s.proveedor_id !== "") out.proveedor_id = Number(s.proveedor_id);
-  if (s.referencia.trim()) out.referencia = s.referencia.trim();
-  return Object.keys(out).length ? out : undefined;
-}
+const HIST_FILTROS_VACIOS: HistorialFiltrosForm = {
+  desde: "",
+  hasta: "",
+  proveedorId: "",
+  referencia: "",
+};
 
 const pasos = ["Proveedor", "Productos", "Pagos", "Resumen y notas"] as const;
 
@@ -187,48 +185,53 @@ export function PedidosProveedoresPage() {
   const [editRef, setEditRef] = useState("");
   const [editBusy, setEditBusy] = useState(false);
 
-  /** Filtros del historial (lectura en `load` vía ref para no refetch en cada tecla). */
-  const [historialDesde, setHistorialDesde] = useState("");
-  const [historialHasta, setHistorialHasta] = useState("");
-  const [historialProveedorId, setHistorialProveedorId] = useState<number | "">("");
-  const [historialReferencia, setHistorialReferencia] = useState("");
-  const historialFiltrosRef = useRef<HistorialFiltrosSnap>({
-    desde: "",
-    hasta: "",
-    proveedor_id: "",
-    referencia: "",
-  });
+  const historialFiltrosRef = useRef<HistorialFiltrosForm>({ ...HIST_FILTROS_VACIOS });
+  const [historialForm, setHistorialForm] = useState<HistorialFiltrosForm>({ ...HIST_FILTROS_VACIOS });
+  const [historialFiltrosActivos, setHistorialFiltrosActivos] = useState(false);
 
-  useEffect(() => {
-    historialFiltrosRef.current = {
-      desde: historialDesde,
-      hasta: historialHasta,
-      proveedor_id: historialProveedorId,
-      referencia: historialReferencia,
-    };
-  }, [historialDesde, historialHasta, historialProveedorId, historialReferencia]);
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const h = historialFiltrosRef.current;
+      const [p, pr, prod] = await Promise.all([
+        fetchPedidosProveedores({
+          desde: h.desde || undefined,
+          hasta: h.hasta || undefined,
+          proveedor_id: h.proveedorId.trim() ? Number(h.proveedorId) : undefined,
+          referencia: h.referencia.trim() || undefined,
+        }),
+        fetchProveedores(),
+        fetchProductos(),
+      ]);
+      setPedidos(p);
+      setProveedores(pr);
+      setProductos(prod);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Error", "error");
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
 
-  const load = useCallback(
-    async (snap?: HistorialFiltrosSnap) => {
-      setLoading(true);
-      try {
-        const f = snap ?? historialFiltrosRef.current;
-        const [p, pr, prod] = await Promise.all([
-          fetchPedidosProveedores(pedidosHistorialParams(f)),
-          fetchProveedores(),
-          fetchProductos(),
-        ]);
-        setPedidos(p);
-        setProveedores(pr);
-        setProductos(prod);
-      } catch (e) {
-        toast(e instanceof Error ? e.message : "Error", "error");
-      } finally {
-        setLoading(false);
-      }
-    },
-    [toast]
-  );
+  function aplicarFiltrosHistorialYRefrescar() {
+    historialFiltrosRef.current = { ...historialForm };
+    setHistorialFiltrosActivos(
+      Boolean(
+        historialForm.desde.trim() ||
+          historialForm.hasta.trim() ||
+          historialForm.proveedorId.trim() ||
+          historialForm.referencia.trim()
+      )
+    );
+    void load();
+  }
+
+  function limpiarHistorialFiltros() {
+    setHistorialForm({ ...HIST_FILTROS_VACIOS });
+    historialFiltrosRef.current = { ...HIST_FILTROS_VACIOS };
+    setHistorialFiltrosActivos(false);
+    void load();
+  }
 
   useEffect(() => {
     void load();
@@ -254,17 +257,6 @@ export function PedidosProveedoresPage() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [edit]);
-
-  const hayHistorialFiltros = useMemo(
-    () =>
-      Boolean(
-        historialDesde.trim() ||
-          historialHasta.trim() ||
-          historialProveedorId !== "" ||
-          historialReferencia.trim()
-      ),
-    [historialDesde, historialHasta, historialProveedorId, historialReferencia]
-  );
 
   const proveedoresActivos = useMemo(
     () => proveedores.filter((p) => p.estado === "activo"),
@@ -1247,87 +1239,61 @@ export function PedidosProveedoresPage() {
                 Consultá pedidos anteriores y editá plazos, montos o notas de pago.
               </p>
             </div>
-            <button type="button" className="pedidos-btn pedidos-btn--ghost" onClick={() => void load()}>
+            <button type="button" className="pedidos-btn pedidos-btn--ghost" onClick={aplicarFiltrosHistorialYRefrescar}>
               Actualizar
             </button>
           </div>
           <div className="pedidos-historial-filtros" role="search" aria-label="Filtrar historial de pedidos">
-            <div className="pedidos-historial-filtros__grid">
-              <label className="pedidos-field pedidos-field--compact">
-                <span className="pedidos-field__label">Desde</span>
-                <input
-                  className="pedidos-input"
-                  type="date"
-                  value={historialDesde}
-                  onChange={(e) => setHistorialDesde(e.target.value)}
-                />
-              </label>
-              <label className="pedidos-field pedidos-field--compact">
-                <span className="pedidos-field__label">Hasta</span>
-                <input
-                  className="pedidos-input"
-                  type="date"
-                  value={historialHasta}
-                  onChange={(e) => setHistorialHasta(e.target.value)}
-                />
-              </label>
-              <label className="pedidos-field pedidos-field--compact">
-                <span className="pedidos-field__label">Proveedor</span>
-                <select
-                  className="pedidos-select"
-                  value={historialProveedorId === "" ? "" : String(historialProveedorId)}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setHistorialProveedorId(v === "" ? "" : Number(v));
-                  }}
-                >
-                  <option value="">Todos</option>
-                  {proveedores.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.nombre}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="pedidos-field pedidos-field--compact pedidos-historial-filtros__ref">
-                <span className="pedidos-field__label">Ref. o Nº pedido</span>
-                <input
-                  className="pedidos-input"
-                  type="search"
-                  value={historialReferencia}
-                  onChange={(e) => setHistorialReferencia(e.target.value)}
-                  placeholder="Texto en referencia o ID…"
-                  autoComplete="off"
-                />
-              </label>
-            </div>
-            <div className="pedidos-historial-filtros__actions">
-              <button
-                type="button"
-                className="pedidos-btn pedidos-btn--primary"
-                onClick={() => void load()}
+            <label className="pedidos-field pedidos-historial-filtros__field">
+              <span className="pedidos-field__label">Desde</span>
+              <input
+                type="date"
+                className="pedidos-input"
+                value={historialForm.desde}
+                onChange={(e) => setHistorialForm((s) => ({ ...s, desde: e.target.value }))}
+              />
+            </label>
+            <label className="pedidos-field pedidos-historial-filtros__field">
+              <span className="pedidos-field__label">Hasta</span>
+              <input
+                type="date"
+                className="pedidos-input"
+                value={historialForm.hasta}
+                onChange={(e) => setHistorialForm((s) => ({ ...s, hasta: e.target.value }))}
+              />
+            </label>
+            <label className="pedidos-field pedidos-historial-filtros__field">
+              <span className="pedidos-field__label">Proveedor</span>
+              <select
+                className="pedidos-select"
+                value={historialForm.proveedorId}
+                onChange={(e) => setHistorialForm((s) => ({ ...s, proveedorId: e.target.value }))}
               >
+                <option value="">Todos</option>
+                {proveedores.map((p) => (
+                  <option key={p.id} value={String(p.id)}>
+                    {p.nombre || p.email || `Proveedor #${p.id}`}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="pedidos-field pedidos-historial-filtros__field pedidos-historial-filtros__field--grow">
+              <span className="pedidos-field__label">Referencia o n.º pedido</span>
+              <input
+                type="search"
+                className="pedidos-input"
+                value={historialForm.referencia}
+                onChange={(e) => setHistorialForm((s) => ({ ...s, referencia: e.target.value }))}
+                placeholder="Remito, OC, texto en referencia o ID del pedido"
+                autoComplete="off"
+              />
+            </label>
+            <div className="pedidos-historial-filtros__actions">
+              <button type="button" className="pedidos-btn pedidos-btn--primary" onClick={aplicarFiltrosHistorialYRefrescar}>
                 Buscar
               </button>
-              <button
-                type="button"
-                className="pedidos-btn pedidos-btn--ghost"
-                onClick={() => {
-                  const limpio: HistorialFiltrosSnap = {
-                    desde: "",
-                    hasta: "",
-                    proveedor_id: "",
-                    referencia: "",
-                  };
-                  setHistorialDesde("");
-                  setHistorialHasta("");
-                  setHistorialProveedorId("");
-                  setHistorialReferencia("");
-                  historialFiltrosRef.current = limpio;
-                  void load(limpio);
-                }}
-              >
-                Limpiar filtros
+              <button type="button" className="pedidos-btn pedidos-btn--ghost" onClick={limpiarHistorialFiltros}>
+                Limpiar
               </button>
             </div>
           </div>
@@ -1338,11 +1304,11 @@ export function PedidosProveedoresPage() {
           ) : pedidos.length === 0 ? (
             <div className="pedidos-empty-state" role="status">
               <p className="pedidos-empty-state__title">
-                {hayHistorialFiltros ? "Sin resultados" : "Todavía no hay pedidos"}
+                {historialFiltrosActivos ? "Sin resultados para los filtros" : "Todavía no hay pedidos"}
               </p>
               <p className="pedidos-empty-state__text">
-                {hayHistorialFiltros
-                  ? "No hay pedidos que coincidan con los filtros. Probá otras fechas, otro proveedor o otra referencia / número de pedido."
+                {historialFiltrosActivos
+                  ? "Probá otro rango de fechas, proveedor o referencia. «Limpiar» quita los filtros y muestra todo el historial."
                   : "Cuando registres un pedido desde «Pedido», aparecerá acá con fechas, totales e indicadores de pago."}
               </p>
             </div>

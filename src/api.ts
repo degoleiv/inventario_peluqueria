@@ -49,6 +49,7 @@ export type Producto = {
   fecha_vencimiento: string | null;
   /** Si está definido, el ítem se asocia a ese proveedor (catálogo de pedidos). */
   proveedor_id?: number | null;
+  estado?: "activo" | "inactivo" | string | null;
   created_at: string;
   updated_at: string;
 };
@@ -65,8 +66,6 @@ export type Cliente = {
   created_at: string;
   updated_at: string;
 };
-
-
 
 export type Cita = {
   id: number;
@@ -400,6 +399,27 @@ export async function updateProducto(id: number, body: Partial<Producto>): Promi
 
 export async function deleteProducto(id: number): Promise<void> {
   await requestJson(`/api/productos/${id}`, { method: "DELETE" });
+}
+
+export type InventarioCatalogoCategoria = { id: number; nombre_categoria: string };
+export type InventarioCatalogoProveedor = { id: number; nombre: string };
+export type InventarioCatalogo = {
+  categorias: InventarioCatalogoCategoria[];
+  proveedores: InventarioCatalogoProveedor[];
+};
+
+export async function fetchInventarioCatalogo(): Promise<InventarioCatalogo> {
+  return requestJson("/api/inventario/catalogo");
+}
+
+export async function patchProductoEstado(
+  id: number,
+  estado: "activo" | "inactivo"
+): Promise<Producto> {
+  return requestJson(`/api/productos/${id}/estado`, {
+    method: "PATCH",
+    body: JSON.stringify({ estado }),
+  });
 }
 
 export async function lookupBarcode(codigo: string): Promise<LookupOk | LookupManual> {
@@ -848,9 +868,9 @@ export async function fetchPedidosProveedores(params?: {
   referencia?: string;
 }): Promise<PedidoProveedor[]> {
   const q = new URLSearchParams();
-  if (params?.desde?.trim()) q.set("desde", params.desde.trim());
-  if (params?.hasta?.trim()) q.set("hasta", params.hasta.trim());
-  if (params?.proveedor_id != null && params.proveedor_id > 0) {
+  if (params?.desde) q.set("desde", params.desde);
+  if (params?.hasta) q.set("hasta", params.hasta);
+  if (params?.proveedor_id != null && Number.isFinite(params.proveedor_id) && params.proveedor_id > 0) {
     q.set("proveedor_id", String(params.proveedor_id));
   }
   if (params?.referencia?.trim()) q.set("referencia", params.referencia.trim());

@@ -8,7 +8,7 @@ export type CitasTab = (typeof CITAS_TABS)[number];
 export const INVENTARIO_TABS = ["productos", "alertas"] as const;
 export type InventarioTab = (typeof INVENTARIO_TABS)[number];
 
-/** Migra pestaña antigua `movimientos` → `productos`. */
+/** Migra pestaña antigua `movimientos` → `productos` (ya no hay subruta movimientos). */
 export function readInventarioTab(): InventarioTab {
   const t = readLastTab("inventario", "productos");
   if (t === "movimientos") return "productos";

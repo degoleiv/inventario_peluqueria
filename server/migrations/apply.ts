@@ -97,6 +97,9 @@ export async function applyMigrations(database: SqliteDb) {
   if (!pNames.has("fecha_vencimiento")) {
     await database.exec(`ALTER TABLE productos ADD COLUMN fecha_vencimiento TEXT`);
   }
+  if (!pNames.has("estado")) {
+    await database.exec(`ALTER TABLE productos ADD COLUMN estado TEXT NOT NULL DEFAULT 'activo'`);
+  }
 
   if (pNames.has("precio")) {
     await database.exec(

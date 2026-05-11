@@ -139,46 +139,50 @@ export const pedidoProveedorService = {
       .all(...args);
   },
 
-  async list(opts?: {
+  async list(filters?: {
     desde?: string;
     hasta?: string;
     proveedor_id?: number;
+    /** Texto libre: coincide con `referencia` (parcial, sin distinguir mayúsculas) o con el id numérico del pedido. */
     referencia?: string;
   }) {
-    const desde = opts?.desde?.trim();
-    const hasta = opts?.hasta?.trim();
-    const proveedor_id = opts?.proveedor_id;
-    const referencia = opts?.referencia?.trim() ?? "";
+    const desde = filters?.desde?.trim().slice(0, 10);
+    const hasta = filters?.hasta?.trim().slice(0, 10);
+    const proveedorId = filters?.proveedor_id;
+    const refRaw = (filters?.referencia ?? "").trim();
 
     let sql = `SELECT co.*, pr.nombre AS proveedor_nombre_ref
                FROM pedidos_proveedor co
                LEFT JOIN proveedores pr ON pr.id = co.proveedor_id`;
+    const params: unknown[] = [];
     const cond: string[] = [];
-    const params: (string | number)[] = [];
 
-    const d0 = desde ? parseDay(desde) : null;
-    if (d0) {
+    if (desde && /^\d{4}-\d{2}-\d{2}$/.test(desde)) {
       cond.push(`co.fecha >= ?`);
-      params.push(d0);
+      params.push(desde);
     }
-    const h0 = hasta ? parseDay(hasta) : null;
-    if (h0) {
+    if (hasta && /^\d{4}-\d{2}-\d{2}$/.test(hasta)) {
       cond.push(`co.fecha <= ?`);
-      params.push(h0);
+      params.push(hasta);
     }
-    if (proveedor_id != null && Number.isFinite(proveedor_id) && proveedor_id > 0) {
+    if (proveedorId != null && Number.isFinite(proveedorId) && proveedorId > 0) {
       cond.push(`co.proveedor_id = ?`);
-      params.push(proveedor_id);
+      params.push(proveedorId);
     }
-    if (referencia) {
-      const low = referencia.toLowerCase();
-      cond.push(
-        `(INSTR(LOWER(COALESCE(co.referencia, '')), ?) > 0 OR CAST(co.id AS TEXT) = ? OR INSTR(CAST(co.id AS TEXT), ?) > 0)`
-      );
-      params.push(low, referencia, referencia);
+    if (refRaw) {
+      const idNum = Number(refRaw);
+      if (Number.isFinite(idNum) && idNum > 0 && String(Math.floor(idNum)) === refRaw) {
+        cond.push(`(LOWER(COALESCE(co.referencia, '')) LIKE ? OR co.id = ?)`);
+        params.push(`%${refRaw.toLowerCase()}%`, Math.floor(idNum));
+      } else {
+        cond.push(`LOWER(COALESCE(co.referencia, '')) LIKE ?`);
+        params.push(`%${refRaw.toLowerCase()}%`);
+      }
     }
 
-    if (cond.length) sql += ` WHERE ${cond.join(" AND ")}`;
+    if (cond.length) {
+      sql += ` WHERE ${cond.join(" AND ")}`;
+    }
     sql += ` ORDER BY co.fecha DESC, co.id DESC`;
     const rows = (await db.prepare(sql).all(...params)) as Record<string, unknown>[];
     return rows.map((r) => enrichRow(r));

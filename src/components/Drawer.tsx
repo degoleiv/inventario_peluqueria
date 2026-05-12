@@ -62,7 +62,7 @@ export function Drawer({
 
   return (
     <div className="drawer-root" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
-      <button type="button" className="drawer-backdrop" onClick={onClose} aria-label="Cerrar" />
+      <div className="drawer-backdrop" aria-hidden="true" />
       <aside className={`drawer-panel ${wide ? "drawer-panel--wide" : ""}`}>
         <header className="drawer-header">
           <h2 id="drawer-title" className="drawer-title">

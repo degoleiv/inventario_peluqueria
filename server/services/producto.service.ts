@@ -1,5 +1,36 @@
 import { db, recordSyncEvent } from "../db.js";
 import { AppError } from "../lib/AppError.js";
+import { isOurMediaUrl, saveImageDataUrl, unlinkMediaPublicPath } from "../lib/mediaStore.js";
+
+const PRODUCTO_IMAGEN_MAX_BYTES = 25 * 1024 * 1024;
+
+async function resolveProductoImagenField(
+  incoming: unknown,
+  previous: string | null
+): Promise<string | null> {
+  if (incoming === null || incoming === "") {
+    await unlinkMediaPublicPath(isOurMediaUrl(previous) ? previous : undefined);
+    return null;
+  }
+  if (typeof incoming !== "string") return previous;
+  const t = incoming.trim();
+  if (!t) {
+    await unlinkMediaPublicPath(isOurMediaUrl(previous) ? previous : undefined);
+    return null;
+  }
+  const low = t.toLowerCase();
+  if (low.startsWith("http://") || low.startsWith("https://") || isOurMediaUrl(t)) {
+    if (previous && previous !== t && isOurMediaUrl(previous)) await unlinkMediaPublicPath(previous);
+    return t;
+  }
+  if (low.startsWith("data:image/")) {
+    const saved = await saveImageDataUrl(t, "productos", PRODUCTO_IMAGEN_MAX_BYTES);
+    if (previous && previous !== saved && isOurMediaUrl(previous)) await unlinkMediaPublicPath(previous);
+    return saved;
+  }
+  if (previous && previous !== t && isOurMediaUrl(previous)) await unlinkMediaPublicPath(previous);
+  return t;
+}
 
 function validatePrecios(precio_compra: number | null, precio_venta: number | null) {
   if (
@@ -25,7 +56,7 @@ export const productoService = {
       .all();
   },
 
-  async create(body: Record<string, unknown>) {
+  async create(body: Record<string, unknown>, _opts?: { relaxCatalog?: boolean }) {
     const nombre = typeof body.nombre === "string" ? body.nombre.trim() : "";
     if (!nombre) throw new AppError("nombre requerido");
 
@@ -67,6 +98,11 @@ export const productoService = {
         ? Math.floor(Number(body.proveedor_id))
         : null;
 
+    const imagen_url =
+      body.imagen_url !== undefined
+        ? await resolveProductoImagenField(body.imagen_url, null)
+        : null;
+
     const info = await db
       .prepare(
         `INSERT INTO productos (
@@ -81,7 +117,7 @@ export const productoService = {
         typeof body.marca === "string" ? body.marca || null : null,
         typeof body.categoria === "string" ? body.categoria || null : null,
         typeof body.descripcion === "string" ? body.descripcion || null : null,
-        typeof body.imagen_url === "string" ? body.imagen_url || null : null,
+        imagen_url,
         stock,
         precio_venta,
         precio_compra,
@@ -155,6 +191,12 @@ export const productoService = {
             ? Math.floor(Number(body.proveedor_id))
             : null;
 
+    const existingImagen = (existing.imagen_url as string | null) ?? null;
+    const imagen_url =
+      body.imagen_url !== undefined
+        ? await resolveProductoImagenField(body.imagen_url, existingImagen)
+        : existingImagen;
+
     const now = new Date().toISOString();
     await db
       .prepare(
@@ -170,7 +212,7 @@ export const productoService = {
         typeof body.marca === "string" ? body.marca || null : existing.marca,
         typeof body.categoria === "string" ? body.categoria || null : existing.categoria,
         typeof body.descripcion === "string" ? body.descripcion || null : existing.descripcion,
-        typeof body.imagen_url === "string" ? body.imagen_url || null : existing.imagen_url,
+        imagen_url,
         stock,
         precio_venta,
         precio_compra,

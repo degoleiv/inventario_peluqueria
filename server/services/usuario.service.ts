@@ -1,6 +1,7 @@
 import bcrypt from "bcrypt";
 import { BCRYPT_ROUNDS } from "../config.js";
 import { AppError } from "../lib/AppError.js";
+import { isOurMediaUrl, saveImageDataUrl, unlinkMediaPublicPath } from "../lib/mediaStore.js";
 import { db, recordSyncEvent } from "../db.js";
 import { usuariosRepo } from "../repositories/usuarios.js";
 import { rolesService } from "./roles.service.js";
@@ -43,6 +44,11 @@ export const usuarioService = {
         ? Number(params.valor_comision)
         : 0;
 
+    let foto_url = params.foto_url?.trim() || null;
+    if (foto_url?.toLowerCase().startsWith("data:image/")) {
+      foto_url = await saveImageDataUrl(foto_url, "usuarios", 15 * 1024 * 1024);
+    }
+
     const plantilla = parseTurnoPlantillaSemanal(params.turno_inicial);
 
     return await db.transaction(async () => {
@@ -53,7 +59,7 @@ export const usuarioService = {
         rol,
         telefono: params.telefono?.trim() || null,
         color_agenda: params.color_agenda?.trim() || null,
-        foto_url: params.foto_url?.trim() || null,
+        foto_url,
         tipo_comision: tipoCom,
         valor_comision: valorCom,
       });
@@ -116,7 +122,20 @@ export const usuarioService = {
       await usuariosRepo.updateColorAgenda(id, params.color_agenda?.trim() || null);
     }
     if (params.foto_url !== undefined) {
-      await usuariosRepo.updateFotoUrl(id, params.foto_url?.trim() || null);
+      const prev = u.foto_url ?? null;
+      let next = params.foto_url?.trim() || null;
+      if (next?.toLowerCase().startsWith("data:image/")) {
+        next = await saveImageDataUrl(next, "usuarios", 15 * 1024 * 1024);
+        if (prev && prev !== next && isOurMediaUrl(prev)) await unlinkMediaPublicPath(prev);
+      } else {
+        if (next == null || next === "") {
+          if (prev && isOurMediaUrl(prev)) await unlinkMediaPublicPath(prev);
+          next = null;
+        } else if (prev && prev !== next && isOurMediaUrl(prev)) {
+          await unlinkMediaPublicPath(prev);
+        }
+      }
+      await usuariosRepo.updateFotoUrl(id, next);
     }
     if (params.activo !== undefined) {
       if (!params.activo && u.rol === "admin") {

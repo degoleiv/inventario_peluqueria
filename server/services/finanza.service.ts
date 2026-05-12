@@ -1,17 +1,28 @@
 import { db } from "../db.js";
 import { AppError } from "../lib/AppError.js";
+import {
+  isOurMediaUrl,
+  saveGastoComprobanteDataUrl,
+  unlinkMediaPublicPath,
+} from "../lib/mediaStore.js";
 
-const COMPROBANTE_MAX_LEN = 4_500_000; /* ~3 MB de binario en base64 */
+const COMPROBANTE_MAX_LEN = 4_500_000; /* ~3 MB de binario en base64 (solo data URL; en disco hasta 15 MB) */
+const COMPROBANTE_MAX_DISK_BYTES = 15 * 1024 * 1024;
 
 function parseComprobanteUrl(value: unknown): string | null {
   if (value == null || value === "") return null;
   if (typeof value !== "string") throw new AppError("Comprobante inválido");
   const t = value.trim();
   if (!t) return null;
+  const low = t.toLowerCase();
+  if (low.startsWith("/api/media/")) {
+    if (!isOurMediaUrl(t)) throw new AppError("Comprobante inválido");
+    if (t.length > 500) throw new AppError("Comprobante inválido");
+    return t;
+  }
   if (t.length > COMPROBANTE_MAX_LEN) {
     throw new AppError("Comprobante demasiado grande (máx. 3 MB).");
   }
-  const low = t.toLowerCase();
   if (!low.startsWith("data:image/") && !low.startsWith("data:application/pdf")) {
     throw new AppError(
       "Solo se aceptan imágenes (JPG/PNG/WEBP) o PDF como comprobante."
@@ -100,6 +111,13 @@ export const finanzaService = {
 
   async deleteGasto(id: number) {
     if (!Number.isInteger(id) || id < 1) throw new AppError("id inválido", 400);
+    const row = (await db
+      .prepare(`SELECT comprobante_url FROM gastos_operativos WHERE id = ?`)
+      .get(id)) as { comprobante_url: string | null } | undefined;
+    if (!row) throw new AppError("Gasto no encontrado", 404);
+    if (row.comprobante_url && isOurMediaUrl(row.comprobante_url)) {
+      await unlinkMediaPublicPath(row.comprobante_url);
+    }
     const info = await db.prepare(`DELETE FROM gastos_operativos WHERE id = ?`).run(id);
     if (info.changes === 0) throw new AppError("Gasto no encontrado", 404);
   },
@@ -127,11 +145,21 @@ export const finanzaService = {
 
     let comprobante: string | null;
     if (!pagadoFlag) {
+      if (cur.comprobante_url && isOurMediaUrl(cur.comprobante_url)) {
+        await unlinkMediaPublicPath(cur.comprobante_url);
+      }
       comprobante = null;
     } else if (body.comprobante_url === undefined) {
       comprobante = cur.comprobante_url ?? null;
     } else {
-      comprobante = parseComprobanteUrl(body.comprobante_url);
+      let c = parseComprobanteUrl(body.comprobante_url);
+      if (c && c.toLowerCase().startsWith("data:")) {
+        c = await saveGastoComprobanteDataUrl(c, COMPROBANTE_MAX_DISK_BYTES);
+      }
+      if (cur.comprobante_url && cur.comprobante_url !== c && isOurMediaUrl(cur.comprobante_url)) {
+        await unlinkMediaPublicPath(cur.comprobante_url);
+      }
+      comprobante = c;
     }
 
     const now = new Date().toISOString();

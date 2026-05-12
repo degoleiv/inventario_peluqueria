@@ -1,5 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import type { Express } from "express";
+import fs from "node:fs/promises";
+import path from "node:path";
 import { db } from "./db.js";
 import { lookupBarcode } from "./barcode.js";
 import { requireAdmin, requireAlguno, requireAuth, requirePermiso } from "./middleware/auth.js";
@@ -34,6 +36,7 @@ import { empleadoMovimientoService } from "./services/empleadoMovimiento.service
 import { certificadoController } from "./controllers/certificado.controller.js";
 import { proveedoresController } from "./controllers/proveedores.controller.js";
 import { AppError } from "./lib/AppError.js";
+import { mediaPublicPathToAbsolute } from "./lib/mediaStore.js";
 import { businessHours } from "./config.js";
 
 function parseId(req: Request, res: Response): number | null {
@@ -45,8 +48,64 @@ function parseId(req: Request, res: Response): number | null {
   return id;
 }
 
+/** Express: `req.params` puede ser `string | string[]` según tipos. */
+function paramOne(v: string | string[] | undefined): string {
+  if (v == null) return "";
+  return Array.isArray(v) ? (v[0] ?? "") : v;
+}
+
 export function registerHttpRoutes(app: Express) {
-  app.get("/api/health", (_req, res) => res.json({ ok: true }));
+  app.get(
+    "/api/health",
+    asyncHandler(async (_req, res) => {
+      const ts = new Date().toISOString();
+      const t0 = Date.now();
+
+      let dbStatus: "ok" | "error" = "ok";
+      let dbError: string | undefined;
+      let dbPingMs = 0;
+      const counts: Record<string, number> = {};
+
+      try {
+        const dbT0 = Date.now();
+        await db.prepare("SELECT 1").get();
+        dbPingMs = Date.now() - dbT0;
+
+        const tables = ["usuarios", "productos", "clientes", "citas", "ventas"] as const;
+        const rows = await Promise.all(
+          tables.map((t) => db.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get<{ n: number }>())
+        );
+        tables.forEach((t, i) => {
+          counts[t] = rows[i]?.n ?? 0;
+        });
+      } catch (e) {
+        dbStatus = "error";
+        dbError = e instanceof Error ? e.message : String(e);
+      }
+
+      const status = dbStatus === "ok" ? "ok" : "degraded";
+      const uptimeS = Math.floor(process.uptime());
+      const responseMs = Date.now() - t0;
+
+      console.log(
+        `[api/health] status:${status} db:${dbStatus} ping:${dbPingMs}ms uptime:${uptimeS}s ts:${ts}`
+      );
+
+      res.status(dbStatus === "ok" ? 200 : 503).json({
+        status,
+        timestamp: ts,
+        uptime_s: uptimeS,
+        response_ms: responseMs,
+        checks: {
+          database: {
+            status: dbStatus,
+            ping_ms: dbPingMs,
+            ...(dbError ? { error: dbError } : { counts }),
+          },
+        },
+      });
+    })
+  );
 
   app.get(
     "/api/auth/bootstrap-needed",
@@ -82,6 +141,44 @@ export function registerHttpRoutes(app: Express) {
     "/api/configuracion/branding",
     asyncHandler(async (_req, res) => {
       res.json(await configuracionService.getBranding());
+    })
+  );
+
+  /** Archivos subidos (icono, fotos, comprobantes): sin JWT para `<img src>` en login y listados. */
+  app.get(
+    "/api/media/:scope/:file",
+    asyncHandler(async (req, res) => {
+      const scope = paramOne(req.params.scope);
+      const file = paramOne(req.params.file);
+      const publicPath = `/api/media/${path.basename(scope)}/${path.basename(file)}`;
+      const abs = mediaPublicPathToAbsolute(publicPath);
+      if (!abs) {
+        res.status(404).end();
+        return;
+      }
+      const buf = await fs.readFile(abs).catch(() => null);
+      if (!buf) {
+        res.status(404).end();
+        return;
+      }
+      const ext = path.extname(file).toLowerCase();
+      const contentType =
+        ext === ".png"
+          ? "image/png"
+          : ext === ".jpg" || ext === ".jpeg"
+            ? "image/jpeg"
+            : ext === ".webp"
+              ? "image/webp"
+              : ext === ".gif"
+                ? "image/gif"
+                : ext === ".svg"
+                  ? "image/svg+xml"
+                  : ext === ".pdf"
+                    ? "application/pdf"
+                    : "application/octet-stream";
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Cache-Control", "public, max-age=86400");
+      res.send(buf);
     })
   );
 
@@ -785,14 +882,15 @@ export function registerHttpRoutes(app: Express) {
       delete raw.factura_tipo;
 
       const data = await ventaService.create(raw);
-      await auditService.log(req.user?.sub, "crear", "venta", data.id as number, {
+      const ventaId = (data as Record<string, unknown>).id as number;
+      await auditService.log(req.user?.sub, "crear", "venta", ventaId, {
         total: (data as { total?: number }).total,
       });
       let factura_electronica: unknown = null;
       let factura_error: string | null = null;
       if (emitir) {
         try {
-          factura_electronica = await facturaElectronicaService.emitirParaVenta(data.id as number, {
+          factura_electronica = await facturaElectronicaService.emitirParaVenta(ventaId, {
             condicion_iva_cliente: condicion_iva,
             tipo: factura_tipo,
           });
@@ -1170,9 +1268,12 @@ export function registerHttpRoutes(app: Express) {
     "/cobranzas",
     requirePermiso("finanzas"),
     asyncHandler(async (req, res) => {
-      const row = await cobranzaService.create(req.body as Record<string, unknown>);
-      await auditService.log(req.user?.sub, "crear", "cobranza", row.id as number, {
-        cliente_id: (row as { cliente_id?: number }).cliente_id,
+      const row = (await cobranzaService.create(req.body as Record<string, unknown>)) as {
+        id: number;
+        cliente_id?: number;
+      };
+      await auditService.log(req.user?.sub, "crear", "cobranza", row.id, {
+        cliente_id: row.cliente_id,
       });
       res.status(201).json(row);
     })
@@ -1417,7 +1518,7 @@ export function registerHttpRoutes(app: Express) {
     "/barcode/:codigo",
     requireAlguno("ventas", "inventario"),
     asyncHandler(async (req, res) => {
-      const codigo = req.params.codigo || "";
+      const codigo = paramOne(req.params.codigo);
       const result = await lookupBarcode(codigo);
       res.json(result);
     })
@@ -1453,7 +1554,7 @@ export function registerHttpRoutes(app: Express) {
     "/roles/:slug",
     requireAdmin,
     asyncHandler(async (req, res) => {
-      const slug = req.params.slug || "";
+      const slug = paramOne(req.params.slug);
       const row = await rolesService.update(slug, req.body as Record<string, unknown>);
       res.json({
         ...row,
@@ -1466,7 +1567,7 @@ export function registerHttpRoutes(app: Express) {
     "/roles/:slug",
     requireAdmin,
     asyncHandler(async (req, res) => {
-      const slug = req.params.slug || "";
+      const slug = paramOne(req.params.slug);
       await rolesService.delete(slug);
       res.status(204).send();
     })

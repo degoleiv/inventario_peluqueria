@@ -1,6 +1,7 @@
 import sqlite3 from "sqlite3";
 import path from "node:path";
 import fs from "node:fs";
+import { fileURLToPath } from "node:url";
 import { applyMigrations } from "./migrations/apply.js";
 
 export type RunResult = { lastInsertRowid: number; changes: number };
@@ -87,118 +88,102 @@ function openRaw(pathStr: string): Promise<sqlite3.Database> {
   });
 }
 
-/** Ruta del archivo SQLite (misma lógica que `initDatabase`). Útil para scripts de mantenimiento. */
-export function inventarioDbFilePath(): string {
-  let dbPath = process.env.INVENTARIO_DB_PATH;
-  if (!dbPath) {
-    const base =
-      process.env.APPDATA ||
-      (process.platform === "darwin"
-        ? path.join(process.env.HOME || "", "Library", "Application Support")
-        : process.env.HOME
-          ? path.join(process.env.HOME, ".local", "share")
-          : process.cwd());
-    const dir = path.join(base, "inventario-peluqueria");
-    fs.mkdirSync(dir, { recursive: true });
-    dbPath = path.join(dir, "inventario.sqlite");
+/**
+ * Raíz del paquete API (`…/server`): misma carpeta con `package.json` del API
+ * y la carpeta `data/` persistente. No debe vivir dentro de `dist/` para que
+ * `npm run build` no borre la base al limpiar o recompilar.
+ */
+function serverPackageRoot(): string {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  // Compilado: …/server/dist/db.js  →  …/server
+  if (path.basename(here) === "dist") {
+    return path.resolve(here, "..");
   }
-  return dbPath;
+  // Desarrollo (tsx): …/server/db.ts  →  …/server
+  return here;
+}
+
+/**
+ * Si existe una base en la ruta antigua del monorepo (`<repo>/data/`, al subir
+ * un nivel desde `server/`), se mueve a `server/data/` para no perder datos.
+ */
+function migrateLegacySqliteIfNeeded(targetDb: string, serverRoot: string): void {
+  if (fs.existsSync(targetDb)) return;
+
+  const legacyPairs: { db: string; mediaDir: string }[] = [
+    {
+      db: path.join(serverRoot, "..", "data", "inventario.sqlite"),
+      mediaDir: path.join(serverRoot, "..", "data", "media"),
+    },
+    {
+      db: path.join(serverRoot, "dist", "data", "inventario.sqlite"),
+      mediaDir: path.join(serverRoot, "dist", "data", "media"),
+    },
+  ];
+
+  const targetDir = path.dirname(targetDb);
+  const targetMedia = path.join(targetDir, "media");
+
+  for (const { db: legacyDb, mediaDir: legacyMedia } of legacyPairs) {
+    if (!fs.existsSync(legacyDb)) continue;
+    try {
+      fs.renameSync(legacyDb, targetDb);
+      console.warn(
+        `[db] Se encontró inventario.sqlite en una ubicación antigua (${legacyDb}). ` +
+          `Se movió a la carpeta persistente del API: ${targetDb}`
+      );
+    } catch (e) {
+      console.error(`[db] No se pudo mover la base desde ${legacyDb}:`, e);
+      throw e;
+    }
+    if (fs.existsSync(legacyMedia) && !fs.existsSync(targetMedia)) {
+      try {
+        fs.renameSync(legacyMedia, targetMedia);
+        console.warn(`[db] Carpeta media migrada a: ${targetMedia}`);
+      } catch {
+        fs.cpSync(legacyMedia, targetMedia, { recursive: true });
+        fs.rmSync(legacyMedia, { recursive: true, force: true });
+        console.warn(`[db] Carpeta media copiada a: ${targetMedia}`);
+      }
+    }
+    return;
+  }
+}
+
+/** Ruta del archivo SQLite. Útil para scripts de mantenimiento. */
+export function inventarioDbFilePath(): string {
+  const fromEnv = process.env.INVENTARIO_DB_PATH?.trim();
+  if (fromEnv) {
+    return path.resolve(fromEnv);
+  }
+
+  const serverRoot = serverPackageRoot();
+  const dataDir = process.env.INVENTARIO_DATA_DIR?.trim()
+    ? path.resolve(process.env.INVENTARIO_DATA_DIR.trim())
+    : path.join(serverRoot, "data");
+
+  fs.mkdirSync(dataDir, { recursive: true });
+  const dbFile = path.join(dataDir, "inventario.sqlite");
+
+  migrateLegacySqliteIfNeeded(dbFile, serverRoot);
+
+  return dbFile;
 }
 
 export let db!: SqliteDb;
 
-const schemaSql = `
-CREATE TABLE IF NOT EXISTS productos_cache_api (
-  codigo_barras TEXT PRIMARY KEY,
-  respuesta_json TEXT NOT NULL,
-  fecha_consulta TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS productos (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  codigo_barras TEXT UNIQUE,
-  nombre TEXT NOT NULL,
-  marca TEXT,
-  categoria TEXT,
-  descripcion TEXT,
-  imagen_url TEXT,
-  stock INTEGER NOT NULL DEFAULT 0,
-  precio REAL,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_productos_codigo ON productos(codigo_barras);
-
-CREATE TABLE IF NOT EXISTS clientes (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  nombre TEXT NOT NULL,
-  telefono TEXT,
-  email TEXT,
-  notas TEXT,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS citas (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  cliente_id INTEGER NOT NULL,
-  inicio TEXT NOT NULL,
-  duracion_min INTEGER NOT NULL DEFAULT 60,
-  servicio TEXT,
-  estado TEXT NOT NULL DEFAULT 'pendiente',
-  notas TEXT,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE CASCADE
-);
-
-CREATE INDEX IF NOT EXISTS idx_citas_inicio ON citas(inicio);
-CREATE INDEX IF NOT EXISTS idx_citas_cliente ON citas(cliente_id);
-
-CREATE TABLE IF NOT EXISTS ventas (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  cliente_id INTEGER,
-  fecha TEXT NOT NULL,
-  total REAL NOT NULL,
-  metodo_pago TEXT NOT NULL DEFAULT 'efectivo',
-  notas TEXT,
-  created_at TEXT NOT NULL,
-  FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE SET NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_ventas_fecha ON ventas(fecha);
-
-CREATE TABLE IF NOT EXISTS venta_lineas (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  venta_id INTEGER NOT NULL,
-  producto_id INTEGER NOT NULL,
-  cantidad INTEGER NOT NULL,
-  precio_unitario REAL NOT NULL,
-  subtotal REAL NOT NULL,
-  FOREIGN KEY (venta_id) REFERENCES ventas(id) ON DELETE CASCADE,
-  FOREIGN KEY (producto_id) REFERENCES productos(id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_lineas_venta ON venta_lineas(venta_id);
-
-CREATE TABLE IF NOT EXISTS sync_outbox (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  entidad TEXT NOT NULL,
-  accion TEXT NOT NULL,
-  payload_json TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  sincronizado INTEGER NOT NULL DEFAULT 0
-);
-
-CREATE INDEX IF NOT EXISTS idx_sync_pendiente ON sync_outbox(sincronizado);
-`;
-
+/**
+ * Inicializa la base de datos.
+ * En instalación nueva: aplica todas las migraciones y crea el schema completo.
+ * En instalación existente: aplica solo las migraciones pendientes.
+ * El schema y las migraciones viven en server/migrations/apply.ts.
+ */
 export async function initDatabase(): Promise<void> {
-  const raw = await openRaw(inventarioDbFilePath());
+  const dbPath = inventarioDbFilePath();
+  console.log(`[db] Abriendo base de datos: ${dbPath}`);
+  const raw = await openRaw(dbPath);
   db = new SqliteDb(raw);
   await db.pragma("foreign_keys = ON");
-  await db.exec(schemaSql);
   await applyMigrations(db);
 }
 

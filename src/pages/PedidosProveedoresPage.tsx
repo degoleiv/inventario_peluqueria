@@ -1350,7 +1350,6 @@ export function PedidosProveedoresPage() {
           role="dialog"
           aria-modal
           aria-labelledby="edit-pedido-title"
-          onClick={() => setEdit(null)}
         >
           <div className="card drawer-overlay-card pedidos-drawer-card" onClick={(e) => e.stopPropagation()}>
             <h3 id="edit-pedido-title" className="pedidos-drawer-card__title">

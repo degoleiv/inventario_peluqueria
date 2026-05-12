@@ -7,9 +7,14 @@ export type UiRadius = "default" | "soft" | "pill";
 
 export type UiClayStyle = "full" | "soft";
 
+/** Escala visual global (pantallas chicas / tablets). 100 = sin zoom. */
+export type UiScale = 100 | 92 | 85 | 78;
+
 export type UiPreferences = {
   preset: ColorThemeId;
   density: UiDensity;
+  /** Zoom del documento (Chrome/Edge; en otros navegadores puede ignorarse). */
+  uiScale: UiScale;
   radius: UiRadius;
   clayStyle: UiClayStyle;
   /** Si se define, pisa `--primary` del tema en `:root` (solo esta app / equipo). */
@@ -24,11 +29,18 @@ const LEGACY_THEME_KEY = "peluqueria_color_theme";
 const DEFAULT_PREFS: UiPreferences = {
   preset: "default",
   density: "comfortable",
+  uiScale: 100,
   radius: "default",
   clayStyle: "full",
   customPrimary: null,
   customAccent: null,
 };
+
+function parseUiScale(v: unknown): UiScale {
+  const n = typeof v === "number" ? v : Number(v);
+  if (n === 92 || n === 85 || n === 78) return n as UiScale;
+  return 100;
+}
 
 function isPresetId(s: string): s is ColorThemeId {
   return (
@@ -50,6 +62,7 @@ export function readUiPreferences(): UiPreferences {
       return {
         preset,
         density: o.density === "compact" ? "compact" : "comfortable",
+        uiScale: parseUiScale(o.uiScale),
         radius: o.radius === "soft" || o.radius === "pill" ? o.radius : "default",
         clayStyle: o.clayStyle === "soft" ? "soft" : "full",
         customPrimary:
@@ -90,6 +103,15 @@ export function applyUiPreferencesToDocument(prefs: UiPreferences): void {
   applyColorThemeToBody(prefs.preset);
 
   document.body.classList.toggle("ui-density-compact", prefs.density === "compact");
+
+  if (prefs.uiScale === 100) {
+    document.documentElement.style.removeProperty("zoom");
+    delete document.documentElement.dataset.uiScale;
+  } else {
+    const z = prefs.uiScale / 100;
+    document.documentElement.style.zoom = String(z);
+    document.documentElement.dataset.uiScale = String(prefs.uiScale);
+  }
 
   if (prefs.radius === "default") {
     delete document.documentElement.dataset.uiRadius;

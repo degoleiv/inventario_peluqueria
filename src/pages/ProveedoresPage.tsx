@@ -148,6 +148,15 @@ function ProveedorDetailAvatarPicker({
           <Camera size={28} weight="fill" className="prov-detail-avatar-op__icon" />
         </span>
       </button>
+      {showImg && !disabled ? (
+        <button
+          type="button"
+          className="btn ghost small prov-detail-avatar-quitar"
+          onClick={() => onChangeIcono("")}
+        >
+          Quitar imagen
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -516,9 +525,6 @@ export function ProveedoresPage() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="prov-detail-title"
-          onClick={() => {
-            if (!detailSaveBusy) void requestCloseDetail();
-          }}
         >
           <div
             ref={detailPanelRef}
@@ -688,7 +694,6 @@ export function ProveedoresPage() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="prov-form-title"
-          onClick={() => !busy && setModalOpen(false)}
         >
           <div
             className="card drawer-overlay-card prov-detail-panel"
@@ -817,7 +822,6 @@ export function ProveedoresPage() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="prov-delete-title"
-          onClick={() => !deleteBusy && setDeleteTarget(null)}
         >
           <div className="card drawer-overlay-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420 }}>
             <h3 id="prov-delete-title" className="card-title">

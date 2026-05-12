@@ -84,7 +84,7 @@ export function CommandPalette({
 
   return (
     <div className="palette-root" role="dialog" aria-modal="true" aria-label="Paleta de comandos">
-      <button type="button" className="palette-backdrop" onClick={onClose} aria-label="Cerrar" />
+      <div className="palette-backdrop" aria-hidden="true" />
       <div className="palette-panel">
         <div className="palette-head">{title}</div>
         <input

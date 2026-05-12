@@ -429,10 +429,10 @@ export function CitasPage() {
   useEffect(() => {
     void fetchAuthMe()
       .then((me) => setMiUsuarioId(me.user.id))
-      .catch(() => {});
+      .catch((e: unknown) => { console.warn("[citas] fetchAuthMe falló:", e); });
     void fetchEquipo()
       .then(setEquipo)
-      .catch(() => {});
+      .catch((e: unknown) => { console.warn("[citas] fetchEquipo falló:", e); });
   }, []);
 
   useEffect(() => {
@@ -442,7 +442,7 @@ export function CitasPage() {
         const e = parseHmToMin(floatNegocioAHm(cfg.close));
         setNegocioDiaMin({ s: Math.min(s, e), e: Math.max(s, e) });
       })
-      .catch(() => {});
+      .catch((e: unknown) => { console.warn("[citas] fetchCitasConfigAgenda falló:", e); });
   }, []);
 
   useEffect(() => {
@@ -509,11 +509,13 @@ export function CitasPage() {
       });
       setCitas(c);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
+      const msg = e instanceof Error ? e.message : "Error al cargar citas";
+      setError(msg);
+      toast(msg, "error");
     } finally {
       setLoading(false);
     }
-  }, [filtroListaDesde, filtroListaHasta, filtroListaEmpleado]);
+  }, [filtroListaDesde, filtroListaHasta, filtroListaEmpleado, toast]);
 
   useEffect(() => {
     void load();
@@ -677,12 +679,14 @@ export function CitasPage() {
         page_size: 200,
       });
       setServiciosCatalogo(res.items ?? []);
-    } catch {
+    } catch (e) {
+      console.warn("[citas] No se pudo cargar catálogo de servicios:", e);
+      toast("No se pudo cargar el catálogo de servicios. Podés escribir el nombre manualmente.", "warning");
       setServiciosCatalogo([]);
     } finally {
       setServiciosCatalogoLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     if (!drawerOpen) return;
@@ -714,8 +718,12 @@ export function CitasPage() {
       try {
         const rows = await fetchClientes();
         if (!cancelled) setClientesPickList(rows);
-      } catch {
-        if (!cancelled) setClientesPickList([]);
+      } catch (e) {
+        console.warn("[citas] No se pudo cargar la lista de clientes:", e);
+        if (!cancelled) {
+          toast("No se pudo cargar la lista de clientes. Revisá la conexión con el servidor.", "error");
+          setClientesPickList([]);
+        }
       } finally {
         if (!cancelled) setClientesPickLoading(false);
       }
@@ -723,7 +731,7 @@ export function CitasPage() {
     return () => {
       cancelled = true;
     };
-  }, [drawerOpen]);
+  }, [drawerOpen, toast]);
 
   useEffect(() => {
     if (!drawerOpen) return;
@@ -864,8 +872,10 @@ export function CitasPage() {
         );
         return;
       }
-    } catch {
-      setError("No se pudo comprobar si el horario está libre. Intentá de nuevo.");
+    } catch (e) {
+      const msg = "No se pudo comprobar si el horario está libre. Intentá de nuevo.";
+      setError(msg);
+      toast(msg, "warning");
       return;
     }
     const inicioIso = inicioDate.toISOString();
@@ -918,7 +928,9 @@ export function CitasPage() {
       setDrawerOpen(false);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al guardar");
+      const msg = err instanceof Error ? err.message : "Error al guardar la cita";
+      setError(msg);
+      toast(msg, "error");
     }
   }
 
@@ -1800,11 +1812,9 @@ export function CitasPage() {
           aria-modal="true"
           aria-labelledby="citas-descanso-modal-title"
         >
-          <button
-            type="button"
+          <div
             className="citas-descanso-modal-backdrop"
-            onClick={() => !creandoDiaDescanso && setModalDescansoDia(null)}
-            aria-label="Cerrar"
+            aria-hidden="true"
           />
           <div className="citas-descanso-modal-panel">
             <h2 id="citas-descanso-modal-title" className="citas-descanso-modal-title">
@@ -1852,12 +1862,7 @@ export function CitasPage() {
           aria-modal="true"
           aria-labelledby="agenda-hours-modal-title"
         >
-          <button
-            type="button"
-            className="agenda-hours-modal-backdrop"
-            onClick={cerrarModalHoras}
-            aria-label="Cerrar panel de horas"
-          />
+          <div className="agenda-hours-modal-backdrop" aria-hidden="true" />
           <div
             className={`agenda-hours-modal-row ${drawerOpen ? "agenda-hours-modal-row--split" : ""}`}
           >

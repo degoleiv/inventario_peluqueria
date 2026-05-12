@@ -286,7 +286,8 @@ export function FinanzasPage() {
         const me = await fetchAuthMe();
         if (cancel) return;
         setIsAdmin(!!me.user.permisos?.includes("*"));
-      } catch {
+      } catch (e) {
+        console.warn("[finanzas] No se pudo verificar permisos de admin:", e);
         if (!cancel) setIsAdmin(false);
       }
     })();
@@ -967,7 +968,6 @@ export function FinanzasPage() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="fin-cal-day-title"
-          onClick={() => setDiaDetalleIso(null)}
         >
           <div
             className="card drawer-overlay-card fin-cal-day-modal"

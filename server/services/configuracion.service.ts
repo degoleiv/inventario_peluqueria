@@ -1,5 +1,14 @@
 import { db } from "../db.js";
 import { AppError } from "../lib/AppError.js";
+import {
+  isOurMediaUrl,
+  saveDataUrlToDisk,
+  saveImageDataUrl,
+  unlinkMediaPublicPath,
+} from "../lib/mediaStore.js";
+
+const BRANDING_IMAGE_MAX_BYTES = 25 * 1024 * 1024;
+const CERT_FIRMA_MAX_BYTES = 25 * 1024 * 1024;
 
 const CLAVES = {
   puntos_activo: "puntos_activo",
@@ -104,16 +113,25 @@ export const configuracionService = {
       await setValor("brand_nombre_negocio", body.nombre_negocio.trim().slice(0, 120));
     }
     if (body.logo_data_url === null) {
+      const prev = await getValor("brand_logo_data_url");
+      await unlinkMediaPublicPath(prev ?? undefined);
       await setValor("brand_logo_data_url", "");
     } else if (typeof body.logo_data_url === "string") {
       const raw = body.logo_data_url.trim();
-      if (raw.length > 450_000) {
-        throw new AppError("Logo demasiado grande (máx. ~300KB en base64)");
+      const prev = await getValor("brand_logo_data_url");
+      if (!raw) {
+        await unlinkMediaPublicPath(prev ?? undefined);
+        await setValor("brand_logo_data_url", "");
+      } else if (isOurMediaUrl(raw) || raw.startsWith("http://") || raw.startsWith("https://")) {
+        if (prev && prev !== raw && isOurMediaUrl(prev)) await unlinkMediaPublicPath(prev);
+        await setValor("brand_logo_data_url", raw.slice(0, 4000));
+      } else if (raw.startsWith("data:image/")) {
+        const saved = await saveImageDataUrl(raw, "branding", BRANDING_IMAGE_MAX_BYTES);
+        if (prev && prev !== saved && isOurMediaUrl(prev)) await unlinkMediaPublicPath(prev);
+        await setValor("brand_logo_data_url", saved);
+      } else {
+        throw new AppError("Logo: imagen base64 (data:image/…), URL http(s) o ruta /api/media/…");
       }
-      if (raw && !raw.startsWith("data:image/")) {
-        throw new AppError("Logo: usar imagen en base64 data:image/…");
-      }
-      await setValor("brand_logo_data_url", raw);
     }
     if (typeof body.color_primario === "string") {
       await setValor("brand_color_primario", hexOrThrow(body.color_primario, "color_primario"));
@@ -149,16 +167,29 @@ export const configuracionService = {
 
   async updateCertificadoLaboral(body: Record<string, unknown>) {
     if (body.firma_data_url === null) {
+      const prev = await getValor("cert_laboral_firma_data_url");
+      await unlinkMediaPublicPath(prev ?? undefined);
       await setValor("cert_laboral_firma_data_url", "");
     } else if (typeof body.firma_data_url === "string") {
       const raw = body.firma_data_url.trim();
-      if (raw.length > 450_000) {
-        throw new AppError("Firma demasiado grande (máx. ~300KB en base64)");
+      const prev = await getValor("cert_laboral_firma_data_url");
+      if (!raw) {
+        await unlinkMediaPublicPath(prev ?? undefined);
+        await setValor("cert_laboral_firma_data_url", "");
+      } else if (isOurMediaUrl(raw) || raw.startsWith("http://") || raw.startsWith("https://")) {
+        if (prev && prev !== raw && isOurMediaUrl(prev)) await unlinkMediaPublicPath(prev);
+        await setValor("cert_laboral_firma_data_url", raw.slice(0, 4000));
+      } else if (raw.startsWith("data:image/")) {
+        const saved = await saveDataUrlToDisk(raw, {
+          scope: "cert",
+          maxBytes: CERT_FIRMA_MAX_BYTES,
+          allowedMime: new Set(["image/png", "image/jpeg", "image/jpg"]),
+        });
+        if (prev && prev !== saved && isOurMediaUrl(prev)) await unlinkMediaPublicPath(prev);
+        await setValor("cert_laboral_firma_data_url", saved);
+      } else {
+        throw new AppError("Firma: PNG/JPEG en base64, URL o /api/media/…");
       }
-      if (raw && !raw.startsWith("data:image/")) {
-        throw new AppError("Firma: usar imagen PNG o JPEG en base64 (data:image/…)");
-      }
-      await setValor("cert_laboral_firma_data_url", raw);
     }
     if (typeof body.nombre_quien_expide === "string") {
       await setValor("cert_laboral_nombre_expide", body.nombre_quien_expide.trim().slice(0, 120));

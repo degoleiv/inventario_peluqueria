@@ -1083,7 +1083,7 @@ body.theme-slate .drawer-overlay {
   justify-content: center;
   padding: var(--space-4);
   background: rgba(0, 0, 0, 0.48);
-  cursor: pointer;
+  cursor: default;
   animation: clay-dialog-backdrop-in 0.2s ease;
 }
 

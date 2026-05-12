@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { WorkspaceTabsBar } from "../components/WorkspaceTabsBar";
 import {
   NAV_GROUPS,
   NAV_LABEL,
@@ -329,6 +330,7 @@ export function AppLayout({
               <h1 className="main-pro-title">{pageTitle}</h1>
             </header>
           ) : null}
+          <WorkspaceTabsBar />
           <div className="main-pro-content">{children}</div>
         </main>
       </div>

@@ -1,6 +1,7 @@
 /**
- * Preferencias UI locales: radios, densidad, relieve clay suave.
+ * Preferencias UI locales: radios, densidad, escala de pantalla, relieve clay suave.
  * Controlado desde `document.documentElement.dataset` y clases en `body`.
+ * La escala menor a 100 % aplica `zoom` en el elemento raíz del documento (ver `applyUiPreferencesToDocument`).
  */
 
 :root[data-ui-radius="soft"] {
@@ -610,7 +611,7 @@ body.ui-density-compact .field {
   margin: 0;
   padding: 0;
   background: color-mix(in srgb, var(--text) 36%, transparent);
-  cursor: pointer;
+  cursor: default;
 }
 
 .cat-nueva-modal-shell {

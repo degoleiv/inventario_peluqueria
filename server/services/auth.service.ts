@@ -60,7 +60,7 @@ export async function bootstrapFirstAdmin(email: string, password: string, nombr
 
 export function verifyAccessToken(token: string): JwtUser {
   try {
-    const p = jwt.verify(token, getJwtSecret()) as JwtUser & { sub: number };
+    const p = jwt.verify(token, getJwtSecret()) as unknown as JwtUser & { sub: number };
     return { sub: p.sub, email: p.email, rol: p.rol };
   } catch {
     throw new AppError("Token inválido o expirado", 401);

@@ -36,6 +36,7 @@ function labelFuenteLookup(fuente: string) {
   if (fuente === "cache") return "Datos desde caché (consulta previa)";
   if (fuente === "openfoodfacts") return "Datos desde Open Food Facts";
   if (fuente === "openbeautyfacts") return "Datos desde Open Beauty Facts (cosmética / peluquería)";
+  if (fuente === "upcitemdb") return "Datos desde UPCitemdb (catálogo comercial, trial gratuito)";
   if (fuente === "ean_search") return "Datos desde EAN-Search.org (token)";
   return "Datos externos";
 }
@@ -73,6 +74,8 @@ export function InventarioPage() {
   const [filtroBusqueda, setFiltroBusqueda] = useState("");
   const [filtroEstado, setFiltroEstado] = useState<"todos" | "activo" | "inactivo">("todos");
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; p: Producto } | null>(null);
+  /** Si no es null, el drawer de creación está rellenado desde este producto (flujo “Duplicar”). */
+  const [duplicateDraftSource, setDuplicateDraftSource] = useState<Producto | null>(null);
   const formDrawerRef = useRef<HTMLFormElement>(null);
   const codigoRef = useRef(codigo);
   const inventarioCatalogoRef = useRef(inventarioCatalogo);
@@ -140,11 +143,13 @@ export function InventarioPage() {
       const rows = await fetchProductos();
       setProductos(rows);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al cargar productos");
+      const msg = e instanceof Error ? e.message : "Error al cargar productos";
+      setError(msg);
+      toast(msg, "error");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     void load();
@@ -212,6 +217,7 @@ export function InventarioPage() {
     setLookupHint(null);
     setEditingId(null);
     setCreatingNew(false);
+    setDuplicateDraftSource(null);
   }
 
   const drawerOpen = editingId !== null || creatingNew;
@@ -310,6 +316,7 @@ export function InventarioPage() {
 
   function onEditar(p: Producto) {
     setViewingProduct(null);
+    setDuplicateDraftSource(null);
     setCreatingNew(false);
     setEditingId(p.id);
     setCodigo(p.codigo_barras ?? "");
@@ -331,35 +338,38 @@ export function InventarioPage() {
     setLookupHint(null);
   }
 
-  async function duplicarProducto(p: Producto) {
-    setError(null);
-    if (p.proveedor_id == null || !Number.isFinite(Number(p.proveedor_id)) || Number(p.proveedor_id) <= 0) {
-      toast(
-        "Este producto no tiene proveedor (marca) asignado. Editá el original, elegí un proveedor activo y volvé a duplicar.",
-        "warning"
-      );
-      return;
-    }
-    try {
-      await createProducto({
-        codigo_barras: null,
-        nombre: `${p.nombre} (copia)`,
-        marca: p.marca,
-        categoria: p.categoria,
-        proveedor_id: p.proveedor_id!,
-        descripcion: p.descripcion,
-        imagen_url: p.imagen_url,
-        stock: 0,
-        precio_compra: p.precio_compra,
-        precio_venta: p.precio_venta ?? p.precio,
-        stock_minimo: p.stock_minimo,
-        fecha_vencimiento: p.fecha_vencimiento,
-      });
-      toast("Producto duplicado", "success");
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al duplicar");
-      toast(err instanceof Error ? err.message : "Error", "error");
+  function abrirDuplicarProducto(p: Producto) {
+    setViewingProduct(null);
+    setCtxMenu(null);
+    setDuplicateDraftSource(p);
+    setEditingId(null);
+    setCreatingNew(true);
+    setCodigo("");
+    const baseNombre = p.nombre.trim();
+    setNombre(baseNombre ? `${baseNombre} (copia)` : "(copia)");
+    setMarca(p.marca ?? "");
+    setCategoria(p.categoria ?? "");
+    setProveedorId(
+      p.proveedor_id != null && Number.isFinite(Number(p.proveedor_id)) && Number(p.proveedor_id) > 0
+        ? Number(p.proveedor_id)
+        : ""
+    );
+    setDescripcion(p.descripcion ?? "");
+    setImagenUrl(p.imagen_url ?? "");
+    setStock(0);
+    setPrecioCompra(p.precio_compra ?? "");
+    setPrecioVenta(p.precio_venta ?? p.precio ?? "");
+    setStockMinimo(p.stock_minimo ?? "");
+    setFechaVencimiento(p.fecha_vencimiento?.slice(0, 10) ?? "");
+    setLookupHint(
+      "Copiado del producto original: revisá el nombre y el código de barras; categoría, proveedor y precios podés mantenerlos o ajustarlos."
+    );
+    if (
+      p.proveedor_id == null ||
+      !Number.isFinite(Number(p.proveedor_id)) ||
+      Number(p.proveedor_id) <= 0
+    ) {
+      toast("Este producto no tenía proveedor (marca) asignado: elegí uno en el formulario antes de guardar.", "info");
     }
   }
 
@@ -435,7 +445,7 @@ export function InventarioPage() {
     return [
       { label: "Visualizar", onSelect: () => onVisualizar(p) },
       { label: "Editar", onSelect: () => onEditar(p) },
-      { label: "Duplicar", onSelect: () => void duplicarProducto(p) },
+      { label: "Duplicar…", onSelect: () => abrirDuplicarProducto(p) },
       {
         label: "Eliminar",
         danger: true,
@@ -512,7 +522,9 @@ export function InventarioPage() {
       <Drawer
         open={drawerOpen}
         onClose={cerrarDrawer}
-        title={editingId ? "Editar producto" : "Nuevo producto"}
+        title={
+          editingId != null ? "Editar producto" : duplicateDraftSource ? "Duplicar producto" : "Nuevo producto"
+        }
         wide
       >
         <form
@@ -521,6 +533,12 @@ export function InventarioPage() {
           className="form drawer-form"
           onSubmit={onGuardar}
         >
+          {duplicateDraftSource ? (
+            <p className="muted small" style={{ margin: "0 0 0.75rem" }}>
+              Copia basada en <strong>{duplicateDraftSource.nombre}</strong>. El código de barras quedó vacío para
+              evitar duplicados; el stock inicia en 0.
+            </p>
+          ) : null}
           <ProductoCatalogoForm
             values={catalogoValues}
             onChange={patchCatalogo}
@@ -574,7 +592,7 @@ export function InventarioPage() {
 
           <div className="drawer-actions">
             <button type="submit" className="btn primary btn-lg">
-              {editingId ? "Guardar" : "Añadir al inventario"}
+              {editingId != null ? "Guardar" : duplicateDraftSource ? "Crear producto" : "Añadir al inventario"}
             </button>
             <button type="button" className="btn ghost" onClick={cerrarDrawer}>
               Cancelar
@@ -677,7 +695,7 @@ export function InventarioPage() {
                 }
                 role="listitem"
                 tabIndex={0}
-                title="Clic: visualizar · Clic derecho: menú"
+                title="Clic: visualizar · Clic derecho: menú (duplicar, editar…)"
                 onClick={() => onVisualizar(p)}
                 onContextMenu={(e) => {
                   e.preventDefault();
@@ -871,6 +889,13 @@ export function InventarioPage() {
             </dl>
 
               <div className="drawer-actions">
+              <button
+                type="button"
+                className="btn secondary"
+                onClick={() => abrirDuplicarProducto(viewingProduct)}
+              >
+                Duplicar…
+              </button>
               <button
                 type="button"
                 className="btn primary"

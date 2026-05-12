@@ -187,6 +187,7 @@ export function EmpleadosPage({ onChanged }: Props) {
   /** Feedback UI mientras el API genera el PDF del certificado. */
   const [certBusy, setCertBusy] = useState<{ id: number } | null>(null);
   const certLockRef = useRef(false);
+  const fotoFileInputRef = useRef<HTMLInputElement>(null);
 
   const [rolDrawerOpen, setRolDrawerOpen] = useState(false);
   const [rolSaving, setRolSaving] = useState(false);
@@ -1624,12 +1625,25 @@ export function EmpleadosPage({ onChanged }: Props) {
           </label>
           <label className="field">
             <span>Foto (archivo)</span>
-            <input type="file" accept="image/*" onChange={onFotoFile} />
+            <input ref={fotoFileInputRef} type="file" accept="image/*" onChange={onFotoFile} />
           </label>
           {form.foto_url ? (
-            <p className="muted small">
-              Foto cargada ({form.foto_url.length > 80 ? "data:image…" : form.foto_url})
-            </p>
+            <div className="empleado-foto-cargada">
+              <p className="muted small" style={{ margin: "0.25rem 0 0" }}>
+                Foto cargada ({form.foto_url.length > 80 ? "data:image…" : form.foto_url})
+              </p>
+              <button
+                type="button"
+                className="btn ghost small"
+                style={{ marginTop: "0.35rem" }}
+                onClick={() => {
+                  setForm((x) => ({ ...x, foto_url: "" }));
+                  if (fotoFileInputRef.current) fotoFileInputRef.current.value = "";
+                }}
+              >
+                Quitar foto
+              </button>
+            </div>
           ) : null}
           {editing ? (
             <div className="field empleado-edit-activo-row">

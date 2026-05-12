@@ -15,6 +15,7 @@ import {
   type UiDensity,
   type UiPreferences,
   type UiRadius,
+  type UiScale,
 } from "../lib/uiPreferences";
 
 export type ThemeUiContextValue = {
@@ -22,6 +23,7 @@ export type ThemeUiContextValue = {
   setPrefs: (next: UiPreferences) => void;
   setPreset: (preset: ColorThemeId) => void;
   setDensity: (d: UiDensity) => void;
+  setUiScale: (s: UiScale) => void;
   setRadius: (r: UiRadius) => void;
   setClayStyle: (c: UiClayStyle) => void;
   setCustomPrimary: (hex: string | null) => void;
@@ -38,6 +40,7 @@ let cachedClientPrefsKey = JSON.stringify(cachedClientPrefs);
 const SERVER_PREFS_SNAPSHOT: UiPreferences = {
   preset: "default",
   density: "comfortable",
+  uiScale: 100,
   radius: "default",
   clayStyle: "full",
   customPrimary: null,
@@ -98,6 +101,13 @@ export function ThemeUiProvider({ children }: { children: React.ReactNode }) {
     [setPrefs]
   );
 
+  const setUiScale = useCallback(
+    (uiScale: UiScale) => {
+      setPrefs({ ...readUiPreferences(), uiScale });
+    },
+    [setPrefs]
+  );
+
   const setRadius = useCallback(
     (radius: UiRadius) => {
       setPrefs({ ...readUiPreferences(), radius });
@@ -138,6 +148,7 @@ export function ThemeUiProvider({ children }: { children: React.ReactNode }) {
         setPrefs,
         setPreset,
         setDensity,
+        setUiScale,
         setRadius,
         setClayStyle,
         setCustomPrimary,
@@ -149,6 +160,7 @@ export function ThemeUiProvider({ children }: { children: React.ReactNode }) {
       setPrefs,
       setPreset,
       setDensity,
+      setUiScale,
       setRadius,
       setClayStyle,
       setCustomPrimary,

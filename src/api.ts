@@ -168,6 +168,7 @@ async function requestJson<T>(
   init?: RequestInit,
   withAuth = true
 ): Promise<T> {
+  const method = (init?.method ?? "GET").toUpperCase();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(init?.headers as Record<string, string>),
@@ -176,10 +177,13 @@ async function requestJson<T>(
     const token = getAccessToken();
     if (token) headers.Authorization = `Bearer ${token}`;
   }
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, { ...init, headers });
+  } catch (e) {
+    console.error(`[api] ${method} ${path} — error de red:`, e);
+    throw e;
+  }
   if (!res.ok) {
     const text = await res.text();
     let msg = res.statusText;
@@ -189,10 +193,31 @@ async function requestJson<T>(
     } catch {
       if (text.trim()) msg = text;
     }
+    console.warn(`[api] ${method} ${path} → ${res.status} ${msg}`);
     throw new Error(msg);
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
+}
+
+/* Health */
+export type HealthStatus = {
+  status: "ok" | "degraded";
+  timestamp: string;
+  uptime_s: number;
+  response_ms: number;
+  checks: {
+    database: {
+      status: "ok" | "error";
+      ping_ms: number;
+      error?: string;
+      counts?: Record<string, number>;
+    };
+  };
+};
+
+export async function fetchHealth(): Promise<HealthStatus> {
+  return requestJson("/api/health", undefined, false);
 }
 
 /* Auth (sin JWT previo) */

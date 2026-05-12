@@ -9,7 +9,7 @@ const PORT = Number(process.env.INVENTARIO_API_PORT || 3010);
 
 const app = express();
 app.use(cors({ origin: true }));
-app.use(express.json({ limit: "5mb" }));
+app.use(express.json({ limit: "35mb" }));
 
 initDatabase()
   .then(() => {

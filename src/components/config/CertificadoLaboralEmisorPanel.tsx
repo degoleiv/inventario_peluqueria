@@ -14,8 +14,8 @@ function validarFirma(f: File): string | null {
   if (!mimeOk && !extOk) {
     return "Usá PNG o JPEG.";
   }
-  if (f.size > 320 * 1024) {
-    return "La imagen es demasiado grande (máximo ~300 KB).";
+  if (f.size > 25 * 1024 * 1024) {
+    return "La imagen es demasiado grande (máximo 25 MB). Se guarda en el servidor.";
   }
   return null;
 }

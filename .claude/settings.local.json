@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(npm install *)",
-      "Bash(npx playwright *)"
+      "Bash(npx playwright *)",
+      "Bash(Get-ChildItem -Recurse -Filter \"*logger*\" -ErrorAction SilentlyContinue)",
+      "Bash(findstr /S /R \"useToast\\\\|toast\\(\" src)"
     ]
   }
 }

@@ -21,6 +21,7 @@ import { ReportesPage } from "./pages/ReportesPage";
 import { ConfiguracionPage } from "./pages/ConfiguracionPage";
 import { EmpleadosPage } from "./pages/EmpleadosPage";
 import { AppLayout } from "./layout/AppLayout";
+import { WorkspaceTabsProvider, clearWorkspaceTabsStorage } from "./context/WorkspaceTabsContext";
 import {
   NAV_LABEL,
   puedeVerModulo,
@@ -102,8 +103,8 @@ export function AuthenticatedShell() {
         setBrandLogo(b.logo_data_url);
         applyBrandingToDocument(b);
       })
-      .catch(() => {
-        /* offline / sin permiso */
+      .catch((e: unknown) => {
+        console.warn("[shell] fetchBranding no disponible (offline / sin permiso):", e);
       });
     return () => {
       cancel = true;
@@ -121,7 +122,8 @@ export function AuthenticatedShell() {
           const f = me.user.foto_url?.trim();
           setUserFotoUrl(f && f.length > 0 ? f : null);
         }
-      } catch {
+      } catch (e) {
+        console.warn("[shell] fetchAuthMe falló:", e);
         if (!cancel) {
           setUserEmail(null);
           setPermisos([]);
@@ -131,7 +133,8 @@ export function AuthenticatedShell() {
       try {
         await fetchSyncEstado();
         if (!cancel) setOnline(true);
-      } catch {
+      } catch (e) {
+        console.warn("[shell] fetchSyncEstado falló (modo offline):", e);
         if (!cancel) setOnline(false);
       }
     })();
@@ -151,7 +154,8 @@ export function AuthenticatedShell() {
       .then((list) => {
         if (!cancel) setPaletteClientes(list);
       })
-      .catch(() => {
+      .catch((e: unknown) => {
+        console.warn("[shell] fetchClientes para palette falló:", e);
         if (!cancel) setPaletteClientes([]);
       });
     return () => {
@@ -279,36 +283,39 @@ export function AuthenticatedShell() {
 
   return (
     <>
-      <AppLayout
-        nav={nav}
-        setNav={setNav}
-        theme={theme}
-        setTheme={setTheme}
-        collapsed={collapsed}
-        setCollapsed={setCollapsed}
-        userEmail={userEmail}
-        userFotoUrl={userFotoUrl}
-        permisos={permisos}
-        brandTitle={brandTitle}
-        brandLogoSrc={brandLogo}
-        fullscreenContent={customerDisplay}
-        online={online}
-        onLogout={() => {
-          clearAccessToken();
-          setPermisos([]);
-          window.location.reload();
-        }}
-        onCommandPalette={() => setPaletteOpen(true)}
-        onQuickSale={() => navigate(getModuleEntryPath("ventas"))}
-        onQuickCita={() => navigate(getModuleEntryPath("citas"))}
-        breadcrumb={[
-          { label: "Inicio", onClick: () => navigate("/inicio") },
-          { label: NAV_LABEL[nav] },
-        ]}
-        hideModuleHeader={nav === "ventas" || nav === "clientes"}
-      >
-        <Outlet />
-      </AppLayout>
+      <WorkspaceTabsProvider permisos={permisos}>
+        <AppLayout
+          nav={nav}
+          setNav={setNav}
+          theme={theme}
+          setTheme={setTheme}
+          collapsed={collapsed}
+          setCollapsed={setCollapsed}
+          userEmail={userEmail}
+          userFotoUrl={userFotoUrl}
+          permisos={permisos}
+          brandTitle={brandTitle}
+          brandLogoSrc={brandLogo}
+          fullscreenContent={customerDisplay}
+          online={online}
+          onLogout={() => {
+            clearWorkspaceTabsStorage();
+            clearAccessToken();
+            setPermisos([]);
+            window.location.reload();
+          }}
+          onCommandPalette={() => setPaletteOpen(true)}
+          onQuickSale={() => navigate(getModuleEntryPath("ventas"))}
+          onQuickCita={() => navigate(getModuleEntryPath("citas"))}
+          breadcrumb={[
+            { label: "Inicio", onClick: () => navigate("/inicio") },
+            { label: NAV_LABEL[nav] },
+          ]}
+          hideModuleHeader={nav === "ventas" || nav === "clientes"}
+        >
+          <Outlet />
+        </AppLayout>
+      </WorkspaceTabsProvider>
       <CommandPalette
         open={paletteOpen}
         onClose={() => setPaletteOpen(false)}

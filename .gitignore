@@ -42,6 +42,11 @@ coverage/
 *.sqlite3
 *.db
 
+# Carpeta de datos persistentes del servidor (base de datos de producción)
+server/data/
+# Ubicación antigua (dev monorepo) antes de unificar en server/data/
+/data/
+
 # Rust / Tauri (compilados; src-tauri también tiene su .gitignore)
 **/target/
 

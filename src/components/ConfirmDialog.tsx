@@ -14,7 +14,7 @@ type Props = {
 };
 
 /**
- * Diálogo modal accesible (backdrop, Escape, aria-modal).
+ * Diálogo modal accesible (fondo visual sin cerrar al clic; Escape y botones cancelar).
  * z-index por encima del drawer (100) para confirmar acciones destructivas.
  */
 export function ConfirmDialog({
@@ -41,7 +41,7 @@ export function ConfirmDialog({
 
   return (
     <div className="confirm-dialog-root" role="dialog" aria-modal="true" aria-labelledby="confirm-dialog-title">
-      <button type="button" className="confirm-dialog-backdrop" onClick={() => !busy && onCancel()} aria-hidden />
+      <div className="confirm-dialog-backdrop" aria-hidden="true" />
       <div className="confirm-dialog-panel card-pro" onClick={(e) => e.stopPropagation()}>
         <h2 id="confirm-dialog-title" className="card-pro-title confirm-dialog-title">
           {title}

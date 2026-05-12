@@ -60,8 +60,12 @@ export function ReportesPage() {
   const [kpis, setKpis] = useState<Record<string, unknown> | null>(null);
 
   const loadDash = useCallback(async () => {
-    setDash(await fetchDashboard());
-  }, []);
+    try {
+      setDash(await fetchDashboard());
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Error al cargar el resumen del negocio", "error");
+    }
+  }, [toast]);
 
   useEffect(() => {
     let cancel = false;

@@ -1750,9 +1750,6 @@ export function VentasPage() {
               role="dialog"
               aria-modal="true"
               aria-labelledby="pos-nueva-cita-title"
-              onMouseDown={(e) => {
-                if (e.target === e.currentTarget) cerrarNuevaCita();
-              }}
             >
               <div className="pos-nueva-cita-modal pos-exempt-focus">
                 <header className="pos-nueva-cita-head">

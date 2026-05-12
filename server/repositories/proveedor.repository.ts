@@ -82,18 +82,6 @@ export const proveedorRepository = {
       .get(id)) as ProveedorRow | undefined;
   },
 
-  async findByNitNormalized(nit: string, excludeId?: number): Promise<{ id: number } | undefined> {
-    const n = nit.trim().toLowerCase();
-    if (excludeId != null) {
-      return (await db
-        .prepare(`SELECT id FROM proveedores WHERE lower(trim(nit)) = ? AND id != ?`)
-        .get(n, excludeId)) as { id: number } | undefined;
-    }
-    return (await db.prepare(`SELECT id FROM proveedores WHERE lower(trim(nit)) = ?`).get(n)) as
-      | { id: number }
-      | undefined;
-  },
-
   async insert(row: {
     nombre: string;
     nit: string;

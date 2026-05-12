@@ -7,7 +7,7 @@ function faviconTypeFromDataUrl(dataUrl: string): string {
   return m?.[1] ?? "image/png";
 }
 
-/** Actualiza favicon del documento (data URL del logo o icono por defecto). */
+/** Actualiza favicon del documento (data URL, URL del API `/api/media/…` o icono por defecto). */
 export function setDocumentFavicon(logoDataUrl: string | null | undefined): void {
   let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
   if (!link) {
@@ -18,6 +18,22 @@ export function setDocumentFavicon(logoDataUrl: string | null | undefined): void
   if (logoDataUrl && logoDataUrl.startsWith("data:image")) {
     link.href = logoDataUrl;
     link.setAttribute("type", faviconTypeFromDataUrl(logoDataUrl));
+  } else if (logoDataUrl && logoDataUrl.startsWith("/api/media/")) {
+    link.href = logoDataUrl;
+    const ext = logoDataUrl.split(".").pop()?.toLowerCase();
+    const t =
+      ext === "svg"
+        ? "image/svg+xml"
+        : ext === "png"
+          ? "image/png"
+          : ext === "jpg" || ext === "jpeg"
+            ? "image/jpeg"
+            : ext === "webp"
+              ? "image/webp"
+              : ext === "gif"
+                ? "image/gif"
+                : "image/png";
+    link.setAttribute("type", t);
   } else {
     link.href = DEFAULT_FAVICON_HREF;
     link.setAttribute("type", "image/svg+xml");

@@ -22,11 +22,12 @@ import { CONFIG_TABS, readConfigTab, type ConfigTab } from "../lib/moduleRoutes"
 import { useToast } from "../context/ToastContext";
 import { useThemeUi } from "../context/ThemeUiContext";
 import { THEME_CATALOG } from "../lib/themeCatalog";
+import type { UiScale } from "../lib/uiPreferences";
 
 export function ConfiguracionPage() {
   const { tab: tabParam } = useParams<{ tab: string }>();
   const toast = useToast();
-  const { prefs: uiPrefs, setPreset, setDensity, setRadius, setClayStyle } = useThemeUi();
+  const { prefs: uiPrefs, setPreset, setDensity, setUiScale, setRadius, setClayStyle } = useThemeUi();
 
   const [branding, setBranding] = useState<BrandingConfig | null>(null);
   const [sistema, setSistema] = useState<SistemaPrefs | null>(null);
@@ -131,8 +132,8 @@ export function ConfiguracionPage() {
     if (!mimeOk && !extOk) {
       return "Formato no permitido. Usá PNG, JPG o SVG.";
     }
-    if (f.size > 320 * 1024) {
-      return "El archivo es demasiado grande (máximo ~300 KB).";
+    if (f.size > 25 * 1024 * 1024) {
+      return "El archivo es demasiado grande (máximo 25 MB). El servidor lo guarda en disco.";
     }
     return null;
   }
@@ -243,7 +244,7 @@ export function ConfiguracionPage() {
             {!branding.logo_data_url ? (
               <>
                 <p className="muted small" style={{ margin: "0.25rem 0 0.5rem" }}>
-                  Sube un icono para tu aplicación (PNG, JPG o SVG, máx. ~300 KB).
+                  Sube un icono para tu aplicación (PNG, JPG o SVG; hasta 25 MB — se guarda en el equipo).
                 </p>
                 <input
                   ref={iconoInputRef}
@@ -278,7 +279,7 @@ export function ConfiguracionPage() {
             ) : (
               <>
                 <p className="muted small" style={{ margin: "0.25rem 0 0.5rem" }}>
-                  Elegí un archivo PNG, JPG o SVG (máx. ~300 KB).
+                  Elegí un archivo PNG, JPG o SVG (hasta 25 MB).
                 </p>
                 <input
                   ref={iconoInputRef}
@@ -287,7 +288,10 @@ export function ConfiguracionPage() {
                   onChange={onLogoFile}
                   aria-label="Reemplazar icono"
                 />
-                <div className="actions" style={{ marginTop: "0.5rem" }}>
+                <div className="actions" style={{ marginTop: "0.5rem", flexWrap: "wrap", gap: "0.5rem" }}>
+                  <button type="button" className="btn ghost small" onClick={() => void quitarIcono()}>
+                    Quitar icono
+                  </button>
                   <button type="button" className="btn ghost small" onClick={() => setIconoEditando(false)}>
                     Cancelar
                   </button>
@@ -300,7 +304,7 @@ export function ConfiguracionPage() {
             Interfaz
           </span>
           <p className="muted small" style={{ marginBottom: "0.75rem" }}>
-            Se aplica al elegir cada opción: paleta, densidad, bordes y relieve clay.
+            Se aplica al elegir cada opción: paleta, densidad, escala de pantalla, bordes y relieve clay.
           </p>
 
           <span className="config-section-label">Paleta</span>
@@ -347,6 +351,28 @@ export function ConfiguracionPage() {
                 <option value="comfortable">Cómoda</option>
                 <option value="compact">Compacta</option>
               </select>
+            </label>
+            <label className="field">
+              <span>Escala de pantalla</span>
+              <select
+                value={String(uiPrefs.uiScale)}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  const scale: UiScale = v === 92 || v === 85 || v === 78 ? v : 100;
+                  setUiScale(scale);
+                  scheduleToastInterfazLocal();
+                }}
+                aria-label="Escala de interfaz para pantallas pequeñas"
+              >
+                <option value="100">100 % — Normal</option>
+                <option value="92">92 % — Pantalla chica</option>
+                <option value="85">85 % — Tablet / netbook</option>
+                <option value="78">78 % — Muy compacta</option>
+              </select>
+              <span className="muted small" style={{ marginTop: "0.25rem" }}>
+                Reduce el tamaño visual de toda la app (útil en monitores o ventanas pequeñas). En algunos
+                navegadores puede no aplicarse igual.
+              </span>
             </label>
             <label className="field">
               <span>Forma de bordes</span>

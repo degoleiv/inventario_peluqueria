@@ -3,6 +3,8 @@ import { db } from "./db.js";
 const OFF_URL = "https://world.openfoodfacts.org/api/v2/product";
 const OBF_URL = "https://world.openbeautyfacts.org/api/v2/product";
 const EAN_SEARCH_API = "https://api.ean-search.org/api";
+/** Plan trial sin API key (~100 consultas/día). Belleza y categorías varias. */
+const UPCITEMDB_TRIAL = "https://api.upcitemdb.com/prod/trial/lookup";
 const LOOKUP_TIMEOUT_MS = Number(process.env.BARCODE_LOOKUP_TIMEOUT_MS) || 8000;
 const USER_AGENT =
   process.env.BARCODE_USER_AGENT?.trim() ||
@@ -15,7 +17,14 @@ export type ProductoNormalizado = {
   categoria: string | null;
   descripcion: string | null;
   imagen_url: string | null;
-  fuente: "inventario" | "cache" | "openfoodfacts" | "openbeautyfacts" | "ean_search" | "manual";
+  fuente:
+    | "inventario"
+    | "cache"
+    | "openfoodfacts"
+    | "openbeautyfacts"
+    | "upcitemdb"
+    | "ean_search"
+    | "manual";
 };
 
 function nowIso() {
@@ -109,6 +118,59 @@ function normalizeEanSearchPayload(
     imagen_url: null,
     fuente: "ean_search",
   };
+}
+
+/** UPCitemdb trial: sin registro; límite aprox. 100 req/día. Incluye Health & Beauty entre otras categorías. */
+async function fetchUpcitemdb(codigo: string): Promise<ProductoNormalizado | null> {
+  if (process.env.BARCODE_UPCITEMDB_DISABLED === "1") return null;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), LOOKUP_TIMEOUT_MS);
+  try {
+    const url = `${UPCITEMDB_TRIAL}?upc=${encodeURIComponent(codigo.trim())}`;
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        Accept: "application/json",
+        "User-Agent": USER_AGENT,
+      },
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as {
+      code?: string;
+      items?: Array<Record<string, unknown>>;
+    };
+    if (body.code !== "OK" || !Array.isArray(body.items) || body.items.length === 0) return null;
+    const it = body.items[0];
+    const title = typeof it.title === "string" ? it.title.trim() : "";
+    if (!title) return null;
+    const brand = typeof it.brand === "string" ? it.brand.trim() || null : null;
+    const cat = typeof it.category === "string" ? it.category.trim() || null : null;
+    const descRaw = typeof it.description === "string" ? it.description.trim() : "";
+    const descripcion = descRaw ? descRaw.slice(0, 2000) : null;
+    let imagen_url: string | null = null;
+    if (Array.isArray(it.images)) {
+      for (const img of it.images) {
+        if (typeof img === "string" && /^https?:\/\//i.test(img)) {
+          imagen_url = img;
+          break;
+        }
+      }
+    }
+
+    return {
+      codigo_barras: codigo.trim(),
+      nombre: title,
+      marca: brand,
+      categoria: cat,
+      descripcion,
+      imagen_url,
+      fuente: "upcitemdb",
+    };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function getCacheRow(codigo: string): Promise<ProductoNormalizado | null> {
@@ -237,16 +299,22 @@ export async function lookupBarcode(codigo: string): Promise<LookupResult> {
   const cached = await getCacheRow(trimmed);
   if (cached) return { ok: true, data: cached };
 
+  const fromObf = await fetchOpenBeautyFacts(trimmed);
+  if (fromObf) {
+    await saveCache(trimmed, fromObf);
+    return { ok: true, data: fromObf };
+  }
+
   const fromOff = await fetchOpenFoodFacts(trimmed);
   if (fromOff) {
     await saveCache(trimmed, fromOff);
     return { ok: true, data: fromOff };
   }
 
-  const fromObf = await fetchOpenBeautyFacts(trimmed);
-  if (fromObf) {
-    await saveCache(trimmed, fromObf);
-    return { ok: true, data: fromObf };
+  const fromUpc = await fetchUpcitemdb(trimmed);
+  if (fromUpc) {
+    await saveCache(trimmed, fromUpc);
+    return { ok: true, data: fromUpc };
   }
 
   const fromEan = await fetchEanSearchOrg(trimmed);

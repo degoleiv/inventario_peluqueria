@@ -1,4 +1,9 @@
 import { AppError } from "../lib/AppError.js";
+import {
+  isOurMediaUrl,
+  saveImageDataUrl,
+  unlinkMediaPublicPath,
+} from "../lib/mediaStore.js";
 import { proveedorRepository, type ProveedorRow } from "../repositories/proveedor.repository.js";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -89,17 +94,34 @@ function parseVendedorCelular(body: Record<string, unknown>): string | null {
   return t;
 }
 
-function parseIconoUrl(value: unknown): string | null {
-  if (value == null || value === "") return null;
+async function resolveIconoUrlForDb(value: unknown, previous: string | null): Promise<string | null> {
+  if (value == null || value === "") {
+    await unlinkMediaPublicPath(isOurMediaUrl(previous) ? previous : undefined);
+    return null;
+  }
   if (typeof value !== "string") throw new AppError("URL de icono inválida");
   const t = value.trim();
-  if (!t) return null;
-  if (t.length > 4000) throw new AppError("URL de icono demasiado larga");
-  const low = t.toLowerCase();
-  if (!low.startsWith("http://") && !low.startsWith("https://") && !low.startsWith("data:image/")) {
-    throw new AppError("El icono debe ser una URL (http/https) o una imagen data:image/…");
+  if (!t) {
+    await unlinkMediaPublicPath(isOurMediaUrl(previous) ? previous : undefined);
+    return null;
   }
-  return t;
+  const low = t.toLowerCase();
+  if (low.startsWith("/api/media/")) {
+    if (t.length > 500) throw new AppError("URL de icono inválida");
+    if (previous && previous !== t && isOurMediaUrl(previous)) await unlinkMediaPublicPath(previous);
+    return t;
+  }
+  if (low.startsWith("http://") || low.startsWith("https://")) {
+    if (t.length > 4000) throw new AppError("URL de icono demasiado larga");
+    if (previous && previous !== t && isOurMediaUrl(previous)) await unlinkMediaPublicPath(previous);
+    return t;
+  }
+  if (low.startsWith("data:image/")) {
+    const saved = await saveImageDataUrl(t, "proveedores", 15 * 1024 * 1024);
+    if (previous && previous !== saved && isOurMediaUrl(previous)) await unlinkMediaPublicPath(previous);
+    return saved;
+  }
+  throw new AppError("El icono debe ser URL (http/https), data:image/… o ruta /api/media/…");
 }
 
 function parseEstado(body: Record<string, unknown>, fallback: "activo" | "inactivo"): "activo" | "inactivo" {
@@ -114,11 +136,6 @@ function sqliteErrCode(e: unknown): string {
     return String((e as { code: unknown }).code);
   }
   return "";
-}
-
-function isUniqueConstraint(e: unknown): boolean {
-  const c = sqliteErrCode(e);
-  return c === "SQLITE_CONSTRAINT_UNIQUE" || c.includes("SQLITE_CONSTRAINT_UNIQUE");
 }
 
 function isAnyConstraint(e: unknown): boolean {
@@ -168,41 +185,30 @@ export const proveedoresService = {
     const email = parseEmail(body);
     const telefono = parseTelefono(body);
     const direccion = parseDireccion(body);
-    const icono_url = parseIconoUrl(body.icono_url);
+    const icono_url = await resolveIconoUrlForDb(body.icono_url ?? null, null);
     const vendedor_nombre = parseVendedorNombre(body);
     const vendedor_celular = parseVendedorCelular(body);
     const estado = parseEstado(body, "activo");
     const now = new Date().toISOString();
 
-    if (await proveedorRepository.findByNitNormalized(nit)) {
-      throw new AppError("Ya existe un proveedor con ese NIT", 409);
-    }
-
-    try {
-      const info = await proveedorRepository.insert({
-        nombre,
-        nit,
-        telefono,
-        email,
-        direccion,
-        icono_url,
-        vendedor_nombre,
-        vendedor_celular,
-        estado,
-        fecha_creacion: now,
-        fecha_actualizacion: now,
-        created_at: now,
-      });
-      const id = Number(info.lastInsertRowid);
-      const row = await proveedorRepository.findById(id);
-      if (!row) throw new AppError("Error al crear proveedor", 500);
-      return toDto(row);
-    } catch (e) {
-      if (isUniqueConstraint(e)) {
-        throw new AppError("Ya existe un proveedor con ese NIT", 409);
-      }
-      throw e;
-    }
+    const info = await proveedorRepository.insert({
+      nombre,
+      nit,
+      telefono,
+      email,
+      direccion,
+      icono_url,
+      vendedor_nombre,
+      vendedor_celular,
+      estado,
+      fecha_creacion: now,
+      fecha_actualizacion: now,
+      created_at: now,
+    });
+    const id = Number(info.lastInsertRowid);
+    const row = await proveedorRepository.findById(id);
+    if (!row) throw new AppError("Error al crear proveedor", 500);
+    return toDto(row);
   },
 
   async update(id: number, body: Record<string, unknown>): Promise<ProveedorDto> {
@@ -217,7 +223,9 @@ export const proveedoresService = {
     const telefono = body.telefono !== undefined ? parseTelefono(body) : cur.telefono;
     const direccion = body.direccion !== undefined ? parseDireccion(body) : cur.direccion;
     const icono_url =
-      body.icono_url !== undefined ? parseIconoUrl(body.icono_url) : (cur.icono_url ?? null);
+      body.icono_url !== undefined
+        ? await resolveIconoUrlForDb(body.icono_url, cur.icono_url ?? null)
+        : (cur.icono_url ?? null);
     const vendedor_nombre =
       body.vendedor_nombre !== undefined ? parseVendedorNombre(body) : (cur.vendedor_nombre ?? null);
     const vendedor_celular =
@@ -228,28 +236,18 @@ export const proveedoresService = {
     const estado = body.estado !== undefined ? parseEstado(body, estadoCur) : estadoCur;
     const now = new Date().toISOString();
 
-    const dup = await proveedorRepository.findByNitNormalized(nit, id);
-    if (dup) throw new AppError("Ya existe otro proveedor con ese NIT", 409);
-
-    try {
-      await proveedorRepository.update(id, {
-        nombre,
-        nit,
-        telefono,
-        email,
-        direccion,
-        icono_url,
-        vendedor_nombre,
-        vendedor_celular,
-        estado,
-        fecha_actualizacion: now,
-      });
-    } catch (e) {
-      if (isUniqueConstraint(e)) {
-        throw new AppError("Ya existe otro proveedor con ese NIT", 409);
-      }
-      throw e;
-    }
+    await proveedorRepository.update(id, {
+      nombre,
+      nit,
+      telefono,
+      email,
+      direccion,
+      icono_url,
+      vendedor_nombre,
+      vendedor_celular,
+      estado,
+      fecha_actualizacion: now,
+    });
 
     const row = await proveedorRepository.findById(id);
     if (!row) throw new AppError("Proveedor no encontrado", 404);

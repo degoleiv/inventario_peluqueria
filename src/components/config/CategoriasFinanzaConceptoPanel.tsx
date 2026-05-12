@@ -436,12 +436,7 @@ export function CategoriasFinanzaConceptoPanel() {
 
       {formNuevaVisible ? (
         <div className="cat-nueva-modal-root" role="dialog" aria-modal="true" aria-labelledby={idModalTitulo}>
-          <button
-            type="button"
-            className="cat-nueva-modal-backdrop"
-            onClick={() => !saving && cerrarFormNueva()}
-            aria-label="Cerrar ventana"
-          />
+          <div className="cat-nueva-modal-backdrop" aria-hidden="true" />
           <div className="cat-nueva-modal-shell" onClick={(e) => e.stopPropagation()}>
             <form className="cat-nueva-card cat-nueva-card--modal" onSubmit={onGuardar}>
               <h4 id={idModalTitulo} className="cat-nueva-card__title">

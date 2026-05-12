@@ -1,5 +1,6 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import { AppError } from "../lib/AppError.js";
+import { isOurMediaUrl, readMediaFileBuffer } from "../lib/mediaStore.js";
 import { usuariosRepo } from "../repositories/usuarios.js";
 import { configuracionService } from "./configuracion.service.js";
 
@@ -117,6 +118,30 @@ function parseDataUrlImage(dataUrl: string): { buffer: Uint8Array; kind: "png" |
   return null;
 }
 
+/** Logo o firma: data URL o archivo guardado bajo `/api/media/…` (solo PNG/JPEG en PDF). */
+async function loadImageForPdf(
+  src: string | null | undefined
+): Promise<{ buffer: Uint8Array; kind: "png" | "jpg" } | null> {
+  if (!src?.trim()) return null;
+  const trimmed = src.trim();
+  const lower = trimmed.toLowerCase();
+  if (lower.startsWith("data:image/")) {
+    return parseDataUrlImage(trimmed);
+  }
+  if (isOurMediaUrl(trimmed)) {
+    const buf = await readMediaFileBuffer(trimmed);
+    if (!buf || buf.length < 4) return null;
+    if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) {
+      return { buffer: new Uint8Array(buf), kind: "png" };
+    }
+    if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) {
+      return { buffer: new Uint8Array(buf), kind: "jpg" };
+    }
+    return null;
+  }
+  return null;
+}
+
 export const certificadoService = {
   async generarPdf(empleadoId: number, query: CertificadoQuery): Promise<Buffer> {
     const u = await usuariosRepo.findById(empleadoId);
@@ -156,18 +181,12 @@ export const certificadoService = {
     );
 
     const nombreExpide = textoPdf(certEmisor.nombre_quien_expide || "", 120);
-    const parsedFirma =
-      certEmisor.firma_data_url && certEmisor.firma_data_url.trim().startsWith("data:image")
-        ? parseDataUrlImage(certEmisor.firma_data_url)
-        : null;
+    const parsedFirma = await loadImageForPdf(certEmisor.firma_data_url);
 
     const fechaCertificado = formatearFecha(new Date().toISOString());
     const referencia = `CERT-${empleadoId}-${Date.now().toString(36).toUpperCase()}`;
 
-    const parsedLogo =
-      branding.logo_data_url && branding.logo_data_url.trim().startsWith("data:image")
-        ? parseDataUrlImage(branding.logo_data_url)
-        : null;
+    const parsedLogo = await loadImageForPdf(branding.logo_data_url);
 
     const pdfDoc = await PDFDocument.create();
     const page = pdfDoc.addPage([A4_W, A4_H]);

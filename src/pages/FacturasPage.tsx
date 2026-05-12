@@ -11,6 +11,7 @@ import {
   type SmtpPublicConfig,
 } from "../api";
 import { useToast } from "../context/ToastContext";
+import { PromptDialog } from "../components/PromptDialog";
 
 export function FacturasPage() {
   const toast = useToast();
@@ -28,6 +29,7 @@ export function FacturasPage() {
   const [smtpTestEmail, setSmtpTestEmail] = useState("");
   const [smtpSaving, setSmtpSaving] = useState(false);
   const [sendingId, setSendingId] = useState<number | null>(null);
+  const [enviarCorreoFactura, setEnviarCorreoFactura] = useState<FacturaElectronica | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -112,16 +114,18 @@ export function FacturasPage() {
     }
   }
 
-  async function enviarCorreo(f: FacturaElectronica) {
-    const hint = window.prompt(
-      "Email del destinatario (vacío = usar el email del cliente de la venta, si existe):",
-      ""
-    );
-    if (hint === null) return;
-    const email = hint.trim();
+  function abrirEnviarCorreo(f: FacturaElectronica) {
+    setEnviarCorreoFactura(f);
+  }
+
+  async function confirmEnviarCorreo(trimmed: string) {
+    const f = enviarCorreoFactura;
+    if (!f) return;
+    const email = trimmed.trim();
     setSendingId(f.id);
     try {
       const out = await enviarFacturaPorEmail(f.id, email || undefined);
+      setEnviarCorreoFactura(null);
       toast(`Enviado a ${out.to}.`, "success");
       void load();
     } catch (err) {
@@ -282,7 +286,7 @@ export function FacturasPage() {
                         type="button"
                         className="link"
                         disabled={sendingId === f.id}
-                        onClick={() => void enviarCorreo(f)}
+                        onClick={() => abrirEnviarCorreo(f)}
                       >
                         {sendingId === f.id ? "Enviando…" : "Correo"}
                       </button>
@@ -308,6 +312,24 @@ export function FacturasPage() {
           </div>
         )}
       </section>
+
+      <PromptDialog
+        open={enviarCorreoFactura != null}
+        title="Enviar factura por correo"
+        description="Podés indicar un email concreto o dejar vacío para usar el del cliente de la venta (si existe)."
+        inputLabel="Email del destinatario (opcional)"
+        inputType="text"
+        defaultValue=""
+        placeholder="correo@ejemplo.com"
+        confirmLabel="Enviar"
+        cancelLabel="Cancelar"
+        busy={enviarCorreoFactura != null && sendingId === enviarCorreoFactura.id}
+        onCancel={() => {
+          if (enviarCorreoFactura != null && sendingId === enviarCorreoFactura.id) return;
+          setEnviarCorreoFactura(null);
+        }}
+        onConfirm={(t) => void confirmEnviarCorreo(t)}
+      />
     </>
   );
 }

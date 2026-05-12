@@ -18,4 +18,9 @@ export default defineConfig(async () => ({
       "/api": { target: "http://127.0.0.1:3010", changeOrigin: true },
     },
   },
+  preview: {
+    proxy: {
+      "/api": { target: "http://127.0.0.1:3010", changeOrigin: true },
+    },
+  },
 }));

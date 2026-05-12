@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { resolveImageSrc } from "../api";
 import { filterIntegerTyping } from "../lib/decimalInput";
 import { SearchableSelect } from "./SearchableSelect";
 import { useToast } from "../context/ToastContext";
@@ -70,7 +71,7 @@ function ImagenProductoPicker({
         >
           {showImg ? (
             <img
-              src={trimmed}
+              src={resolveImageSrc(trimmed) ?? trimmed}
               alt=""
               style={{ width: "100%", height: "100%", objectFit: "cover" }}
               onError={() => setBroken(true)}

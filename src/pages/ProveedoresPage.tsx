@@ -5,9 +5,12 @@ import {
   deleteProveedor,
   fetchProveedores,
   patchProveedorEstado,
+  resolveImageSrc,
   updateProveedor,
   type Proveedor,
 } from "../api";
+import { ChoiceDialog } from "../components/ChoiceDialog";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { useToast } from "../context/ToastContext";
 
 function fmtFecha(iso: string) {
@@ -140,7 +143,12 @@ function ProveedorDetailAvatarPicker({
         onClick={() => fileRef.current?.click()}
       >
         {showImg ? (
-          <img src={url} alt="" className="prov-detail-hero__img" onError={() => setBroken(true)} />
+          <img
+            src={resolveImageSrc(url) ?? url}
+            alt=""
+            className="prov-detail-hero__img"
+            onError={() => setBroken(true)}
+          />
         ) : (
           <div className="prov-detail-hero__ph">{nombre.trim().slice(0, 1).toUpperCase()}</div>
         )}
@@ -167,7 +175,12 @@ function ProveedorCardMedia({ proveedor }: { proveedor: Proveedor }) {
   if (url && !broken) {
     return (
       <div className="prov-card__media-wrap">
-        <img src={url} alt="" className="prov-card__img" onError={() => setBroken(true)} />
+        <img
+          src={resolveImageSrc(url) ?? url}
+          alt=""
+          className="prov-card__img"
+          onError={() => setBroken(true)}
+        />
       </div>
     );
   }
@@ -193,6 +206,8 @@ export function ProveedoresPage() {
   const [estadoSavingId, setEstadoSavingId] = useState<number | null>(null);
 
   const [detailProveedor, setDetailProveedor] = useState<Proveedor | null>(null);
+  const [detailUnsavedChoiceOpen, setDetailUnsavedChoiceOpen] = useState(false);
+  const [desactivarProveedorTarget, setDesactivarProveedorTarget] = useState<Proveedor | null>(null);
   const detailPanelRef = useRef<HTMLDivElement>(null);
   const [detailForm, setDetailForm] = useState<DetailFormFields>(emptyDetailForm);
   const detailBaselineRef = useRef<string | null>(null);
@@ -278,40 +293,39 @@ export function ProveedoresPage() {
       setDetailProveedor(null);
       return;
     }
-    const saveFirst = window.confirm(
-      "Hay cambios sin guardar.\n\n¿Deseás guardar antes de cerrar?\n\nAceptar: guardar y cerrar.\nCancelar: otras opciones."
-    );
-    if (saveFirst) {
-      if (!detailForm.nombre.trim() || !detailForm.nit.trim()) {
-        toast("Nombre y NIT son obligatorios", "error");
-        return;
-      }
-      setDetailSaveBusy(true);
-      try {
-        const row = rows.find((r) => r.id === detailProveedor.id) ?? detailProveedor;
-        await updateProveedor(detailProveedor.id, {
-          nombre: detailForm.nombre.trim(),
-          nit: detailForm.nit.trim(),
-          direccion: row.direccion?.trim() ? row.direccion.trim() : null,
-          icono_url: detailForm.iconoUrl.trim() || null,
-          vendedor_nombre: detailForm.vendedorNombre.trim() || null,
-          vendedor_celular: detailForm.vendedorCelular.trim() || null,
-          estado: row.estado,
-        });
-        toast("Cambios guardados.", "success");
-        await load();
-        setDetailProveedor(null);
-      } catch (err) {
-        toast(err instanceof Error ? err.message : "Error al guardar", "error");
-      } finally {
-        setDetailSaveBusy(false);
-      }
-      return;
+    setDetailUnsavedChoiceOpen(true);
+  }, [detailProveedor, detailSaveBusy, detailDirty]);
+
+  const saveDetailProveedorAndClose = useCallback(async (): Promise<boolean> => {
+    if (!detailProveedor || detailSaveBusy) return false;
+    if (!detailForm.nombre.trim() || !detailForm.nit.trim()) {
+      toast("Nombre y NIT son obligatorios", "error");
+      return false;
     }
-    if (window.confirm("¿Descartar los cambios y cerrar sin guardar?")) {
+    setDetailSaveBusy(true);
+    try {
+      const row = rows.find((r) => r.id === detailProveedor.id) ?? detailProveedor;
+      await updateProveedor(detailProveedor.id, {
+        nombre: detailForm.nombre.trim(),
+        nit: detailForm.nit.trim(),
+        direccion: row.direccion?.trim() ? row.direccion.trim() : null,
+        icono_url: detailForm.iconoUrl.trim() || null,
+        vendedor_nombre: detailForm.vendedorNombre.trim() || null,
+        vendedor_celular: detailForm.vendedorCelular.trim() || null,
+        estado: row.estado,
+      });
+      toast("Cambios guardados.", "success");
+      await load();
       setDetailProveedor(null);
+      setDetailUnsavedChoiceOpen(false);
+      return true;
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Error al guardar", "error");
+      return false;
+    } finally {
+      setDetailSaveBusy(false);
     }
-  }, [detailProveedor, detailSaveBusy, detailDirty, detailForm, rows, toast, load]);
+  }, [detailProveedor, detailSaveBusy, detailForm, rows, toast, load]);
 
   useEffect(() => {
     if (!modalOpen && !deleteTarget && !detailProveedor) return;
@@ -373,11 +387,20 @@ export function ProveedoresPage() {
   async function onToggleActivo(p: Proveedor, nextActivo: boolean) {
     const next = nextActivo ? "activo" : "inactivo";
     if (next === "inactivo") {
-      const ok = window.confirm(
-        `¿Desactivar a «${p.nombre}»? No aparecerá en nuevos pedidos a proveedor.`
-      );
-      if (!ok) return;
+      setDesactivarProveedorTarget(p);
+      return;
     }
+    await applyProveedorEstado(p, next);
+  }
+
+  async function confirmDesactivarProveedor() {
+    const p = desactivarProveedorTarget;
+    if (!p) return;
+    setDesactivarProveedorTarget(null);
+    await applyProveedorEstado(p, "inactivo");
+  }
+
+  async function applyProveedorEstado(p: Proveedor, next: "activo" | "inactivo") {
     const snapshot = rows;
     setEstadoSavingId(p.id);
     setRows((r) => r.map((x) => (x.id === p.id ? { ...x, estado: next } : x)));
@@ -815,6 +838,50 @@ export function ProveedoresPage() {
           </div>
         </div>
       ) : null}
+
+      <ChoiceDialog
+        open={detailUnsavedChoiceOpen}
+        title="Cambios sin guardar"
+        description="Elegí qué hacer con los datos del proveedor antes de cerrar el panel."
+        dismissLabel="Seguir editando"
+        busy={detailSaveBusy}
+        onDismiss={() => !detailSaveBusy && setDetailUnsavedChoiceOpen(false)}
+        choices={[
+          {
+            label: detailSaveBusy ? "Guardando…" : "Guardar y cerrar",
+            variant: "primary",
+            disabled: detailSaveBusy,
+            onSelect: () => void saveDetailProveedorAndClose(),
+          },
+          {
+            label: "Descartar cambios",
+            variant: "danger",
+            disabled: detailSaveBusy,
+            onSelect: () => {
+              setDetailProveedor(null);
+              setDetailUnsavedChoiceOpen(false);
+            },
+          },
+        ]}
+      />
+
+      <ConfirmDialog
+        open={desactivarProveedorTarget != null}
+        title="Desactivar proveedor"
+        description={
+          desactivarProveedorTarget ? (
+            <>
+              ¿Desactivar a <strong>«{desactivarProveedorTarget.nombre}»</strong>? No aparecerá en nuevos pedidos a
+              proveedor.
+            </>
+          ) : null
+        }
+        confirmLabel="Desactivar"
+        cancelLabel="Cancelar"
+        variant="danger"
+        onCancel={() => setDesactivarProveedorTarget(null)}
+        onConfirm={() => void confirmDesactivarProveedor()}
+      />
 
       {deleteTarget ? (
         <div

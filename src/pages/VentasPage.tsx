@@ -24,6 +24,7 @@ import {
   fetchVentas,
   lookupBarcode,
   patchCitaServiciosDesdePos,
+  resolveImageSrc,
   type CategoriaServicio,
   type Cita,
   type Cliente,
@@ -1010,7 +1011,11 @@ export function VentasPage() {
                           >
                             <div className="pos-cart-thumb" aria-hidden>
                               {prod?.imagen_url ? (
-                                <img src={prod.imagen_url} alt="" loading="lazy" />
+                                <img
+                                  src={resolveImageSrc(prod.imagen_url) ?? prod.imagen_url}
+                                  alt=""
+                                  loading="lazy"
+                                />
                               ) : (
                                 <span className="pos-cart-thumb-initial">{inicial}</span>
                               )}
@@ -1498,7 +1503,12 @@ export function VentasPage() {
                             >
                               <div className="pos-saas-pro-img-wrap">
                                 {p.imagen_url ? (
-                                  <img src={p.imagen_url} alt="" className="pos-saas-pro-img" loading="lazy" />
+                                  <img
+                                    src={resolveImageSrc(p.imagen_url) ?? p.imagen_url}
+                                    alt=""
+                                    className="pos-saas-pro-img"
+                                    loading="lazy"
+                                  />
                                 ) : (
                                   <div className="pos-saas-pro-img-ph" aria-hidden />
                                 )}

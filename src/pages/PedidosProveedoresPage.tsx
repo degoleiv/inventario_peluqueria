@@ -14,6 +14,7 @@ import {
   fetchPedidosProveedores,
   fetchProductos,
   fetchProveedores,
+  resolveImageSrc,
   updatePedidoProveedorMeta,
   type PedidoProveedor,
   type Producto,
@@ -128,7 +129,12 @@ function ProveedorSelectableMedia({ proveedor }: { proveedor: Proveedor }) {
   if (url && !broken) {
     return (
       <div className="pedidos-prov-card__media">
-        <img src={url} alt="" className="pedidos-prov-card__img" onError={() => setBroken(true)} />
+        <img
+          src={resolveImageSrc(url) ?? url}
+          alt=""
+          className="pedidos-prov-card__img"
+          onError={() => setBroken(true)}
+        />
       </div>
     );
   }

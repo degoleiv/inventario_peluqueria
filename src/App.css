@@ -10139,6 +10139,17 @@ select {
   justify-content: flex-end;
 }
 
+.confirm-dialog-actions--stack {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+}
+
+.confirm-dialog-actions--stack .btn {
+  width: 100%;
+  justify-content: center;
+}
+
 .confirm-dialog-confirm--danger {
   background: var(--danger, #dc2626);
   color: #fff;

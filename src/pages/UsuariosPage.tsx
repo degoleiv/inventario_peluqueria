@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   createRole,
   createUsuario,
@@ -13,8 +13,16 @@ import {
 } from "../api";
 import { NAV_LABEL, PERMISO_MODULOS, type PermisoModulo } from "../nav";
 import { useToast } from "../context/ToastContext";
+import { ConfirmDialog } from "../components/ConfirmDialog";
+import { PromptDialog } from "../components/PromptDialog";
 
 type Props = { onChanged?: () => void };
+
+type RolEditUi =
+  | { kind: "idle" }
+  | { kind: "nombre"; rol: RolDefinicion }
+  | { kind: "star"; rol: RolDefinicion; nombre: string }
+  | { kind: "modulos"; rol: RolDefinicion; nombre: string };
 
 export function UsuariosPage({ onChanged }: Props) {
   const toast = useToast();
@@ -35,6 +43,11 @@ export function UsuariosPage({ onChanged }: Props) {
     mods: {} as Record<PermisoModulo, boolean>,
   });
 
+  const [rolEditUi, setRolEditUi] = useState<RolEditUi>({ kind: "idle" });
+  const [confirmDeleteRolSlug, setConfirmDeleteRolSlug] = useState<string | null>(null);
+  const [confirmDeleteUsuario, setConfirmDeleteUsuario] = useState<UsuarioListado | null>(null);
+  const [adminDialogBusy, setAdminDialogBusy] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -52,48 +65,56 @@ export function UsuariosPage({ onChanged }: Props) {
     void load();
   }, [load]);
 
-  async function editarRolSimple(r: RolDefinicion) {
-    const nombre = window.prompt("Nombre visible del rol", r.nombre);
-    if (nombre === null || !nombre.trim()) return;
-    const usarTodo = confirm(
-      "¿Acceso total (*) como administrador de sistema?\n\nCancelá para definir módulos en la siguiente pantalla."
+  const listaModulosPrompt = useMemo((): ReactNode => {
+    return (
+      <div>
+        <p style={{ marginTop: 0 }}>Escribí los números separados por coma de los módulos a habilitar (ej. 1,2,3).</p>
+        <ol style={{ margin: "0.35rem 0 0 1.1rem", padding: 0 }}>
+          {PERMISO_MODULOS.map((m, i) => (
+            <li key={m}>
+              {i + 1}. {NAV_LABEL[m]} ({m})
+            </li>
+          ))}
+        </ol>
+      </div>
     );
-    let permisos: string[];
-    if (usarTodo) {
-      permisos = ["*"];
-    } else {
-      const lines = PERMISO_MODULOS.map(
-        (m, i) => `${i + 1}. ${NAV_LABEL[m]} (${m})`
-      ).join("\n");
-      const sel = window.prompt(
-        `Escribí los números separados por coma de los módulos a habilitar:\n\n${lines}\n\nEj: 1,2,3`
-      );
-      if (sel === null) return;
-      const nums = sel.split(/[,;\s]+/).map((x) => Number(x.trim()));
-      permisos = [];
-      for (const n of nums) {
-        if (Number.isFinite(n) && n >= 1 && n <= PERMISO_MODULOS.length) {
-          permisos.push(PERMISO_MODULOS[n - 1]!);
-        }
-      }
-      const uniq = [...new Set(permisos)];
-      if (uniq.length === 0) {
-        toast("Seleccioná al menos un módulo.", "warning");
-        return;
-      }
-      permisos = uniq;
-    }
+  }, []);
+
+  async function aplicarRolPermisos(rol: RolDefinicion, nombre: string, permisos: string[]) {
+    setAdminDialogBusy(true);
     try {
-      await updateRole(r.slug, {
+      await updateRole(rol.slug, {
         nombre: nombre.trim(),
-        permisos: r.slug === "admin" ? ["*"] : permisos,
+        permisos: rol.slug === "admin" ? ["*"] : permisos,
       });
       toast("Rol actualizado.", "success");
+      setRolEditUi({ kind: "idle" });
       void load();
       onChanged?.();
     } catch (err) {
       toast(err instanceof Error ? err.message : "Error", "error");
+    } finally {
+      setAdminDialogBusy(false);
     }
+  }
+
+  function startEditarRol(r: RolDefinicion) {
+    setRolEditUi({ kind: "nombre", rol: r });
+  }
+
+  function parseModulosSeleccion(sel: string): { ok: true; permisos: string[] } | { ok: false; error: string } {
+    const nums = sel.split(/[,;\s]+/).map((x) => Number(x.trim()));
+    const permisos: string[] = [];
+    for (const n of nums) {
+      if (Number.isFinite(n) && n >= 1 && n <= PERMISO_MODULOS.length) {
+        permisos.push(PERMISO_MODULOS[n - 1]!);
+      }
+    }
+    const uniq = [...new Set(permisos)];
+    if (uniq.length === 0) {
+      return { ok: false, error: "Seleccioná al menos un módulo válido (números de la lista)." };
+    }
+    return { ok: true, permisos: uniq };
   }
 
   async function crearRolSubmit(e: React.FormEvent) {
@@ -148,16 +169,29 @@ export function UsuariosPage({ onChanged }: Props) {
     }
   }
 
-  async function borrarRol(slug: string) {
-    if (!window.confirm(`¿Eliminar el rol «${slug}»?`)) return;
+  function requestBorrarRol(slug: string) {
+    setConfirmDeleteRolSlug(slug);
+  }
+
+  async function confirmBorrarRolAction() {
+    const slug = confirmDeleteRolSlug;
+    if (!slug) return;
+    setAdminDialogBusy(true);
     try {
       await deleteRole(slug);
+      setConfirmDeleteRolSlug(null);
       toast("Rol eliminado.", "success");
       void load();
       onChanged?.();
     } catch (err) {
       toast(err instanceof Error ? err.message : "Error", "error");
+    } finally {
+      setAdminDialogBusy(false);
     }
+  }
+
+  function borrarRol(slug: string) {
+    requestBorrarRol(slug);
   }
 
   async function cambiarRolUsuario(u: UsuarioListado, rol: string) {
@@ -171,16 +205,29 @@ export function UsuariosPage({ onChanged }: Props) {
     }
   }
 
-  async function borrarUsuario(u: UsuarioListado) {
-    if (!window.confirm(`¿Eliminar usuario ${u.email}?`)) return;
+  function requestBorrarUsuario(u: UsuarioListado) {
+    setConfirmDeleteUsuario(u);
+  }
+
+  async function confirmBorrarUsuarioAction() {
+    const u = confirmDeleteUsuario;
+    if (!u) return;
+    setAdminDialogBusy(true);
     try {
       await deleteUsuario(u.id);
+      setConfirmDeleteUsuario(null);
       toast("Usuario eliminado.", "success");
       void load();
       onChanged?.();
     } catch (err) {
       toast(err instanceof Error ? err.message : "Error", "error");
+    } finally {
+      setAdminDialogBusy(false);
     }
+  }
+
+  function borrarUsuario(u: UsuarioListado) {
+    requestBorrarUsuario(u);
   }
 
   if (loading && roles.length === 0) {
@@ -225,11 +272,11 @@ export function UsuariosPage({ onChanged }: Props) {
                   )}
                 </td>
                 <td className="row-actions">
-                  <button type="button" className="link" onClick={() => void editarRolSimple(r)}>
+                  <button type="button" className="link" onClick={() => startEditarRol(r)}>
                     Editar
                   </button>
                   {r.slug !== "admin" ? (
-                    <button type="button" className="link" onClick={() => void borrarRol(r.slug)}>
+                    <button type="button" className="link" onClick={() => borrarRol(r.slug)}>
                       Eliminar
                     </button>
                   ) : null}
@@ -375,7 +422,7 @@ export function UsuariosPage({ onChanged }: Props) {
                     </select>
                   </td>
                   <td>
-                    <button type="button" className="link" onClick={() => void borrarUsuario(u)}>
+                    <button type="button" className="link" onClick={() => borrarUsuario(u)}>
                       Eliminar
                     </button>
                   </td>
@@ -385,6 +432,107 @@ export function UsuariosPage({ onChanged }: Props) {
           </table>
         </div>
       </section>
+
+      <PromptDialog
+        open={rolEditUi.kind === "nombre"}
+        title="Nombre visible del rol"
+        description="Este nombre se muestra en listas y selectores."
+        inputLabel="Nombre"
+        defaultValue={rolEditUi.kind === "nombre" ? rolEditUi.rol.nombre : ""}
+        confirmLabel="Continuar"
+        cancelLabel="Cancelar"
+        busy={adminDialogBusy}
+        validate={(t) => (!t.trim() ? "El nombre no puede quedar vacío." : null)}
+        onCancel={() => !adminDialogBusy && setRolEditUi({ kind: "idle" })}
+        onConfirm={(t) => {
+          setRolEditUi((cur) => (cur.kind === "nombre" ? { kind: "star", rol: cur.rol, nombre: t.trim() } : cur));
+        }}
+      />
+
+      <ConfirmDialog
+        open={rolEditUi.kind === "star"}
+        title="Permisos del rol"
+        description={
+          <>
+            ¿Asignar acceso total (<code>*</code>) como administrador de sistema?
+            <br />
+            <span className="muted">Si no, podés elegir módulos por número en el siguiente paso.</span>
+          </>
+        }
+        confirmLabel="Sí, acceso total (*)"
+        cancelLabel="No, elegir módulos…"
+        busy={adminDialogBusy}
+        onCancel={() => {
+          if (adminDialogBusy) return;
+          setRolEditUi((cur) =>
+            cur.kind === "star" ? { kind: "modulos", rol: cur.rol, nombre: cur.nombre } : cur
+          );
+        }}
+        onConfirm={() => {
+          if (rolEditUi.kind !== "star") return;
+          void aplicarRolPermisos(rolEditUi.rol, rolEditUi.nombre, ["*"]);
+        }}
+      />
+
+      <PromptDialog
+        open={rolEditUi.kind === "modulos"}
+        title="Módulos habilitados"
+        description={listaModulosPrompt}
+        inputLabel="Números (ej. 1,2,3)"
+        defaultValue=""
+        placeholder="1,2,3"
+        confirmLabel="Guardar rol"
+        cancelLabel="Cancelar"
+        busy={adminDialogBusy}
+        validate={(t) => {
+          const parsed = parseModulosSeleccion(t);
+          return parsed.ok ? null : parsed.error;
+        }}
+        onCancel={() => !adminDialogBusy && setRolEditUi({ kind: "idle" })}
+        onConfirm={(t) => {
+          if (rolEditUi.kind !== "modulos") return;
+          const parsed = parseModulosSeleccion(t);
+          if (!parsed.ok) return;
+          void aplicarRolPermisos(rolEditUi.rol, rolEditUi.nombre, parsed.permisos);
+        }}
+      />
+
+      <ConfirmDialog
+        open={confirmDeleteRolSlug != null}
+        title="Eliminar rol"
+        description={
+          confirmDeleteRolSlug ? (
+            <>
+              ¿Eliminar el rol <strong>«{confirmDeleteRolSlug}»</strong>? Los usuarios con ese rol deberán
+              reasignarse.
+            </>
+          ) : null
+        }
+        confirmLabel="Eliminar"
+        cancelLabel="Cancelar"
+        variant="danger"
+        busy={adminDialogBusy}
+        onCancel={() => !adminDialogBusy && setConfirmDeleteRolSlug(null)}
+        onConfirm={() => void confirmBorrarRolAction()}
+      />
+
+      <ConfirmDialog
+        open={confirmDeleteUsuario != null}
+        title="Eliminar usuario"
+        description={
+          confirmDeleteUsuario ? (
+            <>
+              ¿Eliminar a <strong>{confirmDeleteUsuario.email}</strong>? Esta acción no se puede deshacer.
+            </>
+          ) : null
+        }
+        confirmLabel="Eliminar"
+        cancelLabel="Cancelar"
+        variant="danger"
+        busy={adminDialogBusy}
+        onCancel={() => !adminDialogBusy && setConfirmDeleteUsuario(null)}
+        onConfirm={() => void confirmBorrarUsuarioAction()}
+      />
     </>
   );
 }

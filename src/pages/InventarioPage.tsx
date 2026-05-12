@@ -7,6 +7,7 @@ import {
   fetchProductos,
   lookupBarcode,
   patchProductoEstado,
+  resolveImageSrc,
   updateProducto,
   type InventarioCatalogo,
   type LookupManual,
@@ -19,6 +20,7 @@ import {
   catalogoFieldsToCreateBody,
   type ProductoCatalogoFields,
 } from "../components/ProductoCatalogoForm";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Drawer } from "../components/Drawer";
 import { SkeletonCard } from "../components/Skeleton";
 import { useToast } from "../context/ToastContext";
@@ -76,6 +78,8 @@ export function InventarioPage() {
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; p: Producto } | null>(null);
   /** Si no es null, el drawer de creación está rellenado desde este producto (flujo “Duplicar”). */
   const [duplicateDraftSource, setDuplicateDraftSource] = useState<Producto | null>(null);
+  const [confirmDeleteProducto, setConfirmDeleteProducto] = useState<Producto | null>(null);
+  const [deleteProductoBusy, setDeleteProductoBusy] = useState(false);
   const formDrawerRef = useRef<HTMLFormElement>(null);
   const codigoRef = useRef(codigo);
   const inventarioCatalogoRef = useRef(inventarioCatalogo);
@@ -373,14 +377,21 @@ export function InventarioPage() {
     }
   }
 
-  async function onEliminarProducto(p: Producto) {
-    if (!window.confirm("¿Eliminar este producto?")) return;
+  function requestEliminarProducto(p: Producto) {
+    setConfirmDeleteProducto(p);
+  }
+
+  async function confirmDeleteProductoAction() {
+    const p = confirmDeleteProducto;
+    if (!p) return;
     const snapshot = p;
+    setDeleteProductoBusy(true);
     setError(null);
     setProductos((rows) => rows.filter((x) => x.id !== p.id));
     if (editingId === p.id) resetForm();
     try {
       await deleteProducto(p.id);
+      setConfirmDeleteProducto(null);
       toast("Producto eliminado", "success", {
         action: {
           label: "Deshacer",
@@ -414,6 +425,8 @@ export function InventarioPage() {
       setProductos((rows) => [...rows, snapshot].sort((a, b) => a.id - b.id));
       setError(err instanceof Error ? err.message : "Error al eliminar");
       toast(err instanceof Error ? err.message : "Error al eliminar", "error");
+    } finally {
+      setDeleteProductoBusy(false);
     }
   }
 
@@ -449,16 +462,16 @@ export function InventarioPage() {
       {
         label: "Eliminar",
         danger: true,
-        onSelect: () => void onEliminarProducto(p),
+        onSelect: () => requestEliminarProducto(p),
       },
     ];
   }
 
-  async function onEliminarDesdeVisualizar() {
+  function onEliminarDesdeVisualizar() {
     const p = viewingProduct;
     if (!p) return;
     cerrarVisualizar();
-    await onEliminarProducto(p);
+    requestEliminarProducto(p);
   }
 
   const productosFiltrados = useMemo(() => {
@@ -711,7 +724,7 @@ export function InventarioPage() {
                 <div className="prov-card__media-wrap">
                   {p.imagen_url ? (
                     <img
-                      src={p.imagen_url}
+                      src={resolveImageSrc(p.imagen_url) ?? p.imagen_url}
                       alt=""
                       className="prov-card__img"
                       width={112}
@@ -825,7 +838,7 @@ export function InventarioPage() {
               >
                 {viewingProduct.imagen_url ? (
                   <img
-                    src={viewingProduct.imagen_url}
+                    src={resolveImageSrc(viewingProduct.imagen_url) ?? viewingProduct.imagen_url}
                     alt=""
                     style={{ width: "100%", height: "100%", objectFit: "cover" }}
                   />
@@ -917,6 +930,25 @@ export function InventarioPage() {
           </div>
         ) : null}
       </Drawer>
+
+      <ConfirmDialog
+        open={confirmDeleteProducto != null}
+        title="Eliminar producto"
+        description={
+          confirmDeleteProducto ? (
+            <>
+              ¿Eliminar <strong>{confirmDeleteProducto.nombre}</strong>? Esta acción no se puede deshacer
+              (salvo con Deshacer en el aviso).
+            </>
+          ) : null
+        }
+        confirmLabel="Eliminar"
+        cancelLabel="Cancelar"
+        variant="danger"
+        busy={deleteProductoBusy}
+        onCancel={() => !deleteProductoBusy && setConfirmDeleteProducto(null)}
+        onConfirm={() => void confirmDeleteProductoAction()}
+      />
 
       <ContextMenu
         open={ctxMenu != null}

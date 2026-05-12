@@ -15,7 +15,8 @@
     "reset:total": "tsx scripts/reset-total-db.ts",
     "reset:ventas": "tsx scripts/reset-ventas.ts",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "tauri:icon": "tauri icon"
   },
   "dependencies": {
     "@emoji-mart/data": "^1.2.1",

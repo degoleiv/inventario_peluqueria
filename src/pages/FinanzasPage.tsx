@@ -26,12 +26,15 @@ import {
   fetchGastos,
   marcarGastoPago,
   registrarPagoCobranza,
+  resolveImageSrc,
   type CategoriaFinanzaConcepto,
   type Cliente,
   type GastoOperativo,
 } from "../api";
 import { useToast } from "../context/ToastContext";
 import { SearchableSelect } from "../components/SearchableSelect";
+import { ConfirmDialog } from "../components/ConfirmDialog";
+import { PromptDialog } from "../components/PromptDialog";
 
 type FinanzasTab = "flujo" | "gastos" | "cobrar";
 
@@ -147,6 +150,11 @@ export function FinanzasPage() {
   const [loading, setLoading] = useState(false);
   const [gastoDeletingId, setGastoDeletingId] = useState<number | null>(null);
   const [gastoPagoBusyId, setGastoPagoBusyId] = useState<number | null>(null);
+  const [pagoDeudaModal, setPagoDeudaModal] = useState<{ id: number; saldo: number } | null>(null);
+  const [pagoDeudaBusy, setPagoDeudaBusy] = useState(false);
+  const [confirmDeleteGastoId, setConfirmDeleteGastoId] = useState<number | null>(null);
+  const [deleteGastoDialogBusy, setDeleteGastoDialogBusy] = useState(false);
+  const [confirmAnularPagoGasto, setConfirmAnularPagoGasto] = useState<GastoOperativo | null>(null);
 
   const [gMonto, setGMonto] = useState<number | "">("");
   const [gCatId, setGCatId] = useState<number | "">("");
@@ -371,30 +379,45 @@ export function FinanzasPage() {
     }
   }
 
-  async function pagoDeuda(id: number, saldo: number) {
-    const m = window.prompt(`Monto a registrar (máx ${saldo.toFixed(2)}):`, String(saldo));
-    if (m == null) return;
-    const n = Number(m);
+  function openPagoDeudaModal(id: number, saldo: number) {
+    setPagoDeudaModal({ id, saldo });
+  }
+
+  async function confirmPagoDeuda(trimmed: string) {
+    if (!pagoDeudaModal) return;
+    const n = Number(trimmed.replace(",", "."));
     if (!Number.isFinite(n) || n <= 0) return;
+    setPagoDeudaBusy(true);
     try {
-      await registrarPagoCobranza(id, n);
+      await registrarPagoCobranza(pagoDeudaModal.id, n);
+      setPagoDeudaModal(null);
       await load();
     } catch (err) {
       toast(err instanceof Error ? err.message : "Error", "error");
+    } finally {
+      setPagoDeudaBusy(false);
     }
   }
 
-  async function onEliminarGasto(id: number) {
-    if (!window.confirm("¿Eliminar este gasto? Esta acción no se puede deshacer.")) return;
+  function requestEliminarGasto(id: number) {
+    setConfirmDeleteGastoId(id);
+  }
+
+  async function confirmDeleteGastoAction() {
+    const id = confirmDeleteGastoId;
+    if (id == null) return;
     setGastoDeletingId(id);
+    setDeleteGastoDialogBusy(true);
     try {
       await deleteGasto(id);
+      setConfirmDeleteGastoId(null);
       toast("Gasto eliminado.", "success");
       await load();
     } catch (err) {
       toast(err instanceof Error ? err.message : "No se pudo eliminar", "error");
     } finally {
       setGastoDeletingId(null);
+      setDeleteGastoDialogBusy(false);
     }
   }
 
@@ -485,17 +508,18 @@ export function FinanzasPage() {
     input.click();
   }
 
-  async function anularPagoGasto(g: GastoOperativo) {
+  function requestAnularPagoGasto(g: GastoOperativo) {
     if (gastoPagoBusyId !== null) return;
-    if (
-      !window.confirm(
-        `¿Anular el pago de «${g.concepto}»?\n\nSe quitará la fecha de pago y el comprobante adjunto (si lo hay).`
-      )
-    )
-      return;
+    setConfirmAnularPagoGasto(g);
+  }
+
+  async function confirmAnularPagoGastoAction() {
+    const g = confirmAnularPagoGasto;
+    if (!g) return;
     setGastoPagoBusyId(g.id);
     try {
       await marcarGastoPago(g.id, { pagado: false, comprobante_url: null });
+      setConfirmAnularPagoGasto(null);
       toast("Pago anulado.", "success");
       await load();
     } catch (err) {
@@ -512,19 +536,20 @@ export function FinanzasPage() {
       toast("Permití abrir ventanas para ver el comprobante.", "warning");
       return;
     }
+    const srcUrl = resolveImageSrc(g.comprobante_url) ?? g.comprobante_url;
     /* Para data URLs grandes Chrome bloquea el navegador → embebemos en HTML. */
-    const isPdf = g.comprobante_url.toLowerCase().startsWith("data:application/pdf");
+    const isPdf = srcUrl.toLowerCase().startsWith("data:application/pdf");
     const safeName = (g.concepto || `gasto-${g.id}`).replace(/[<>"']/g, "");
     if (isPdf) {
       w.document.write(
         `<!doctype html><html><head><title>${safeName}</title></head><body style="margin:0">` +
-          `<embed src="${g.comprobante_url}" type="application/pdf" width="100%" height="100%" style="height:100vh"/>` +
+          `<embed src="${srcUrl}" type="application/pdf" width="100%" height="100%" style="height:100vh"/>` +
           `</body></html>`
       );
     } else {
       w.document.write(
         `<!doctype html><html><head><title>${safeName}</title></head><body style="margin:0;display:grid;place-items:center;background:#111">` +
-          `<img src="${g.comprobante_url}" alt="" style="max-width:100vw;max-height:100vh;object-fit:contain"/>` +
+          `<img src="${srcUrl}" alt="" style="max-width:100vw;max-height:100vh;object-fit:contain"/>` +
           `</body></html>`
       );
     }
@@ -921,7 +946,7 @@ export function FinanzasPage() {
                                     title="Anular pago"
                                     aria-label="Anular pago"
                                     disabled={pagoBusy}
-                                    onClick={() => void anularPagoGasto(g)}
+                                    onClick={() => requestAnularPagoGasto(g)}
                                   >
                                     <ArrowCounterClockwise size={16} weight="bold" />
                                   </button>
@@ -934,7 +959,7 @@ export function FinanzasPage() {
                                   title="Eliminar gasto"
                                   aria-label="Eliminar gasto"
                                   disabled={gastoDeletingId === g.id}
-                                  onClick={() => void onEliminarGasto(g.id)}
+                                  onClick={() => requestEliminarGasto(g.id)}
                                 >
                                   <Trash size={16} weight="bold" />
                                 </button>
@@ -1075,7 +1100,7 @@ export function FinanzasPage() {
                               title="Anular pago"
                               aria-label="Anular pago"
                               disabled={pagoBusy}
-                              onClick={() => void anularPagoGasto(g)}
+                              onClick={() => requestAnularPagoGasto(g)}
                             >
                               <ArrowCounterClockwise size={16} weight="bold" />
                             </button>
@@ -1088,7 +1113,7 @@ export function FinanzasPage() {
                             title="Eliminar gasto"
                             aria-label="Eliminar gasto"
                             disabled={gastoDeletingId === g.id}
-                            onClick={() => void onEliminarGasto(g.id)}
+                            onClick={() => requestEliminarGasto(g.id)}
                           >
                             <Trash size={16} weight="bold" />
                           </button>
@@ -1254,7 +1279,7 @@ export function FinanzasPage() {
                               <button
                                 type="button"
                                 className="finanzas-pill-pago"
-                                onClick={() => void pagoDeuda(c.id, c.saldo_pendiente)}
+                                onClick={() => openPagoDeudaModal(c.id, c.saldo_pendiente)}
                               >
                                 <Check size={16} weight="bold" aria-hidden />
                                 Registrar pago
@@ -1276,6 +1301,70 @@ export function FinanzasPage() {
           </section>
         </>
       ) : null}
+
+      <PromptDialog
+        open={pagoDeudaModal != null}
+        title="Registrar pago"
+        description={
+          pagoDeudaModal ? (
+            <>
+              Monto a registrar (máximo <strong>{pagoDeudaModal.saldo.toFixed(2)}</strong>).
+            </>
+          ) : null
+        }
+        inputLabel="Monto"
+        inputType="number"
+        inputMode="decimal"
+        defaultValue={pagoDeudaModal ? String(pagoDeudaModal.saldo) : ""}
+        confirmLabel="Registrar"
+        cancelLabel="Cancelar"
+        busy={pagoDeudaBusy}
+        validate={(t) => {
+          if (!pagoDeudaModal) return null;
+          const n = Number(t.replace(",", "."));
+          if (!Number.isFinite(n) || n <= 0) return "Ingresá un monto válido mayor a cero.";
+          if (n > pagoDeudaModal.saldo + 1e-9) {
+            return `El monto no puede superar el saldo pendiente (${pagoDeudaModal.saldo.toFixed(2)}).`;
+          }
+          return null;
+        }}
+        onCancel={() => !pagoDeudaBusy && setPagoDeudaModal(null)}
+        onConfirm={(t) => void confirmPagoDeuda(t)}
+      />
+
+      <ConfirmDialog
+        open={confirmDeleteGastoId != null}
+        title="Eliminar gasto"
+        description="¿Eliminar este gasto? Esta acción no se puede deshacer."
+        confirmLabel="Eliminar"
+        cancelLabel="Cancelar"
+        variant="danger"
+        busy={deleteGastoDialogBusy}
+        onCancel={() => !deleteGastoDialogBusy && setConfirmDeleteGastoId(null)}
+        onConfirm={() => void confirmDeleteGastoAction()}
+      />
+
+      <ConfirmDialog
+        open={confirmAnularPagoGasto != null}
+        title="Anular pago del gasto"
+        description={
+          confirmAnularPagoGasto ? (
+            <>
+              ¿Anular el pago de <strong>«{confirmAnularPagoGasto.concepto}»</strong>? Se quitará la fecha de pago
+              y el comprobante adjunto (si lo hay).
+            </>
+          ) : null
+        }
+        confirmLabel="Anular pago"
+        cancelLabel="Volver"
+        variant="danger"
+        busy={confirmAnularPagoGasto != null && gastoPagoBusyId === confirmAnularPagoGasto.id}
+        onCancel={() => {
+          const busy = confirmAnularPagoGasto != null && gastoPagoBusyId === confirmAnularPagoGasto.id;
+          if (!busy) setConfirmAnularPagoGasto(null);
+        }}
+        onConfirm={() => void confirmAnularPagoGastoAction()}
+      />
     </div>
   );
 }

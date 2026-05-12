@@ -16,6 +16,7 @@ import {
   fetchEmpleadosTurnos,
   fetchRoles,
   fetchUsuarios,
+  resolveImageSrc,
   updateEmpleadoMovimientoEstado,
   updateRole,
   updateUsuario,
@@ -27,6 +28,7 @@ import {
   type TurnoPlantillaInicial,
   type UsuarioListado,
 } from "../api";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Drawer } from "../components/Drawer";
 import { SubNav } from "../components/SubNav";
 import { EMPLEADOS_TABS, readEmpleadosTab, type EmpleadosTab } from "../lib/moduleRoutes";
@@ -188,6 +190,11 @@ export function EmpleadosPage({ onChanged }: Props) {
   const [certBusy, setCertBusy] = useState<{ id: number } | null>(null);
   const certLockRef = useRef(false);
   const fotoFileInputRef = useRef<HTMLInputElement>(null);
+
+  const [confirmDeleteUsuario, setConfirmDeleteUsuario] = useState<UsuarioListado | null>(null);
+  const [confirmDeleteRolSlug, setConfirmDeleteRolSlug] = useState<string | null>(null);
+  const [confirmDeleteTurno, setConfirmDeleteTurno] = useState<TurnoEmpleado | null>(null);
+  const [empleadoConfirmBusy, setEmpleadoConfirmBusy] = useState(false);
 
   const [rolDrawerOpen, setRolDrawerOpen] = useState(false);
   const [rolSaving, setRolSaving] = useState(false);
@@ -404,16 +411,29 @@ export function EmpleadosPage({ onChanged }: Props) {
     }
   }
 
-  async function onDelete(u: UsuarioListado) {
-    if (!window.confirm(`¿Eliminar ${u.email}?`)) return;
+  function requestDeleteUsuario(u: UsuarioListado) {
+    setConfirmDeleteUsuario(u);
+  }
+
+  async function confirmDeleteUsuarioAction() {
+    const u = confirmDeleteUsuario;
+    if (!u) return;
+    setEmpleadoConfirmBusy(true);
     try {
       await deleteUsuario(u.id);
+      setConfirmDeleteUsuario(null);
       toast("Eliminado.", "info");
       void load();
       onChanged?.();
     } catch (err) {
       toast(err instanceof Error ? err.message : "Error", "error");
+    } finally {
+      setEmpleadoConfirmBusy(false);
     }
+  }
+
+  function onDelete(u: UsuarioListado) {
+    requestDeleteUsuario(u);
   }
 
   function openRolDrawerNuevo() {
@@ -496,16 +516,29 @@ export function EmpleadosPage({ onChanged }: Props) {
     }
   }
 
-  async function borrarRol(slug: string) {
-    if (!window.confirm(`¿Eliminar rol «${slug}»?`)) return;
+  function requestBorrarRol(slug: string) {
+    setConfirmDeleteRolSlug(slug);
+  }
+
+  async function confirmBorrarRolAction() {
+    const slug = confirmDeleteRolSlug;
+    if (!slug) return;
+    setEmpleadoConfirmBusy(true);
     try {
       await deleteRole(slug);
+      setConfirmDeleteRolSlug(null);
       toast("Rol eliminado.", "success");
       void load();
       onChanged?.();
     } catch (err) {
       toast(err instanceof Error ? err.message : "Error", "error");
+    } finally {
+      setEmpleadoConfirmBusy(false);
     }
+  }
+
+  function borrarRol(slug: string) {
+    requestBorrarRol(slug);
   }
 
   function onFotoFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -534,6 +567,22 @@ export function EmpleadosPage({ onChanged }: Props) {
       toast(e instanceof Error ? e.message : "Error", "error");
     }
   }, [filtDesde, filtHasta, filtUsuario, toast]);
+
+  async function confirmDeleteTurnoAction() {
+    const t = confirmDeleteTurno;
+    if (!t) return;
+    setEmpleadoConfirmBusy(true);
+    try {
+      await deleteTurnoEmpleado(t.id);
+      setConfirmDeleteTurno(null);
+      toast("Turno eliminado.", "info");
+      void loadTurnos();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Error", "error");
+    } finally {
+      setEmpleadoConfirmBusy(false);
+    }
+  }
 
   const loadMovimientosTab = useCallback(async () => {
     try {
@@ -671,7 +720,7 @@ export function EmpleadosPage({ onChanged }: Props) {
                     <div className="empleado-card__avatar">
                       {u.foto_url ? (
                         <img
-                          src={u.foto_url}
+                          src={resolveImageSrc(u.foto_url) ?? u.foto_url}
                           alt=""
                           className="empleado-avatar empleado-avatar--xl"
                           width={96}
@@ -851,16 +900,7 @@ export function EmpleadosPage({ onChanged }: Props) {
                       <button
                         type="button"
                         className="link danger"
-                        onClick={async () => {
-                          if (!window.confirm("¿Eliminar este turno?")) return;
-                          try {
-                            await deleteTurnoEmpleado(t.id);
-                            toast("Turno eliminado.", "info");
-                            void loadTurnos();
-                          } catch (err) {
-                            toast(err instanceof Error ? err.message : "Error", "error");
-                          }
-                        }}
+                        onClick={() => setConfirmDeleteTurno(t)}
                       >
                         Eliminar
                       </button>
@@ -1759,6 +1799,55 @@ export function EmpleadosPage({ onChanged }: Props) {
           </div>
         </form>
       </Drawer>
+
+      <ConfirmDialog
+        open={confirmDeleteUsuario != null}
+        title="Eliminar usuario"
+        description={
+          confirmDeleteUsuario ? (
+            <>
+              ¿Eliminar a <strong>{confirmDeleteUsuario.email}</strong>? Esta acción no se puede deshacer.
+            </>
+          ) : null
+        }
+        confirmLabel="Eliminar"
+        cancelLabel="Cancelar"
+        variant="danger"
+        busy={empleadoConfirmBusy}
+        onCancel={() => !empleadoConfirmBusy && setConfirmDeleteUsuario(null)}
+        onConfirm={() => void confirmDeleteUsuarioAction()}
+      />
+
+      <ConfirmDialog
+        open={confirmDeleteRolSlug != null}
+        title="Eliminar rol"
+        description={
+          confirmDeleteRolSlug ? (
+            <>
+              ¿Eliminar el rol <strong>«{confirmDeleteRolSlug}»</strong>? Los usuarios con ese rol deberán
+              reasignarse.
+            </>
+          ) : null
+        }
+        confirmLabel="Eliminar"
+        cancelLabel="Cancelar"
+        variant="danger"
+        busy={empleadoConfirmBusy}
+        onCancel={() => !empleadoConfirmBusy && setConfirmDeleteRolSlug(null)}
+        onConfirm={() => void confirmBorrarRolAction()}
+      />
+
+      <ConfirmDialog
+        open={confirmDeleteTurno != null}
+        title="Eliminar turno"
+        description="¿Eliminar este turno del calendario de empleados?"
+        confirmLabel="Eliminar"
+        cancelLabel="Cancelar"
+        variant="danger"
+        busy={empleadoConfirmBusy}
+        onCancel={() => !empleadoConfirmBusy && setConfirmDeleteTurno(null)}
+        onConfirm={() => void confirmDeleteTurnoAction()}
+      />
     </>
   );
 }

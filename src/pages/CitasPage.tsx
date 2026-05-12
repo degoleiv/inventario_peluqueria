@@ -23,6 +23,7 @@ import {
 } from "../api";
 import { useToast } from "../context/ToastContext";
 import { SubNav } from "../components/SubNav";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Drawer } from "../components/Drawer";
 import { DailyTimeline, type AgendaVentanaDia } from "../components/agenda/DailyTimeline";
 import { MonthCalendar, localDayKeyFromIso } from "../components/agenda/MonthCalendar";
@@ -247,6 +248,9 @@ export function CitasPage() {
   /** Día sin turno (gris): modal para confirmar creación del horario del negocio. */
   const [modalDescansoDia, setModalDescansoDia] = useState<string | null>(null);
   const [creandoDiaDescanso, setCreandoDiaDescanso] = useState(false);
+  const [confirmDeleteCitaId, setConfirmDeleteCitaId] = useState<number | null>(null);
+  const [confirmCancelCita, setConfirmCancelCita] = useState<Cita | null>(null);
+  const [citaDialogBusy, setCitaDialogBusy] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
   const fechaParam = searchParams.get("fecha");
@@ -997,11 +1001,18 @@ export function CitasPage() {
     };
   }, [drawerOpen, fechaDia, duracionStr, editingId, profesionalId, filtroProf]);
 
-  async function onDelete(id: number) {
-    if (!confirm("¿Eliminar esta cita?")) return;
+  function requestDeleteCita(id: number) {
+    setConfirmDeleteCitaId(id);
+  }
+
+  async function confirmDeleteCitaAction() {
+    const id = confirmDeleteCitaId;
+    if (id == null) return;
     setError(null);
+    setCitaDialogBusy(true);
     try {
       await deleteCita(id);
+      setConfirmDeleteCitaId(null);
       if (editingId === id) {
         reset();
         setDrawerOpen(false);
@@ -1009,6 +1020,8 @@ export function CitasPage() {
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error");
+    } finally {
+      setCitaDialogBusy(false);
     }
   }
 
@@ -1022,14 +1035,23 @@ export function CitasPage() {
     }
   }
 
-  async function cancelarCitaBusqueda(c: Cita) {
-    if (!window.confirm(`¿Cancelar la cita de «${c.cliente_nombre}»?`)) return;
+  function requestCancelarCita(c: Cita) {
+    setConfirmCancelCita(c);
+  }
+
+  async function confirmCancelarCitaAction() {
+    const c = confirmCancelCita;
+    if (!c) return;
+    setCitaDialogBusy(true);
     try {
       await updateCita(c.id, { estado: "cancelado" });
+      setConfirmCancelCita(null);
       toast("Cita cancelada.", "success");
       await load();
     } catch (e) {
       toast(e instanceof Error ? e.message : "No se pudo cancelar", "error");
+    } finally {
+      setCitaDialogBusy(false);
     }
   }
 
@@ -1498,7 +1520,7 @@ export function CitasPage() {
           {editingId ? "Guardar" : "Agendar"}
         </button>
         {editingId != null ? (
-          <button type="button" className="btn ghost danger-text" onClick={() => void onDelete(editingId)}>
+          <button type="button" className="btn ghost danger-text" onClick={() => requestDeleteCita(editingId)}>
             Eliminar
           </button>
         ) : null}
@@ -1925,11 +1947,41 @@ export function CitasPage() {
               onEdit={openEditDrawer}
               onConfirm={confirmarCitaBusqueda}
               onPos={irAVentaDesdeCita}
-              onCancel={cancelarCitaBusqueda}
+              onCancel={requestCancelarCita}
             />,
             document.body
           )
         : null}
+
+      <ConfirmDialog
+        open={confirmDeleteCitaId != null}
+        title="Eliminar cita"
+        description="¿Eliminar esta cita? Esta acción no se puede deshacer."
+        confirmLabel="Eliminar"
+        cancelLabel="Cancelar"
+        variant="danger"
+        busy={citaDialogBusy}
+        onCancel={() => !citaDialogBusy && setConfirmDeleteCitaId(null)}
+        onConfirm={() => void confirmDeleteCitaAction()}
+      />
+
+      <ConfirmDialog
+        open={confirmCancelCita != null}
+        title="Cancelar cita"
+        description={
+          confirmCancelCita ? (
+            <>
+              ¿Cancelar la cita de <strong>«{confirmCancelCita.cliente_nombre}»</strong>?
+            </>
+          ) : null
+        }
+        confirmLabel="Cancelar cita"
+        cancelLabel="Volver"
+        variant="danger"
+        busy={citaDialogBusy}
+        onCancel={() => !citaDialogBusy && setConfirmCancelCita(null)}
+        onConfirm={() => void confirmCancelCitaAction()}
+      />
     </>
   );
 }

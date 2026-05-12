@@ -28,10 +28,39 @@ function mapCertFetchError(e: unknown): Error {
   return e instanceof Error ? e : new Error(String(e));
 }
 
-/** En desarrollo con Vite, las rutas /api se proxifican al Express. Empaquetado: URL absoluta. */
-const API_BASE =
-  import.meta.env.VITE_API_URL?.trim() ||
-  (import.meta.env.DEV ? "" : "http://127.0.0.1:3010");
+function stripTrailingSlashes(s: string): string {
+  return s.replace(/\/+$/, "");
+}
+
+/**
+ * Base del API para `fetch` y para resolver `<img src>` cuando la BD guarda rutas relativas `/api/...`.
+ * En desarrollo con Vite, `""` hace que `/api` vaya al proxy. En build estática / Tauri hace falta el host del API.
+ */
+export const API_BASE = import.meta.env.VITE_API_URL?.trim()
+  ? stripTrailingSlashes(import.meta.env.VITE_API_URL.trim())
+  : import.meta.env.DEV
+    ? ""
+    : "http://127.0.0.1:3010";
+
+/** Convierte URLs guardadas como `/api/...` en absolutas usando `API_BASE` (necesario fuera del dev server de Vite). */
+export function resolveImageSrc(url: string | null | undefined): string | null {
+  if (url == null) return null;
+  const u = String(url).trim();
+  if (!u) return null;
+  const lower = u.toLowerCase();
+  if (
+    lower.startsWith("http://") ||
+    lower.startsWith("https://") ||
+    lower.startsWith("data:") ||
+    lower.startsWith("blob:")
+  ) {
+    return u;
+  }
+  if (u.startsWith("/api/")) {
+    return `${API_BASE}${u}`;
+  }
+  return u;
+}
 
 export type Producto = {
   id: number;

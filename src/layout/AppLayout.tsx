@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { resolveImageSrc } from "../api";
 import { WorkspaceTabsBar } from "../components/WorkspaceTabsBar";
 import {
   NAV_GROUPS,
@@ -214,7 +215,13 @@ export function AppLayout({
           </button>
           <span className="topbar-brand">
             {brandLogoSrc ? (
-              <img src={brandLogoSrc} alt="" className="topbar-brand-logo" width={28} height={28} />
+              <img
+                src={resolveImageSrc(brandLogoSrc) ?? brandLogoSrc}
+                alt=""
+                className="topbar-brand-logo"
+                width={28}
+                height={28}
+              />
             ) : null}
             {displayBrand}
           </span>
@@ -245,7 +252,7 @@ export function AppLayout({
           <span className="topbar-user" title={userEmail ?? ""}>
             {userFotoUrl ? (
               <img
-                src={userFotoUrl}
+                src={resolveImageSrc(userFotoUrl) ?? userFotoUrl}
                 alt=""
                 className="topbar-user-avatar"
                 width={32}

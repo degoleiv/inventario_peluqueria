@@ -289,6 +289,55 @@ export async function fetchAuthMe(): Promise<{ user: AuthUser }> {
   return requestJson("/api/auth/me");
 }
 
+/** Token inválido o expirado al llamar a `refreshAuthSession`. */
+export class SessionExpiredError extends Error {
+  constructor(message = "Sesión expirada") {
+    super(message);
+    this.name = "SessionExpiredError";
+  }
+}
+
+/** Renueva el JWT con el token actual aún válido (sesión deslizante). */
+export async function refreshAuthSession(): Promise<{
+  accessToken: string;
+  expiresIn: number;
+  user: AuthUser;
+}> {
+  const token = getAccessToken();
+  if (!token) throw new SessionExpiredError();
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}/api/auth/refresh`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  } catch {
+    throw new Error("Sin conexión al renovar la sesión");
+  }
+  const text = await res.text();
+  if (res.status === 401) {
+    throw new SessionExpiredError();
+  }
+  if (!res.ok) {
+    let msg = res.statusText;
+    try {
+      const j = JSON.parse(text) as { error?: string };
+      if (j.error) msg = j.error;
+    } catch {
+      if (text.trim()) msg = text;
+    }
+    throw new Error(msg);
+  }
+  return JSON.parse(text) as {
+    accessToken: string;
+    expiresIn: number;
+    user: AuthUser;
+  };
+}
+
 export type RolDefinicion = {
   slug: string;
   nombre: string;

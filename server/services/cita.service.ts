@@ -113,16 +113,21 @@ function assertInicioPasosDeCinco(inicioIso: string) {
   }
 }
 
-/** Primer instante local ≥ `ms` con minutos y segundos en cero (hora en punto). */
-function msPrimeraHoraEnPuntoLocal(ms: number): number {
+/** Primer instante local ≥ `ms` alineado a múltiplos de `stepMin` (mismo día local). */
+function msPrimeraEnStepLocal(ms: number, stepMin: number): number {
   const d = new Date(ms);
+  if (Number.isNaN(d.getTime())) return ms;
   const y = d.getFullYear();
   const mo = d.getMonth();
   const da = d.getDate();
-  const h = d.getHours();
-  const floor = new Date(y, mo, da, h, 0, 0, 0).getTime();
-  if (ms <= floor) return floor;
-  return new Date(y, mo, da, h + 1, 0, 0, 0).getTime();
+  const day0 = new Date(y, mo, da, 0, 0, 0, 0).getTime();
+  const offset = ms - day0;
+  if (offset < 0) return ms;
+  const step = stepMin * 60_000;
+  const k = Math.floor(offset / step);
+  const slotStart = day0 + k * step;
+  if (slotStart >= ms) return slotStart;
+  return day0 + (k + 1) * step;
 }
 
 async function assertNoOverlap(
@@ -411,7 +416,7 @@ export const citaService = {
     const mm = parts[1]!;
     const dd = parts[2]!;
     const { open, close } = businessHours();
-    const hourMs = 60 * 60 * 1000;
+    const stepMs = CITA_PASO_MINUTOS * 60_000;
     const slots: string[] = [];
     const seen = new Set<string>();
     const startDay = new Date(yy, mm - 1, dd, Math.floor(open), Math.round((open % 1) * 60), 0, 0);
@@ -448,9 +453,9 @@ export const citaService = {
         const effEndMs = Math.min(endClose.getTime(), segEnd.getTime());
         if (effEndMs <= effStartMs) continue;
         for (
-          let t = msPrimeraHoraEnPuntoLocal(effStartMs);
+          let t = msPrimeraEnStepLocal(effStartMs, CITA_PASO_MINUTOS);
           t + dur * 60_000 <= effEndMs;
-          t += hourMs
+          t += stepMs
         ) {
           await pushIfFree(t);
           if (slots.length >= 64) break;
@@ -459,9 +464,9 @@ export const citaService = {
       }
     } else {
       for (
-        let t = msPrimeraHoraEnPuntoLocal(startDay.getTime());
+        let t = msPrimeraEnStepLocal(startDay.getTime(), CITA_PASO_MINUTOS);
         t + dur * 60_000 <= endClose.getTime();
-        t += hourMs
+        t += stepMs
       ) {
         await pushIfFree(t);
         if (slots.length >= 64) break;

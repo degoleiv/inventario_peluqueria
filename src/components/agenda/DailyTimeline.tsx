@@ -58,13 +58,34 @@ function blockStyleClipped(
 /** Paso por defecto al elegir hueco en la grilla (5 min: ajustes finos al mover la cita). */
 export const AGENDA_SNAP_CLIC_MINUTOS = 5;
 
-function snapMinEnRango(totalMin: number, workStart: number, workEnd: number, step = AGENDA_SNAP_CLIC_MINUTOS): number {
+/**
+ * Alinea el minuto de inicio al paso (p. ej. 5 min) y lo limita para que
+ * `[inicio, inicio + duración)` quede dentro de `[workStart, workEnd)`.
+ * (Antes se usaba `span - paso`, lo que permitía empezar demasiado tarde con citas largas
+ * y rompía la coherencia con la ocupación por bloques.)
+ */
+function snapMinEnRango(
+  totalMin: number,
+  workStart: number,
+  workEnd: number,
+  appointmentDurMin: number,
+  step = AGENDA_SNAP_CLIC_MINUTOS
+): number {
   const span = workEnd - workStart;
+  if (!(span > 0)) return workStart;
+
   const effStep = Math.min(step, Math.max(5, span));
-  const rel = totalMin - workStart;
-  const snapped = Math.round(rel / effStep) * effStep;
-  const clamped = Math.max(0, Math.min(Math.max(0, span - effStep), snapped));
-  return workStart + clamped;
+  const dur = Math.max(1, Math.round(appointmentDurMin));
+  const rel = Math.max(0, Math.min(span, totalMin - workStart));
+  const snappedRel = Math.round(rel / effStep) * effStep;
+
+  if (dur > span) {
+    return workStart;
+  }
+
+  const maxRel = Math.max(0, Math.floor((span - dur) / effStep) * effStep);
+  const clampedRel = Math.min(Math.max(0, snappedRel), maxRel);
+  return workStart + clampedRel;
 }
 
 function mergeIntervals(iv: [number, number][]): [number, number][] {
@@ -264,9 +285,11 @@ function AgendaSegmentTrack({
     const pct = Math.max(0, Math.min(1, y / rect.height));
     const totalMin = workStart + pct * canvasSpan;
     if (totalMin < workStart - 0.5 || totalMin > workEnd) return null;
-    const snapped = snapMinEnRango(totalMin, workStart, workEnd, AGENDA_SNAP_CLIC_MINUTOS);
     const durMin = Math.max(1, Math.round(marcaDuracionMinutos ?? 60));
+    if (durMin > canvasSpan) return null;
+    const snapped = snapMinEnRango(totalMin, workStart, workEnd, durMin, AGENDA_SNAP_CLIC_MINUTOS);
     const rangeEnd = snapped + durMin;
+    if (rangeEnd > workEnd + 1e-6) return null;
     const stepClic = AGENDA_SNAP_CLIC_MINUTOS;
     if (ocupacionActiva && slotsOcupacionClic.length > 0) {
       for (const sl of slotsOcupacionClic) {

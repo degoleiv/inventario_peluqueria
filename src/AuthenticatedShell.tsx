@@ -33,9 +33,11 @@ import {
   fetchBranding,
   fetchClientes,
   fetchSyncEstado,
+  refreshAuthSession,
+  SessionExpiredError,
   type Cliente,
 } from "./api";
-import { clearAccessToken } from "./auth/token";
+import { clearAccessToken, getAccessToken, setAccessToken } from "./auth/token";
 import { applyBrandingToDocument } from "./lib/brandingDocument";
 import {
   getModuleEntryPath,
@@ -178,6 +180,38 @@ export function AuthenticatedShell() {
     const fn = () => setAuthTick((t) => t + 1);
     window.addEventListener("peluqueria-auth-refresh", fn);
     return () => window.removeEventListener("peluqueria-auth-refresh", fn);
+  }, []);
+
+  /** Sesión deslizante: mientras la pestaña está visible se renueva el JWT antes de que venza. */
+  useEffect(() => {
+    const REFRESH_MS = 4 * 60 * 1000;
+    const renew = () => {
+      if (document.visibilityState !== "visible") return;
+      if (!getAccessToken()) return;
+      void refreshAuthSession()
+        .then((r) => {
+          setAccessToken(r.accessToken);
+          window.dispatchEvent(new Event("peluqueria-auth-refresh"));
+        })
+        .catch((e: unknown) => {
+          if (e instanceof SessionExpiredError) {
+            clearAccessToken();
+            window.location.reload();
+            return;
+          }
+          console.warn("[shell] refreshAuthSession:", e);
+        });
+    };
+    const id = window.setInterval(renew, REFRESH_MS);
+    const onVis = () => {
+      if (document.visibilityState === "visible") renew();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    renew();
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVis);
+    };
   }, []);
 
   const primeraVistaPermitida = useMemo((): NavKey => {

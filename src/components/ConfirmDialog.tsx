@@ -15,7 +15,7 @@ type Props = {
 
 /**
  * Diálogo modal accesible (fondo visual sin cerrar al clic; Escape y botones cancelar).
- * z-index por encima del drawer (100) para confirmar acciones destructivas.
+ * z-index por encima de modales centrados (.drawer-overlay, z-index 120) — ver `.confirm-dialog-root` en App.css.
  */
 export function ConfirmDialog({
   open,

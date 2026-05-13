@@ -10094,7 +10094,8 @@ select {
 .confirm-dialog-root {
   position: fixed;
   inset: 0;
-  z-index: 110;
+  /* Por encima de .drawer-overlay (120) en proveedores/pedidos; por debajo de toasts / emoji-mart */
+  z-index: 220;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -10421,6 +10422,11 @@ select {
 .inventario-filtros__buscar {
   flex: 1 1 240px;
   min-width: 200px;
+}
+
+.inventario-filtros__proveedor {
+  flex: 0 1 200px;
+  min-width: 160px;
 }
 
 .inventario-filtros__estado {
@@ -10971,6 +10977,13 @@ select {
 .prov-detail-footer--solo {
   display: flex;
   justify-content: center;
+}
+
+.prov-detail-footer--actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 .prov-detail-url {

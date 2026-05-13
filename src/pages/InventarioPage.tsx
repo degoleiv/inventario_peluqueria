@@ -75,6 +75,8 @@ export function InventarioPage() {
   const [estadoSavingId, setEstadoSavingId] = useState<number | null>(null);
   const [filtroBusqueda, setFiltroBusqueda] = useState("");
   const [filtroEstado, setFiltroEstado] = useState<"todos" | "activo" | "inactivo">("todos");
+  /** "todos" | "sin" (sin proveedor) | id numérico como string */
+  const [filtroProveedor, setFiltroProveedor] = useState<string>("todos");
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; p: Producto } | null>(null);
   /** Si no es null, el drawer de creación está rellenado desde este producto (flujo “Duplicar”). */
   const [duplicateDraftSource, setDuplicateDraftSource] = useState<Producto | null>(null);
@@ -159,6 +161,10 @@ export function InventarioPage() {
     void load();
   }, [load]);
 
+  /** Catálogo para el desplegable de proveedor en filtros (también se recarga al abrir el formulario). */
+  useEffect(() => {
+    void loadInventarioCatalogo("silent");
+  }, [loadInventarioCatalogo]);
 
   /** Al cargar un código nuevo (≥8 caracteres), consulta automática tras un breve debounce. */
   useEffect(() => {
@@ -349,8 +355,7 @@ export function InventarioPage() {
     setEditingId(null);
     setCreatingNew(true);
     setCodigo("");
-    const baseNombre = p.nombre.trim();
-    setNombre(baseNombre ? `${baseNombre} (copia)` : "(copia)");
+    setNombre(p.nombre.trim());
     setMarca(p.marca ?? "");
     setCategoria(p.categoria ?? "");
     setProveedorId(
@@ -479,12 +484,22 @@ export function InventarioPage() {
     return productos.filter((p) => {
       if (filtroEstado === "activo" && p.estado === "inactivo") return false;
       if (filtroEstado === "inactivo" && p.estado !== "inactivo") return false;
+      if (filtroProveedor !== "todos") {
+        const pid =
+          p.proveedor_id != null && Number.isFinite(Number(p.proveedor_id)) ? Number(p.proveedor_id) : null;
+        if (filtroProveedor === "sin") {
+          if (pid != null && pid > 0) return false;
+        } else {
+          const want = Number(filtroProveedor);
+          if (!Number.isFinite(want) || pid !== want) return false;
+        }
+      }
       if (!q) return true;
       const nombre = p.nombre?.toLowerCase() ?? "";
       const codigo = p.codigo_barras?.toLowerCase() ?? "";
       return nombre.includes(q) || codigo.includes(q);
     });
-  }, [productos, filtroBusqueda, filtroEstado]);
+  }, [productos, filtroBusqueda, filtroEstado, filtroProveedor]);
 
   const productosOrdenados = useMemo(() => {
     return [...productosFiltrados].sort((a, b) => {
@@ -638,6 +653,24 @@ export function InventarioPage() {
               autoComplete="off"
             />
           </label>
+          <label className="field inventario-filtros__proveedor">
+            <span>Proveedor</span>
+            <select
+              value={filtroProveedor}
+              onChange={(e) => setFiltroProveedor(e.target.value)}
+              aria-label="Filtrar por proveedor (marca)"
+            >
+              <option value="todos">Todos</option>
+              <option value="sin">Sin proveedor</option>
+              {[...(inventarioCatalogo?.proveedores ?? [])]
+                .sort((a, b) => a.nombre.localeCompare(b.nombre, "es", { sensitivity: "base" }))
+                .map((pr) => (
+                  <option key={pr.id} value={String(pr.id)}>
+                    {pr.nombre}
+                  </option>
+                ))}
+            </select>
+          </label>
           <label className="field inventario-filtros__estado">
             <span>Estado</span>
             <select
@@ -651,18 +684,19 @@ export function InventarioPage() {
               <option value="inactivo">Inactivos</option>
             </select>
           </label>
-          {(filtroBusqueda || filtroEstado !== "todos") && !loading ? (
+          {(filtroBusqueda || filtroEstado !== "todos" || filtroProveedor !== "todos") && !loading ? (
             <span className="muted small inventario-filtros__count">
               {productosFiltrados.length} de {productos.length}
             </span>
           ) : null}
-          {filtroBusqueda || filtroEstado !== "todos" ? (
+          {filtroBusqueda || filtroEstado !== "todos" || filtroProveedor !== "todos" ? (
             <button
               type="button"
               className="btn ghost small"
               onClick={() => {
                 setFiltroBusqueda("");
                 setFiltroEstado("todos");
+                setFiltroProveedor("todos");
               }}
             >
               Limpiar

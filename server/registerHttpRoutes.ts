@@ -6,7 +6,7 @@ import { db } from "./db.js";
 import { lookupBarcode } from "./barcode.js";
 import { requireAdmin, requireAlguno, requireAuth, requirePermiso } from "./middleware/auth.js";
 import { asyncHandler } from "./utils/asyncHandler.js";
-import { bootstrapFirstAdmin, login } from "./services/auth.service.js";
+import { bootstrapFirstAdmin, login, refreshAccessTokenSession } from "./services/auth.service.js";
 import { usuariosRepo } from "./repositories/usuarios.js";
 import { productoService } from "./services/producto.service.js";
 import { clienteService } from "./services/cliente.service.js";
@@ -200,6 +200,19 @@ export function registerHttpRoutes(app: Express) {
           foto_url: dbUser?.foto_url ?? null,
         },
       });
+    })
+  );
+
+  api.post(
+    "/auth/refresh",
+    asyncHandler(async (req, res) => {
+      const u = req.user!;
+      const out = await refreshAccessTokenSession({
+        sub: u.sub,
+        email: u.email,
+        rol: u.rol,
+      });
+      res.json(out);
     })
   );
 

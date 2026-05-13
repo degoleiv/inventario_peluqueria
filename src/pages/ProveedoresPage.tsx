@@ -340,12 +340,13 @@ export function ProveedoresPage() {
         return;
       }
       if (detailProveedor) {
+        if (detailUnsavedChoiceOpen) return;
         void requestCloseDetail();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [modalOpen, deleteTarget, detailProveedor, requestCloseDetail]);
+  }, [modalOpen, deleteTarget, detailProveedor, detailUnsavedChoiceOpen, requestCloseDetail]);
 
   function openCreate() {
     setNombre("");
@@ -696,7 +697,16 @@ export function ProveedoresPage() {
                 </div>
               </dl>
             </fieldset>
-            <div className="actions prov-detail-footer prov-detail-footer--solo">
+            <div className="actions prov-detail-footer prov-detail-footer--actions">
+              <button
+                type="button"
+                className="btn primary"
+                disabled={detailSaveBusy || !detailDirty}
+                title={!detailDirty ? "No hay cambios para guardar" : undefined}
+                onClick={() => void saveDetailProveedorAndClose()}
+              >
+                {detailSaveBusy ? "Guardando…" : "Guardar"}
+              </button>
               <button
                 type="button"
                 className="btn ghost"
@@ -704,7 +714,7 @@ export function ProveedoresPage() {
                 disabled={detailSaveBusy}
                 onClick={() => void requestCloseDetail()}
               >
-                {detailSaveBusy ? "Guardando…" : "Cerrar"}
+                Cerrar
               </button>
             </div>
           </div>

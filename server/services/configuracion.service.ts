@@ -1,6 +1,13 @@
 import { db } from "../db.js";
 import { AppError } from "../lib/AppError.js";
 import {
+  CLAVE_MEDIOS_PAGO_TRANSFERENCIA,
+  MEDIOS_TRANSFERENCIA_DEFAULT,
+  parseMediosTransferenciaJson,
+  validarMediosTransferenciaBody,
+  type MedioPagoTransferencia,
+} from "../lib/mediosPagoTransferencia.js";
+import {
   isOurMediaUrl,
   saveDataUrlToDisk,
   saveImageDataUrl,
@@ -266,5 +273,25 @@ export const configuracionService = {
       await setValor("sis_backup_auto", body.backup_auto ? "1" : "0");
     }
     return await configuracionService.getSistemaPrefs();
+  },
+
+  async getMediosPagoTransferencia(): Promise<MedioPagoTransferencia[]> {
+    const raw = await getValor(CLAVE_MEDIOS_PAGO_TRANSFERENCIA);
+    return parseMediosTransferenciaJson(raw);
+  },
+
+  async updateMediosPagoTransferencia(body: Record<string, unknown>): Promise<MedioPagoTransferencia[]> {
+    try {
+      const medios = validarMediosTransferenciaBody(body.medios ?? body);
+      await setValor(CLAVE_MEDIOS_PAGO_TRANSFERENCIA, JSON.stringify(medios));
+      return medios;
+    } catch (e) {
+      throw new AppError(e instanceof Error ? e.message : "Medios de transferencia inválidos");
+    }
+  },
+
+  /** Valores por defecto al instalar (migración). */
+  mediosTransferenciaDefaultJson(): string {
+    return JSON.stringify(MEDIOS_TRANSFERENCIA_DEFAULT);
   },
 };

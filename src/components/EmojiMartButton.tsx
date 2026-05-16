@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import data from "@emoji-mart/data";
+import { emojiMartPickerEsProps } from "../lib/emojiMartLocale";
 import { readDataTheme, subscribeDataTheme } from "../lib/emojiMartTheme";
 
 const EmojiPicker = lazy(() => import("@emoji-mart/react"));
@@ -49,7 +49,7 @@ export function EmojiMartButton({
         <div className="emoji-mart-popover" role="dialog" aria-label="Selector de emojis">
           <Suspense fallback={<div className="emoji-mart-fallback muted">Cargando emojis…</div>}>
             <EmojiPicker
-              data={data}
+              {...emojiMartPickerEsProps}
               theme={pickerTheme}
               onEmojiSelect={(emoji: EmojiSelectPayload) => {
                 onPick(emoji.native);

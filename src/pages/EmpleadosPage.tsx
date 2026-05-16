@@ -31,6 +31,7 @@ import {
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Drawer } from "../components/Drawer";
 import { SubNav } from "../components/SubNav";
+import { esEmpleadoSalarioFijo } from "../lib/nominaEmpleado";
 import { EMPLEADOS_TABS, readEmpleadosTab, type EmpleadosTab } from "../lib/moduleRoutes";
 import { NAV_LABEL, PERMISO_MODULOS, type PermisoModulo } from "../nav";
 import { useToast } from "../context/ToastContext";
@@ -47,20 +48,6 @@ function addDaysIso(iso: string, days: number): string {
   const dt = new Date(y, m - 1, d);
   dt.setDate(dt.getDate() + days);
   return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
-}
-
-function countIsoDaysInclusive(from: string, to: string): number {
-  const a = from.split("-").map(Number);
-  const b = to.split("-").map(Number);
-  const d0 = new Date(a[0], a[1] - 1, a[2]);
-  const d1 = new Date(b[0], b[1] - 1, b[2]);
-  if (d1 < d0) return -1;
-  let n = 0;
-  for (let c = new Date(d0.getTime()); c <= d1; c.setDate(c.getDate() + 1)) {
-    n++;
-    if (n > 200) return 200;
-  }
-  return n;
 }
 
 /** Orden Lun→Dom; valores como `Date.getDay()` (0 dom … 6 sáb). */
@@ -143,12 +130,10 @@ export function EmpleadosPage({ onChanged }: Props) {
     telefono: "",
     color_agenda: "#b8956a",
     foto_url: "",
-    tipo_comision: "porcentaje" as "porcentaje" | "fijo",
+    tipo_comision: "porcentaje" as "porcentaje" | "fijo" | "salario",
     valor_comision: "0",
     activo: true,
     registrar_turnos_plantilla: true,
-    turno_fecha_desde: isoToday(),
-    turno_fecha_hasta: addDaysIso(isoToday(), 55),
     turno_hora_inicio: "09:00",
     turno_hora_fin: "18:00",
     /** Días laborables iniciales: Lun–Vie */
@@ -268,14 +253,12 @@ export function EmpleadosPage({ onChanged }: Props) {
       nombre: "",
       rol: defaultRol,
       telefono: "",
-      color_agenda: "#b8956a",
+      color_agenda: "",
       foto_url: "",
-      tipo_comision: "porcentaje",
+      tipo_comision: defaultRol === "vendedor" ? "salario" : "porcentaje",
       valor_comision: "0",
       activo: true,
       registrar_turnos_plantilla: true,
-      turno_fecha_desde: isoToday(),
-      turno_fecha_hasta: addDaysIso(isoToday(), 55),
       turno_hora_inicio: "09:00",
       turno_hora_fin: "18:00",
       turno_dias_semana: [1, 2, 3, 4, 5],
@@ -294,12 +277,14 @@ export function EmpleadosPage({ onChanged }: Props) {
       color_agenda: u.color_agenda?.trim() || "#b8956a",
       foto_url: u.foto_url ?? "",
       tipo_comision:
-        u.tipo_comision === "fijo" ? "fijo" : ("porcentaje" as const),
+        esEmpleadoSalarioFijo(u.rol, u.tipo_comision)
+          ? "salario"
+          : u.tipo_comision === "fijo"
+            ? "fijo"
+            : ("porcentaje" as const),
       valor_comision: String(u.valor_comision ?? 0),
       activo: u.activo === 1,
       registrar_turnos_plantilla: true,
-      turno_fecha_desde: isoToday(),
-      turno_fecha_hasta: addDaysIso(isoToday(), 55),
       turno_hora_inicio: "09:00",
       turno_hora_fin: "18:00",
       turno_dias_semana: [1, 2, 3, 4, 5],
@@ -322,6 +307,8 @@ export function EmpleadosPage({ onChanged }: Props) {
     e.preventDefault();
     try {
       const vc = Number(form.valor_comision.replace(",", "."));
+      const salarioFijo = esEmpleadoSalarioFijo(form.rol, form.tipo_comision);
+      const tipoComision = salarioFijo ? "salario" : form.tipo_comision;
       if (editing) {
         await updateUsuario(editing.id, {
           nombre: form.nombre.trim() || null,
@@ -330,7 +317,7 @@ export function EmpleadosPage({ onChanged }: Props) {
           telefono: form.telefono.trim() || null,
           color_agenda: form.color_agenda.trim() || null,
           foto_url: form.foto_url.trim() || null,
-          tipo_comision: form.tipo_comision,
+          tipo_comision: tipoComision,
           valor_comision: Number.isFinite(vc) ? vc : 0,
           activo: form.activo,
         });
@@ -342,18 +329,11 @@ export function EmpleadosPage({ onChanged }: Props) {
             toast("Elegí al menos un día de la semana para los turnos iniciales.", "error");
             return;
           }
-          const span = countIsoDaysInclusive(form.turno_fecha_desde, form.turno_fecha_hasta);
-          if (span < 0) {
-            toast("La fecha hasta no puede ser anterior a la fecha desde.", "error");
-            return;
-          }
-          if (span > 120) {
-            toast("El rango de fechas no puede superar 120 días.", "error");
-            return;
-          }
+          const fechaDesde = isoToday();
+          const fechaHasta = addDaysIso(fechaDesde, 55);
           turno_inicial = {
-            fecha_desde: form.turno_fecha_desde,
-            fecha_hasta: form.turno_fecha_hasta,
+            fecha_desde: fechaDesde,
+            fecha_hasta: fechaHasta,
             dias_semana: [...form.turno_dias_semana].sort((a, b) => a - b),
             hora_inicio: form.turno_hora_inicio.trim(),
             hora_fin: form.turno_hora_fin.trim(),
@@ -365,9 +345,8 @@ export function EmpleadosPage({ onChanged }: Props) {
           nombre: form.nombre.trim() || undefined,
           rol: form.rol,
           telefono: form.telefono.trim() || null,
-          color_agenda: form.color_agenda.trim() || null,
           foto_url: form.foto_url.trim() || null,
-          tipo_comision: form.tipo_comision,
+          tipo_comision: tipoComision,
           valor_comision: Number.isFinite(vc) ? vc : 0,
           turno_inicial,
         });
@@ -1033,8 +1012,8 @@ export function EmpleadosPage({ onChanged }: Props) {
             </button>
           </div>
           <p className="hint">
-            Pendientes se descuentan del saldo respecto de comisiones del período:{" "}
-            <strong>saldo ≈ comisiones − adelantos pendientes</strong>.
+            Pendientes se descuentan del saldo respecto de la remuneración del período (comisiones o
+            salario fijo): <strong>saldo ≈ remuneración − adelantos pendientes</strong>.
           </p>
           <div className="field-row" style={{ marginBottom: "1rem", flexWrap: "wrap" }}>
             <label className="field">
@@ -1083,8 +1062,16 @@ export function EmpleadosPage({ onChanged }: Props) {
             >
               <strong>{resumenEmp.empleado_nombre ?? "Empleado"}</strong>
               <div className="muted small">
-                Comisiones (período): {formatMoney(resumenEmp.total_comisiones_periodo)} · Pendiente
-                descuentos/adelantos: {formatMoney(resumenEmp.adelantos_y_descuentos_pendiente)} ·{" "}
+                {resumenEmp.remuneracion_tipo === "salario" ? (
+                  <>
+                    Salario mensual: {formatMoney(resumenEmp.salario_mensual ?? 0)} · Salario del
+                    período: {formatMoney(resumenEmp.total_comisiones_periodo)}
+                  </>
+                ) : (
+                  <>Comisiones (período): {formatMoney(resumenEmp.total_comisiones_periodo)}</>
+                )}{" "}
+                · Pendiente descuentos/adelantos:{" "}
+                {formatMoney(resumenEmp.adelantos_y_descuentos_pendiente)} ·{" "}
                 <strong>Saldo: {formatMoney(resumenEmp.saldo_final)}</strong>
               </div>
             </div>
@@ -1227,15 +1214,15 @@ export function EmpleadosPage({ onChanged }: Props) {
       {tab === "liquidacion" ? (
         <section className="card">
           <div className="card-head">
-            <h2 className="card-title">Liquidación de comisiones</h2>
+            <h2 className="card-title">Liquidación de nómina</h2>
             <button type="button" className="btn ghost small" onClick={() => void loadLiquidacion()}>
               Actualizar
             </button>
           </div>
           <p className="hint">
-            Las citas en estado <strong>realizado</strong> con importe cobrado generan comisión con el porcentaje
-            o monto fijo configurado en cada empleado (igual que las ventas en POS). Acá ves el total a pagar por
-            persona, el detalle por venta/cita y los bloques de turno de agenda registrados en el mismo período.
+            Profesionales y empleados con comisión: las ventas y citas realizadas generan líneas según su
+            porcentaje o monto fijo. Los <strong>vendedores</strong> tienen salario mensual fijo (sin comisiones
+            por venta). Acá ves el total a pagar por persona, el detalle y los turnos de agenda del período.
           </p>
           <div className="field-row" style={{ marginBottom: "1rem", flexWrap: "wrap", alignItems: "flex-end" }}>
             <label className="field">
@@ -1278,7 +1265,7 @@ export function EmpleadosPage({ onChanged }: Props) {
                   Período {liqData.periodo.desde} — {liqData.periodo.hasta}
                 </div>
                 <div style={{ fontSize: "1.25rem", marginTop: "0.35rem" }}>
-                  Total comisiones (todas):{" "}
+                  Total a pagar (todas):{" "}
                   <strong>
                     {new Intl.NumberFormat("es-AR", {
                       style: "currency",
@@ -1292,7 +1279,11 @@ export function EmpleadosPage({ onChanged }: Props) {
                 <p className="muted">No hay datos en este rango.</p>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-                  {liqData.empleados.map((emp) => (
+                  {liqData.empleados.map((emp) => {
+                    const esSalario =
+                      emp.remuneracion_tipo === "salario" ||
+                      esEmpleadoSalarioFijo(emp.rol, emp.tipo_comision);
+                    return (
                     <div
                       key={emp.empleado_id}
                       style={{
@@ -1304,7 +1295,12 @@ export function EmpleadosPage({ onChanged }: Props) {
                       <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: "0.5rem" }}>
                         <div>
                           <strong>{emp.empleado_nombre ?? `Empleado #${emp.empleado_id}`}</strong>
-                          {emp.tipo_comision ? (
+                          {esSalario ? (
+                            <div className="muted small">
+                              Salario fijo: {formatMoney(emp.valor_comision)} / mes
+                              {emp.rol === "vendedor" ? " · vendedor" : ""}
+                            </div>
+                          ) : emp.tipo_comision ? (
                             <div className="muted small">
                               Comisión:{" "}
                               {emp.tipo_comision === "fijo"
@@ -1314,7 +1310,9 @@ export function EmpleadosPage({ onChanged }: Props) {
                           ) : null}
                         </div>
                         <div style={{ textAlign: "right" }}>
-                          <div className="muted small">A pagar (comisiones período)</div>
+                          <div className="muted small">
+                            {esSalario ? "A pagar (salario período)" : "A pagar (comisiones período)"}
+                          </div>
                           <div style={{ fontSize: "1.15rem" }}>
                             <strong>
                               {new Intl.NumberFormat("es-AR", {
@@ -1326,7 +1324,7 @@ export function EmpleadosPage({ onChanged }: Props) {
                           </div>
                         </div>
                       </div>
-                      {emp.lineas.length > 0 ? (
+                      {!esSalario && emp.lineas.length > 0 ? (
                         <>
                           <h3 className="card-title" style={{ fontSize: "0.95rem", marginTop: "1rem" }}>
                             Detalle comisiones
@@ -1370,9 +1368,13 @@ export function EmpleadosPage({ onChanged }: Props) {
                             </table>
                           </div>
                         </>
-                      ) : (
+                      ) : !esSalario ? (
                         <p className="muted small" style={{ marginTop: "0.75rem" }}>
                           Sin líneas de comisión en el período.
+                        </p>
+                      ) : (
+                        <p className="muted small" style={{ marginTop: "0.75rem" }}>
+                          Remuneración por salario fijo mensual (prorrateado al período seleccionado).
                         </p>
                       )}
                       {emp.turnos_agenda.length > 0 ? (
@@ -1405,7 +1407,8 @@ export function EmpleadosPage({ onChanged }: Props) {
                         </>
                       ) : null}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </>
@@ -1614,7 +1617,18 @@ export function EmpleadosPage({ onChanged }: Props) {
             <select
               required
               value={form.rol}
-              onChange={(e) => setForm((x) => ({ ...x, rol: e.target.value }))}
+              onChange={(e) => {
+                const rol = e.target.value;
+                setForm((x) => {
+                  if (rol === "vendedor") {
+                    return { ...x, rol, tipo_comision: "salario" };
+                  }
+                  if (x.tipo_comision === "salario") {
+                    return { ...x, rol, tipo_comision: "porcentaje" };
+                  }
+                  return { ...x, rol };
+                });
+              }}
             >
               {roles.map((r) => (
                 <option key={r.slug} value={r.slug}>
@@ -1623,31 +1637,46 @@ export function EmpleadosPage({ onChanged }: Props) {
               ))}
             </select>
           </label>
-          <div className="field-row">
+          {esEmpleadoSalarioFijo(form.rol, form.tipo_comision) ? (
             <label className="field">
-              <span>Tipo de comisión</span>
-              <select
-                value={form.tipo_comision}
-                onChange={(e) =>
-                  setForm((x) => ({
-                    ...x,
-                    tipo_comision: e.target.value as "porcentaje" | "fijo",
-                  }))
-                }
-              >
-                <option value="porcentaje">Porcentaje sobre venta</option>
-                <option value="fijo">Monto fijo por venta</option>
-              </select>
-            </label>
-            <label className="field">
-              <span>{form.tipo_comision === "fijo" ? "Monto fijo" : "Porcentaje (%)"}</span>
+              <span>Salario mensual</span>
               <input
                 inputMode="decimal"
                 value={form.valor_comision}
                 onChange={(e) => setForm((x) => ({ ...x, valor_comision: e.target.value }))}
+                placeholder="Ej. 450000"
               />
+              <span className="muted small">
+                Los vendedores no generan comisiones por venta; la liquidación usa este salario fijo.
+              </span>
             </label>
-          </div>
+          ) : (
+            <div className="field-row">
+              <label className="field">
+                <span>Tipo de comisión</span>
+                <select
+                  value={form.tipo_comision}
+                  onChange={(e) =>
+                    setForm((x) => ({
+                      ...x,
+                      tipo_comision: e.target.value as "porcentaje" | "fijo",
+                    }))
+                  }
+                >
+                  <option value="porcentaje">Porcentaje sobre venta</option>
+                  <option value="fijo">Monto fijo por venta</option>
+                </select>
+              </label>
+              <label className="field">
+                <span>{form.tipo_comision === "fijo" ? "Monto fijo" : "Porcentaje (%)"}</span>
+                <input
+                  inputMode="decimal"
+                  value={form.valor_comision}
+                  onChange={(e) => setForm((x) => ({ ...x, valor_comision: e.target.value }))}
+                />
+              </label>
+            </div>
+          )}
           <label className="field">
             <span>Teléfono</span>
             <input
@@ -1655,14 +1684,16 @@ export function EmpleadosPage({ onChanged }: Props) {
               onChange={(e) => setForm((x) => ({ ...x, telefono: e.target.value }))}
             />
           </label>
-          <label className="field">
-            <span>Color en agenda</span>
-            <input
-              type="color"
-              value={form.color_agenda}
-              onChange={(e) => setForm((x) => ({ ...x, color_agenda: e.target.value }))}
-            />
-          </label>
+          {editing ? (
+            <label className="field">
+              <span>Color en agenda</span>
+              <input
+                type="color"
+                value={form.color_agenda}
+                onChange={(e) => setForm((x) => ({ ...x, color_agenda: e.target.value }))}
+              />
+            </label>
+          ) : null}
           <label className="field">
             <span>Foto (archivo)</span>
             <input ref={fotoFileInputRef} type="file" accept="image/*" onChange={onFotoFile} />
@@ -1727,24 +1758,6 @@ export function EmpleadosPage({ onChanged }: Props) {
                 <>
                   <div className="field-row">
                     <label className="field">
-                      <span>Desde</span>
-                      <input
-                        type="date"
-                        value={form.turno_fecha_desde}
-                        onChange={(e) => setForm((x) => ({ ...x, turno_fecha_desde: e.target.value }))}
-                      />
-                    </label>
-                    <label className="field">
-                      <span>Hasta</span>
-                      <input
-                        type="date"
-                        value={form.turno_fecha_hasta}
-                        onChange={(e) => setForm((x) => ({ ...x, turno_fecha_hasta: e.target.value }))}
-                      />
-                    </label>
-                  </div>
-                  <div className="field-row">
-                    <label className="field">
                       <span>Hora inicio</span>
                       <input
                         type="time"
@@ -1786,7 +1799,8 @@ export function EmpleadosPage({ onChanged }: Props) {
                     </div>
                   </div>
                   <p className="muted small" style={{ margin: 0 }}>
-                    Máximo 120 días de rango. Se crea un turno por cada fecha que coincida con los días marcados.
+                    Se generan turnos desde hoy durante ~8 semanas en los días marcados. Podés ajustar fechas
+                    después en la pestaña Turnos.
                   </p>
                 </>
               ) : null}

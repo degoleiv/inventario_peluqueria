@@ -30,8 +30,9 @@ export const clienteService = {
   async create(body: Record<string, unknown>) {
     const nombre = typeof body.nombre === "string" ? body.nombre.trim() : "";
     if (!nombre) throw new AppError("nombre requerido");
-    const telefono = typeof body.telefono === "string" ? body.telefono.trim() || null : null;
-    if (telefono) {
+    const telefono = typeof body.telefono === "string" ? body.telefono.trim() : "";
+    if (!telefono) throw new AppError("teléfono requerido");
+    {
       const d = await db
         .prepare(`SELECT id FROM clientes WHERE telefono = ? AND telefono != ''`)
         .get(telefono);
@@ -43,9 +44,11 @@ export const clienteService = {
       throw new AppError("Correo electrónico no válido");
     }
     const tipo_documento =
-      typeof body.tipo_documento === "string" ? body.tipo_documento.trim() || null : null;
+      typeof body.tipo_documento === "string" ? body.tipo_documento.trim() : "";
+    if (!tipo_documento) throw new AppError("tipo de documento requerido");
     const numero_documento =
-      typeof body.numero_documento === "string" ? body.numero_documento.trim() || null : null;
+      typeof body.numero_documento === "string" ? body.numero_documento.trim() : "";
+    if (!numero_documento) throw new AppError("número de documento requerido");
     if (numero_documento) {
       const dupDoc = await db
         .prepare(

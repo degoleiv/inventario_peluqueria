@@ -20,6 +20,7 @@ import {
   fetchCitasAsociarVentas,
   fetchClientes,
   fetchEquipo,
+  fetchInventarioCatalogo,
   fetchProductos,
   fetchVentas,
   lookupBarcode,
@@ -29,6 +30,7 @@ import {
   type Cita,
   type Cliente,
   type EquipoMiembro,
+  type InventarioCatalogo,
   type Producto,
   type Venta,
 } from "../api";
@@ -46,7 +48,18 @@ import {
   togglePinProduct,
 } from "../lib/recentPins";
 import { posBeepErr, posBeepOk } from "../lib/posSounds";
+import {
+  buildMetodoPagoParaApi,
+  METODO_PAGO_VENTA_INICIAL,
+  METODOS_PAGO_POS,
+  validarMetodoPagoVenta,
+  type MetodoPagoVentaInput,
+} from "../lib/ventaMetodoPago";
+import { PosMetodoPagoFields } from "../components/ventas/PosMetodoPagoFields";
+import { useMediosPagoTransferencia } from "../hooks/useMediosPagoTransferencia";
 import { SubNav } from "../components/SubNav";
+import { VentasHistorialSection } from "../components/ventas/VentasHistorialSection";
+import { VentasCierreSection } from "../components/ventas/VentasCierreSection";
 import { readVentasTab, VENTAS_TABS, type VentasTab } from "../lib/moduleRoutes";
 import { publishPosClienteDisplay } from "../lib/posClientDisplay";
 import { lineasServicioDesdeTextoAgenda, parsePosPreloadCita } from "../lib/posPrecargaDesdeCita";
@@ -78,6 +91,7 @@ export function VentasPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const toast = useToast();
+  const { medios: mediosTransferencia } = useMediosPagoTransferencia();
   const barcodeRef = useRef<HTMLInputElement>(null);
   const saleFormRef = useRef<HTMLFormElement>(null);
   const [ventas, setVentas] = useState<Venta[]>([]);
@@ -95,7 +109,9 @@ export function VentasPage() {
   const [lookupBusy, setLookupBusy] = useState(false);
 
   const [clienteId, setClienteId] = useState<number | "">("");
-  const [metodoPago, setMetodoPago] = useState("efectivo");
+  const [metodoPagoVenta, setMetodoPagoVenta] = useState<MetodoPagoVentaInput>(() => ({
+    ...METODO_PAGO_VENTA_INICIAL,
+  }));
   const [notasVenta, setNotasVenta] = useState("");
   const [emitirFactura] = useState(true);
   const [puntosCanjeados, setPuntosCanjeados] = useState<number | "">("");
@@ -104,8 +120,10 @@ export function VentasPage() {
   const [flashId, setFlashId] = useState<number | null>(null);
   /** Índice de línea seleccionada en carrito (↑↓); null = modo solo escáner */
   const [cartSel, setCartSel] = useState<number | null>(null);
-  const [categoriaCatalogo, setCategoriaCatalogo] = useState<"todos" | string>("todos");
   const [catalogTake, setCatalogTake] = useState(48);
+  const [filtroCategoriaCatalogo, setFiltroCategoriaCatalogo] = useState("todos");
+  const [filtroProveedorCatalogo, setFiltroProveedorCatalogo] = useState("todos");
+  const [inventarioCatalogo, setInventarioCatalogo] = useState<InventarioCatalogo | null>(null);
   const [clienteBusqueda, setClienteBusqueda] = useState("");
   const [createClienteOpen, setCreateClienteOpen] = useState(false);
   const [equipo, setEquipo] = useState<EquipoMiembro[]>([]);
@@ -180,6 +198,21 @@ export function VentasPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (tabParam !== "ventas") return;
+    let cancel = false;
+    void fetchInventarioCatalogo()
+      .then((data) => {
+        if (!cancel) setInventarioCatalogo(data);
+      })
+      .catch(() => {
+        if (!cancel) setInventarioCatalogo(null);
+      });
+    return () => {
+      cancel = true;
+    };
+  }, [tabParam]);
 
   /**
    * Precarga desde Citas → «Cobrar en POS»: cliente, profesional, notas, vínculo a la cita
@@ -277,7 +310,7 @@ export function VentasPage() {
     setClienteOpen(false);
     setNotasVenta("");
     setPuntosCanjeados("");
-    setMetodoPago("efectivo");
+    setMetodoPagoVenta({ ...METODO_PAGO_VENTA_INICIAL });
     toast("Nueva venta lista", "info");
     window.setTimeout(() => barcodeRef.current?.focus(), 0);
   }, [toast]);
@@ -318,20 +351,57 @@ export function VentasPage() {
     [productos]
   );
 
-  const categoriasCatalogo = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const p of productosActivos) {
-      const c = p.categoria?.trim() || "Sin categoría";
-      m.set(c, (m.get(c) ?? 0) + 1);
+  const opcionesFiltroCategoriaCatalogo = useMemo(() => {
+    const names = new Set<string>();
+    for (const c of inventarioCatalogo?.categorias ?? []) {
+      const n = c.nombre_categoria.trim();
+      if (n) names.add(n);
     }
-    return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0], "es"));
-  }, [productosActivos]);
+    for (const p of productosActivos) {
+      const n = p.categoria?.trim();
+      if (n) names.add(n);
+    }
+    const sorted = [...names].sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
+    return [
+      { value: "todos", label: "Todas las categorías" },
+      { value: "sin", label: "Sin categoría" },
+      ...sorted.map((n) => ({ value: n, label: n })),
+    ];
+  }, [inventarioCatalogo, productosActivos]);
+
+  const opcionesFiltroProveedorCatalogo = useMemo(() => {
+    const provs = [...(inventarioCatalogo?.proveedores ?? [])].sort((a, b) =>
+      a.nombre.localeCompare(b.nombre, "es", { sensitivity: "base" })
+    );
+    return [
+      { value: "todos", label: "Todos los proveedores" },
+      { value: "sin", label: "Sin proveedor" },
+      ...provs.map((pr) => ({ value: String(pr.id), label: pr.nombre })),
+    ];
+  }, [inventarioCatalogo]);
 
   const { filteredProducts, catalogMatchCount } = useMemo(() => {
     const q = search.trim().toLowerCase();
     let pool = productosActivos;
-    if (categoriaCatalogo !== "todos") {
-      pool = pool.filter((p) => (p.categoria?.trim() || "Sin categoría") === categoriaCatalogo);
+    if (filtroCategoriaCatalogo !== "todos") {
+      if (filtroCategoriaCatalogo === "sin") {
+        pool = pool.filter((p) => !(p.categoria?.trim() ?? ""));
+      } else {
+        pool = pool.filter(
+          (p) => (p.categoria?.trim() ?? "").toLowerCase() === filtroCategoriaCatalogo.toLowerCase()
+        );
+      }
+    }
+    if (filtroProveedorCatalogo !== "todos") {
+      if (filtroProveedorCatalogo === "sin") {
+        pool = pool.filter((p) => {
+          const id = p.proveedor_id;
+          return id == null || !Number.isFinite(Number(id)) || Number(id) <= 0;
+        });
+      } else {
+        const want = Number(filtroProveedorCatalogo);
+        pool = pool.filter((p) => p.proveedor_id === want);
+      }
     }
     const matched = !q
       ? pool
@@ -355,11 +425,11 @@ export function VentasPage() {
       filteredProducts: sorted.slice(0, catalogTake),
       catalogMatchCount: matched.length,
     };
-  }, [productosActivos, search, pinTick, categoriaCatalogo, catalogTake]);
+  }, [productosActivos, search, pinTick, catalogTake, filtroCategoriaCatalogo, filtroProveedorCatalogo]);
 
   useEffect(() => {
     setCatalogTake(48);
-  }, [search, categoriaCatalogo]);
+  }, [search, filtroCategoriaCatalogo, filtroProveedorCatalogo]);
 
   const clientesOrdenados = useMemo(() => {
     const pins = new Set(getPinnedClienteIds());
@@ -689,19 +759,19 @@ export function VentasPage() {
 
       if (e.code === "F1") {
         e.preventDefault();
-        setMetodoPago("efectivo");
+        setMetodoPagoVenta((prev) => ({ ...prev, principal: "efectivo" }));
         posBeepOk();
         return;
       }
       if (e.code === "F2") {
         e.preventDefault();
-        setMetodoPago("transferencia");
+        setMetodoPagoVenta((prev) => ({ ...prev, principal: "transferencia" }));
         posBeepOk();
         return;
       }
       if (e.code === "F3") {
         e.preventDefault();
-        setMetodoPago("mixto");
+        setMetodoPagoVenta((prev) => ({ ...prev, principal: "mixto" }));
         posBeepOk();
         return;
       }
@@ -863,11 +933,17 @@ export function VentasPage() {
       toast("No se pudo cargar el vendedor de la sesión. Recargá la página.", "warning");
       return;
     }
+    const errPago = validarMetodoPagoVenta(metodoPagoVenta, mediosTransferencia, total);
+    if (errPago) {
+      posBeepErr();
+      toast(errPago, "warning");
+      return;
+    }
     try {
       const r = await createVenta({
         cliente_id: clienteId === "" ? null : clienteId,
         usuario_id: Number(vendedorId),
-        metodo_pago: metodoPago,
+        metodo_pago: buildMetodoPagoParaApi(metodoPagoVenta, mediosTransferencia, total),
         notas: notasVenta.trim() || null,
         lineas: built,
         servicios: builtServicios.length > 0 ? builtServicios : undefined,
@@ -897,7 +973,7 @@ export function VentasPage() {
       setClienteOpen(false);
       setNotasVenta("");
       setPuntosCanjeados("");
-      setMetodoPago("efectivo");
+      setMetodoPagoVenta({ ...METODO_PAGO_VENTA_INICIAL });
       await load();
     } catch (err) {
       posBeepErr();
@@ -919,6 +995,7 @@ export function VentasPage() {
         items={[
           { id: "ventas", label: "Ventas", to: "/ventas/ventas" },
           { id: "historial", label: "Historial", to: "/ventas/historial" },
+          { id: "cierre", label: "Cierre de día", to: "/ventas/cierre" },
           { id: "devoluciones", label: "Devoluciones", to: "/ventas/devoluciones" },
         ]}
         quickActions={
@@ -931,6 +1008,10 @@ export function VentasPage() {
                 Sincronizar datos
               </button>
             </>
+          ) : tab === "historial" ? (
+            <Link to="/ventas/cierre" className="btn primary small">
+              Cerrar día
+            </Link>
           ) : null
         }
       />
@@ -987,6 +1068,7 @@ export function VentasPage() {
                   ) : null}
                 </div>
 
+                <div className="pos-saas-panel-scroll">
                 <div className="pos-cart-subcard pos-cart-subcard--prods">
                   <div className="pos-cart-subhead">
                     <span className="pos-cart-subhead-tag">
@@ -1377,17 +1459,21 @@ export function VentasPage() {
                   <span className="pos-cart-grandtotal-label">Total servicios + productos</span>
                   <span className="pos-cart-grandtotal-value mono">{formatMoney(total)}</span>
                 </div>
+                </div>
               </section>
             </div>
 
             <div className="pos-saas-col pos-saas-col--catalog">
               <section className="pos-saas-card pos-saas-card--catalog">
+                <div className="pos-saas-panel-sticky">
                 <div className="pos-saas-card-head pos-saas-card-head--stack">
                   <div className="pos-saas-card-head-left">
                     <span className="pos-saas-step">2</span>
                     <h2 className="pos-saas-card-title">Catálogo de productos</h2>
                   </div>
-                  <p className="pos-saas-card-desc muted">Buscá, filtrá por categoría y tocá para agregar.</p>
+                  <p className="pos-saas-card-desc muted">
+                    Filtrá por categoría o proveedor, buscá o escaneá y tocá un producto para agregarlo.
+                  </p>
                 </div>
                 <div className="pos-saas-search-row">
                   <div className="pos-saas-search-wrap">
@@ -1443,32 +1529,53 @@ export function VentasPage() {
                   {lookupBusy ? <span className="muted pos-saas-busy">Buscando…</span> : null}
                 </div>
 
-                <div className="pos-saas-chips" role="tablist" aria-label="Categorías">
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={categoriaCatalogo === "todos"}
-                    className={`pos-saas-chip ${categoriaCatalogo === "todos" ? "pos-saas-chip--on" : ""}`}
-                    onClick={() => setCategoriaCatalogo("todos")}
-                  >
-                    Todos
-                  </button>
-                  {categoriasCatalogo.map(([nombre, count]) => (
-                    <button
-                      key={nombre}
-                      type="button"
-                      role="tab"
-                      aria-selected={categoriaCatalogo === nombre}
-                      className={`pos-saas-chip ${categoriaCatalogo === nombre ? "pos-saas-chip--on" : ""}`}
-                      onClick={() => setCategoriaCatalogo(nombre)}
+                <div className="pos-saas-catalog-filters">
+                  <label className="field pos-saas-catalog-filters__field">
+                    <span className="pos-saas-field-label">Categoría</span>
+                    <select
+                      className="pos-saas-select"
+                      value={filtroCategoriaCatalogo}
+                      onChange={(e) => setFiltroCategoriaCatalogo(e.target.value)}
+                      aria-label="Filtrar por categoría"
                     >
-                      {nombre}
-                      <span className="pos-saas-chip-count">{count}</span>
+                      {opcionesFiltroCategoriaCatalogo.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field pos-saas-catalog-filters__field">
+                    <span className="pos-saas-field-label">Proveedor</span>
+                    <select
+                      className="pos-saas-select"
+                      value={filtroProveedorCatalogo}
+                      onChange={(e) => setFiltroProveedorCatalogo(e.target.value)}
+                      aria-label="Filtrar por proveedor"
+                    >
+                      {opcionesFiltroProveedorCatalogo.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {(filtroCategoriaCatalogo !== "todos" || filtroProveedorCatalogo !== "todos") && (
+                    <button
+                      type="button"
+                      className="btn ghost small pos-saas-catalog-filters__clear"
+                      onClick={() => {
+                        setFiltroCategoriaCatalogo("todos");
+                        setFiltroProveedorCatalogo("todos");
+                      }}
+                    >
+                      Limpiar filtros
                     </button>
-                  ))}
+                  )}
                 </div>
 
-                <div className="pos-saas-catalog-scroll">
+                </div>
+                <div className="pos-saas-panel-scroll pos-saas-catalog-scroll">
                 {loading ? (
                   <div className="pos-saas-pro-grid pos-saas-pro-grid--skel">
                     <SkeletonCard />
@@ -1479,7 +1586,9 @@ export function VentasPage() {
                 ) : filteredProducts.length === 0 ? (
                   <div className="pos-saas-empty-catalog">
                     <p>No hay productos para mostrar.</p>
-                    <p className="muted small">Probá otra categoría o otra búsqueda.</p>
+                    <p className="muted small">
+                      Probá otros filtros, otra búsqueda o escaneá un código de barras.
+                    </p>
                   </div>
                 ) : (
                   <>
@@ -1575,6 +1684,7 @@ export function VentasPage() {
                   <p className="pos-saas-card-desc muted">Elegí el método de pago y cobrá la venta.</p>
                 </div>
 
+                <div className="pos-saas-panel-scroll">
                 <div className="pos-pago-block">
                   <span className="pos-saas-field-label">Cliente</span>
                   <div className="pos-pago-combo" ref={clienteComboRef}>
@@ -1690,20 +1800,21 @@ export function VentasPage() {
 
                 <span className="pos-saas-field-label pos-saas-field-label--spaced">Método de pago</span>
                 <div className="pos-saas-pay-grid pos-saas-pay-grid--aside" role="group" aria-label="Método de pago">
-                  {(
-                    [
-                      { id: "efectivo", label: "💵 Efectivo" },
-                      { id: "tarjeta", label: "💳 Tarjeta" },
-                      { id: "transferencia", label: "🏦 Transferencia" },
-                      { id: "mixto", label: "🔀 Mixto" },
-                    ] as const
-                  ).map((opt) => (
+                  {METODOS_PAGO_POS.map((opt) => (
                     <button
                       key={opt.id}
                       type="button"
-                      className={`pos-saas-pay-card ${metodoPago === opt.id ? "pos-saas-pay-card--on" : ""}`}
+                      className={`pos-saas-pay-card ${
+                        metodoPagoVenta.principal === opt.id ? "pos-saas-pay-card--on" : ""
+                      }`}
                       onClick={() => {
-                        setMetodoPago(opt.id);
+                        setMetodoPagoVenta((prev) => ({
+                          ...prev,
+                          principal: opt.id,
+                          transferenciaLlave:
+                            opt.id === "transferencia" ? prev.transferenciaLlave : "",
+                          mixto1Monto: opt.id === "mixto" ? "" : prev.mixto1Monto,
+                        }));
                         posBeepOk();
                       }}
                     >
@@ -1711,6 +1822,13 @@ export function VentasPage() {
                     </button>
                   ))}
                 </div>
+
+                <PosMetodoPagoFields
+                  value={metodoPagoVenta}
+                  medios={mediosTransferencia}
+                  totalVenta={total}
+                  onChange={(patch) => setMetodoPagoVenta((prev) => ({ ...prev, ...patch }))}
+                />
 
                 <div className="pos-pago-block">
                   <label className="pos-saas-field-label" htmlFor="venta-notas">
@@ -1739,6 +1857,7 @@ export function VentasPage() {
                   <span className="pos-pago-secure-dot" aria-hidden />
                   Tu venta está 100% segura
                 </p>
+                </div>
               </section>
             </div>
           </form>
@@ -1870,35 +1989,9 @@ export function VentasPage() {
         </div>
       ) : null}
 
-      {tab === "historial" ? (
-      <section className="card-pro">
-        <div className="card-pro-head">
-          <h2 className="card-pro-title">Últimas ventas</h2>
-          <button type="button" className="btn ghost small" onClick={() => void load()}>
-            Actualizar
-          </button>
-        </div>
-        {loading ? (
-          <p className="muted">…</p>
-        ) : ventas.length === 0 ? (
-          <div className="empty-state">
-            <p>Sin ventas aún.</p>
-          </div>
-        ) : (
-          <ul className="sale-list">
-            {ventas.slice(0, 50).map((v) => (
-              <li key={v.id} className="sale-list-item">
-                <span className="sale-list-date">{new Date(v.fecha).toLocaleString()}</span>
-                <span className="sale-list-client">{v.cliente_nombre ?? "—"}</span>
-                <span className="muted small">{v.vendedor_nombre ?? "—"}</span>
-                <span className="sale-list-total">{v.total.toFixed(2)}</span>
-                <span className="muted">{v.metodo_pago}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-      ) : null}
+      {tab === "historial" ? <VentasHistorialSection /> : null}
+
+      {tab === "cierre" ? <VentasCierreSection /> : null}
 
       {tab === "devoluciones" ? (
         <section className="card-pro">

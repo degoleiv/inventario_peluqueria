@@ -20,7 +20,7 @@ import {
   togglePinCliente,
 } from "../lib/recentPins";
 const TIPO_DOCUMENTO_OPTS = [
-  { value: "", label: "—" },
+  { value: "", label: "Seleccioná tipo…" },
   { value: "CC", label: "CC" },
   { value: "CE", label: "CE" },
   { value: "Pasaporte", label: "Pasaporte" },
@@ -140,6 +140,23 @@ export function ClientesPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!nombre.trim()) return;
+    const tel = telefono.trim();
+    const tipoDoc = tipoDocumento.trim();
+    const numDoc = numeroDocumento.trim();
+    if (editingId == null) {
+      if (!tipoDoc) {
+        toast("El tipo de documento es obligatorio.", "warning");
+        return;
+      }
+      if (!numDoc) {
+        toast("El número de documento es obligatorio.", "warning");
+        return;
+      }
+      if (!tel) {
+        toast("El teléfono es obligatorio.", "warning");
+        return;
+      }
+    }
     if (!validEmail(email)) {
       toast("Revisá el formato del correo electrónico.", "warning");
       return;
@@ -148,19 +165,19 @@ export function ClientesPage() {
       if (editingId != null) {
         await updateCliente(editingId, {
           nombre: nombre.trim(),
-          telefono: telefono.trim() || null,
+          telefono: tel || null,
           email: email.trim() || null,
-          tipo_documento: tipoDocumento.trim() || null,
-          numero_documento: numeroDocumento.trim() || null,
+          tipo_documento: tipoDoc || null,
+          numero_documento: numDoc || null,
         });
         toast("Cliente actualizado correctamente.", "success");
       } else {
         await createCliente({
           nombre: nombre.trim(),
-          telefono: telefono.trim() || null,
+          telefono: tel,
           email: email.trim() || null,
-          tipo_documento: tipoDocumento.trim() || null,
-          numero_documento: numeroDocumento.trim() || null,
+          tipo_documento: tipoDoc,
+          numero_documento: numDoc,
         });
         toast("Cliente creado correctamente.", "success");
       }
@@ -380,8 +397,12 @@ export function ClientesPage() {
           </label>
           <div className="field-row create-cliente-drawer-doc">
             <label className="field">
-              <span>Tipo documento</span>
-              <select value={tipoDocumento} onChange={(e) => setTipoDocumento(e.target.value)}>
+              <span>Tipo documento{editingId == null ? " *" : ""}</span>
+              <select
+                value={tipoDocumento}
+                onChange={(e) => setTipoDocumento(e.target.value)}
+                required={editingId == null}
+              >
                 {TIPO_DOCUMENTO_OPTS.map((o) => (
                   <option key={o.value || "empty"} value={o.value}>
                     {o.label}
@@ -390,21 +411,23 @@ export function ClientesPage() {
               </select>
             </label>
             <label className="field">
-              <span>Número documento</span>
+              <span>Número documento{editingId == null ? " *" : ""}</span>
               <input
                 value={numeroDocumento}
                 onChange={(e) => setNumeroDocumento(e.target.value)}
                 autoComplete="off"
+                required={editingId == null}
               />
             </label>
           </div>
           <label className="field">
-            <span>Teléfono</span>
+            <span>Teléfono{editingId == null ? " *" : ""}</span>
             <input
               type="tel"
               value={telefono}
               onChange={(e) => setTelefono(e.target.value)}
               autoComplete="tel"
+              required={editingId == null}
             />
           </label>
           <label className="field">

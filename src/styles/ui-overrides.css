@@ -497,6 +497,15 @@ body.ui-density-compact .field {
   color: color-mix(in srgb, var(--primary) 42%, var(--secondary) 58%);
 }
 
+.cat-board-card__title--pago {
+  color: color-mix(in srgb, var(--secondary) 70%, var(--primary) 30%);
+}
+
+.cat-board-card__add--pago {
+  background: color-mix(in srgb, var(--secondary) 75%, var(--primary) 25%);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--secondary) 35%, transparent);
+}
+
 .cat-board-card__paren {
   font-size: 0.85rem;
   font-weight: 600;
@@ -699,6 +708,12 @@ body.ui-density-compact .field {
 .cat-nueva-field__input--pill:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.cat-nueva-field__input--emoji {
+  font-family: var(--font-ui, "Inter", "Segoe UI", system-ui, sans-serif), "Apple Color Emoji",
+    "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  font-variant-emoji: emoji;
 }
 
 .cat-nueva-field__textarea,

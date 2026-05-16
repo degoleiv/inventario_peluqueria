@@ -1,11 +1,13 @@
-/** Duración del access token en segundos (por defecto 8 h). Sobrescribible con `JWT_EXPIRY_SEC`. Mínimo 60 s. */
+/** Sesión JWT: mínimo obligatorio 8 horas. `JWT_EXPIRY_SEC` en env solo puede alargar, nunca acortar. */
+const JWT_MIN_SEC = 8 * 60 * 60;
+
 export const JWT_EXPIRY_SEC = (() => {
   const raw = process.env.JWT_EXPIRY_SEC?.trim();
   if (raw) {
     const n = Number(raw);
-    if (Number.isFinite(n) && n >= 60) return Math.floor(n);
+    if (Number.isFinite(n) && n >= JWT_MIN_SEC) return Math.floor(n);
   }
-  return 60 * 60 * 8;
+  return JWT_MIN_SEC;
 })();
 export const BCRYPT_ROUNDS = 11;
 

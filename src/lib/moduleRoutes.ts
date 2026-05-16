@@ -16,7 +16,7 @@ export function readInventarioTab(): InventarioTab {
   return "productos";
 }
 
-export const VENTAS_TABS = ["ventas", "historial", "devoluciones"] as const;
+export const VENTAS_TABS = ["ventas", "historial", "cierre", "devoluciones"] as const;
 export type VentasTab = (typeof VENTAS_TABS)[number];
 
 /** Migra ruta/pestaña antigua `pos` → `ventas`. */

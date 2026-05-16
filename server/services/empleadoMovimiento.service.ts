@@ -1,5 +1,6 @@
 import { db } from "../db.js";
 import { AppError } from "../lib/AppError.js";
+import { calcularSalarioPeriodo, esSalarioFijo } from "../lib/nominaEmpleado.js";
 
 const TIPOS = new Set(["adelanto", "descuento"]);
 const ESTADOS = new Set(["pendiente", "pagado"]);
@@ -66,22 +67,44 @@ export const empleadoMovimientoService = {
   },
 
   async resumen(empleadoId: number, desde?: string, hasta?: string) {
-    const ok = (await db.prepare(`SELECT id, nombre FROM usuarios WHERE id = ?`).get(empleadoId)) as
-      | { id: number; nombre: string | null }
+    const ok = (await db
+      .prepare(`SELECT id, nombre, rol, tipo_comision, valor_comision FROM usuarios WHERE id = ?`)
+      .get(empleadoId)) as
+      | {
+          id: number;
+          nombre: string | null;
+          rol: string;
+          tipo_comision: string;
+          valor_comision: number;
+        }
       | undefined;
     if (!ok) throw new AppError("Empleado no encontrado", 404);
 
-    let sqlC = `SELECT COALESCE(SUM(monto), 0) AS t FROM comisiones WHERE empleado_id = ?`;
-    const paramsC: (number | string)[] = [empleadoId];
-    if (desde) {
-      sqlC += ` AND fecha >= ?`;
-      paramsC.push(desde);
+    let totalComisiones = 0;
+    let remuneracion_tipo: "comision" | "salario" = "comision";
+
+    if (esSalarioFijo(ok.rol, ok.tipo_comision)) {
+      remuneracion_tipo = "salario";
+      const d0 = desde?.trim().slice(0, 10);
+      const d1 = hasta?.trim().slice(0, 10);
+      if (d0 && d1 && /^\d{4}-\d{2}-\d{2}$/.test(d0) && /^\d{4}-\d{2}-\d{2}$/.test(d1)) {
+        totalComisiones = calcularSalarioPeriodo(Number(ok.valor_comision) || 0, d0, d1);
+      } else {
+        totalComisiones = Math.max(0, Number(ok.valor_comision) || 0);
+      }
+    } else {
+      let sqlC = `SELECT COALESCE(SUM(monto), 0) AS t FROM comisiones WHERE empleado_id = ?`;
+      const paramsC: (number | string)[] = [empleadoId];
+      if (desde) {
+        sqlC += ` AND fecha >= ?`;
+        paramsC.push(desde);
+      }
+      if (hasta) {
+        sqlC += ` AND fecha <= ?`;
+        paramsC.push(hasta);
+      }
+      totalComisiones = ((await db.prepare(sqlC).get(...paramsC)) as { t: number }).t;
     }
-    if (hasta) {
-      sqlC += ` AND fecha <= ?`;
-      paramsC.push(hasta);
-    }
-    const totalComisiones = ((await db.prepare(sqlC).get(...paramsC)) as { t: number }).t;
 
     const pend = (await db
       .prepare(
@@ -96,6 +119,8 @@ export const empleadoMovimientoService = {
     return {
       empleado_id: empleadoId,
       empleado_nombre: ok.nombre,
+      remuneracion_tipo,
+      salario_mensual: remuneracion_tipo === "salario" ? Number(ok.valor_comision) || 0 : null,
       total_comisiones_periodo: totalComisiones,
       adelantos_y_descuentos_pendiente: totalAdelantosPendiente,
       saldo_final: saldoFinal,

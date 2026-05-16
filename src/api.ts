@@ -125,25 +125,49 @@ export type Venta = {
   id: number;
   cliente_id: number | null;
   usuario_id?: number | null;
+  cita_id?: number | null;
   fecha: string;
   total: number;
   metodo_pago: string;
   notas: string | null;
+  estado?: string;
+  descuento_puntos?: number;
+  puntos_canjeados?: number;
   created_at: string;
   cliente_nombre: string | null;
   vendedor_nombre?: string | null;
+  /** Resumen en listado (agregados del servidor). */
+  num_lineas?: number;
+  unidades_productos?: number;
+  num_servicios?: number;
+  resumen_productos?: string | null;
+  resumen_servicios?: string | null;
+};
+
+export type VentaLinea = {
+  id: number;
+  venta_id: number;
+  producto_id: number;
+  cantidad: number;
+  precio_unitario: number;
+  subtotal: number;
+  producto_nombre: string;
+};
+
+export type VentaServicioLinea = {
+  id: number;
+  venta_id: number;
+  servicio_nombre: string;
+  usuario_id: number | null;
+  cantidad: number;
+  valor_unitario: number;
+  subtotal: number;
+  profesional_nombre?: string | null;
 };
 
 export type VentaDetalle = Venta & {
-  lineas: Array<{
-    id: number;
-    venta_id: number;
-    producto_id: number;
-    cantidad: number;
-    precio_unitario: number;
-    subtotal: number;
-    producto_nombre: string;
-  }>;
+  lineas: VentaLinea[];
+  servicios?: VentaServicioLinea[];
 };
 
 export type ProximaCitaDia = {
@@ -264,11 +288,17 @@ export type AuthUser = {
   foto_url?: string | null;
 };
 
+export type AuthLoginResponse = {
+  accessToken: string;
+  expiresIn: number;
+  user: AuthUser;
+};
+
 export async function bootstrapAdmin(body: {
   email: string;
   password: string;
   nombre?: string;
-}): Promise<{ accessToken: string; user: AuthUser }> {
+}): Promise<AuthLoginResponse> {
   return requestJson("/api/auth/bootstrap", {
     method: "POST",
     body: JSON.stringify(body),
@@ -278,7 +308,7 @@ export async function bootstrapAdmin(body: {
 export async function loginApi(body: {
   email: string;
   password: string;
-}): Promise<{ accessToken: string; user: AuthUser }> {
+}): Promise<AuthLoginResponse> {
   return requestJson("/api/auth/login", {
     method: "POST",
     body: JSON.stringify(body),
@@ -937,6 +967,119 @@ export async function fetchVenta(id: number): Promise<VentaDetalle> {
   return requestJson(`/api/ventas/${id}`);
 }
 
+export async function cancelarVenta(
+  id: number,
+  body?: { motivo?: string; cancelado_por?: "cliente" | "empleado" | "admin" }
+): Promise<VentaDetalle> {
+  return requestJson(`/api/ventas/${id}/cancelar`, {
+    method: "PATCH",
+    body: JSON.stringify(body ?? {}),
+  });
+}
+
+export type MontosPorCanalCierre = Record<string, number>;
+
+export type CanalCierreMeta = {
+  id: string;
+  label: string;
+  siempreVisible: boolean;
+};
+
+export type MedioPagoTransferencia = {
+  id: string;
+  label: string;
+  emoji: string | null;
+  activo: boolean;
+  orden: number;
+};
+
+export async function fetchMediosPagoTransferencia(): Promise<MedioPagoTransferencia[]> {
+  return requestJson("/api/configuracion/medios-pago-transferencia");
+}
+
+export async function updateMediosPagoTransferencia(
+  medios: MedioPagoTransferencia[]
+): Promise<MedioPagoTransferencia[]> {
+  return requestJson("/api/configuracion/medios-pago-transferencia", {
+    method: "PATCH",
+    body: JSON.stringify({ medios }),
+  });
+}
+
+export type LineaProductoCierre = {
+  producto_id: number;
+  producto_nombre: string;
+  cantidad: number;
+  subtotal: number;
+};
+
+export type LineaServicioCierre = {
+  servicio_nombre: string;
+  profesional_nombre: string | null;
+  cantidad: number;
+  subtotal: number;
+};
+
+export type VentasDiaDetalle = {
+  productos: LineaProductoCierre[];
+  servicios: LineaServicioCierre[];
+  total_productos: number;
+  total_servicios: number;
+};
+
+export type ResumenCierreDia = VentasDiaDetalle & {
+  fecha: string;
+  ya_cerrado: boolean;
+  cierre_id: number | null;
+  ventas_cantidad: number;
+  ventas_total: number;
+  montos_reportados: MontosPorCanalCierre;
+  canales_cierre: CanalCierreMeta[];
+  total_reportado: number;
+};
+
+export type CierreDia = VentasDiaDetalle & {
+  id: number;
+  fecha: string;
+  ventas_cantidad: number;
+  ventas_total: number;
+  montos_reportados: MontosPorCanalCierre;
+  montos_reales: MontosPorCanalCierre;
+  montos_diferencia: MontosPorCanalCierre;
+  canales_cierre: CanalCierreMeta[];
+  total_reportado: number;
+  total_real: number;
+  total_diferencia: number;
+  nota_final: string | null;
+  usuario_id: number | null;
+  usuario_nombre: string | null;
+  created_at: string;
+};
+
+export async function fetchResumenCierreDia(fecha?: string): Promise<ResumenCierreDia> {
+  const q = fecha ? `?fecha=${encodeURIComponent(fecha)}` : "";
+  return requestJson(`/api/cierres-dia/resumen${q}`);
+}
+
+export async function fetchCierresDia(limit = 60): Promise<CierreDia[]> {
+  return requestJson(`/api/cierres-dia?limit=${limit}`);
+}
+
+export async function fetchCierreDia(id: number): Promise<CierreDia> {
+  return requestJson(`/api/cierres-dia/${id}`);
+}
+
+export async function crearCierreDia(body: {
+  fecha?: string;
+  montos_reales: MontosPorCanalCierre;
+  nota_final?: string | null;
+}): Promise<CierreDia> {
+  return requestJson("/api/cierres-dia", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
 /** Servicio realizado en una cita, cobrado dentro de una venta (no descuenta stock). */
 export type VentaServicioInput = {
   servicio_nombre: string;
@@ -1451,6 +1594,8 @@ export type LiquidacionTurnoAgenda = {
 export type LiquidacionEmpleado = {
   empleado_id: number;
   empleado_nombre: string | null;
+  rol?: string;
+  remuneracion_tipo?: "comision" | "salario";
   tipo_comision: string;
   valor_comision: number;
   total_comisiones: number;
@@ -1571,6 +1716,8 @@ export async function updateEmpleadoMovimientoEstado(
 export type EmpleadoResumen = {
   empleado_id: number;
   empleado_nombre: string | null;
+  remuneracion_tipo?: "comision" | "salario";
+  salario_mensual?: number | null;
   total_comisiones_periodo: number;
   adelantos_y_descuentos_pendiente: number;
   saldo_final: number;

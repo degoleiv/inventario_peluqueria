@@ -8,7 +8,10 @@ import { rolesService } from "./roles.service.js";
 export type JwtUser = { sub: number; email: string; rol: string };
 
 export function signAccessToken(payload: JwtUser): string {
-  return jwt.sign(payload, getJwtSecret(), { expiresIn: JWT_EXPIRY_SEC });
+  return jwt.sign(payload, getJwtSecret(), {
+    expiresIn: JWT_EXPIRY_SEC,
+    algorithm: "HS256",
+  });
 }
 
 export async function login(email: string, password: string) {

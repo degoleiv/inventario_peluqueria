@@ -9,20 +9,31 @@ function todayISODate() {
 
 export const ventaService = {
   async list(desde?: string, hasta?: string) {
-    let sql = `SELECT v.*, c.nombre AS cliente_nombre, u.nombre AS vendedor_nombre
+    let sql = `SELECT v.*, c.nombre AS cliente_nombre, u.nombre AS vendedor_nombre,
+               (SELECT COUNT(*) FROM venta_lineas vl WHERE vl.venta_id = v.id) AS num_lineas,
+               (SELECT COALESCE(SUM(vl.cantidad), 0) FROM venta_lineas vl WHERE vl.venta_id = v.id) AS unidades_productos,
+               (SELECT COUNT(*) FROM venta_servicios vs WHERE vs.venta_id = v.id) AS num_servicios,
+               (SELECT GROUP_CONCAT(p.nombre, ' · ')
+                  FROM venta_lineas vl
+                  JOIN productos p ON p.id = vl.producto_id
+                 WHERE vl.venta_id = v.id) AS resumen_productos,
+               (SELECT GROUP_CONCAT(vs.servicio_nombre, ' · ')
+                  FROM venta_servicios vs
+                 WHERE vs.venta_id = v.id) AS resumen_servicios
                FROM ventas v
                LEFT JOIN clientes c ON c.id = v.cliente_id
                LEFT JOIN usuarios u ON u.id = v.usuario_id`;
     const params: string[] = [];
+    // Comparar por día calendario (fecha guardada suele ser ISO con hora).
     if (desde) {
-      sql += ` WHERE v.fecha >= ?`;
+      sql += ` WHERE date(v.fecha) >= date(?)`;
       params.push(desde);
       if (hasta) {
-        sql += ` AND v.fecha <= ?`;
+        sql += ` AND date(v.fecha) <= date(?)`;
         params.push(hasta);
       }
     } else if (hasta) {
-      sql += ` WHERE v.fecha <= ?`;
+      sql += ` WHERE date(v.fecha) <= date(?)`;
       params.push(hasta);
     }
     sql += ` ORDER BY v.fecha DESC`;

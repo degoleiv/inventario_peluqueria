@@ -1,6 +1,7 @@
 import { db, recordSyncEvent } from "../db.js";
 import { AppError } from "../lib/AppError.js";
 import { isOurMediaUrl, saveImageDataUrl, unlinkMediaPublicPath } from "../lib/mediaStore.js";
+import { proveedorRepository } from "../repositories/proveedor.repository.js";
 
 const PRODUCTO_IMAGEN_MAX_BYTES = 25 * 1024 * 1024;
 
@@ -30,6 +31,14 @@ async function resolveProductoImagenField(
   }
   if (previous && previous !== t && isOurMediaUrl(previous)) await unlinkMediaPublicPath(previous);
   return t;
+}
+
+async function assertProveedorActivo(proveedor_id: number | null): Promise<void> {
+  if (proveedor_id == null) return;
+  const ok = await proveedorRepository.isActivo(proveedor_id);
+  if (!ok) {
+    throw new AppError("El proveedor no existe o está inactivo. Elegí un proveedor activo.");
+  }
 }
 
 function validatePrecios(precio_compra: number | null, precio_venta: number | null) {
@@ -97,6 +106,7 @@ export const productoService = {
       Number(body.proveedor_id) > 0
         ? Math.floor(Number(body.proveedor_id))
         : null;
+    await assertProveedorActivo(proveedor_id);
 
     const imagen_url =
       body.imagen_url !== undefined
@@ -190,6 +200,7 @@ export const productoService = {
           : Number.isFinite(Number(body.proveedor_id)) && Number(body.proveedor_id) > 0
             ? Math.floor(Number(body.proveedor_id))
             : null;
+    await assertProveedorActivo(proveedor_id);
 
     const existingImagen = (existing.imagen_url as string | null) ?? null;
     const imagen_url =

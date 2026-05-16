@@ -4,7 +4,7 @@ import { useToast } from "../context/ToastContext";
 import { Drawer } from "./Drawer";
 
 const TIPO_DOCUMENTO_OPTS = [
-  { value: "", label: "—" },
+  { value: "", label: "Seleccioná tipo…" },
   { value: "CC", label: "CC" },
   { value: "CE", label: "CE" },
   { value: "Pasaporte", label: "Pasaporte" },
@@ -57,6 +57,21 @@ export function CreateClienteDrawer({ open, onClose, onCreated }: Props) {
       toast("El nombre completo es obligatorio.", "warning");
       return;
     }
+    const tipoDocumento = form.tipo_documento.trim();
+    const numeroDocumento = form.numero_documento.trim();
+    const telefono = form.telefono.trim();
+    if (!tipoDocumento) {
+      toast("El tipo de documento es obligatorio.", "warning");
+      return;
+    }
+    if (!numeroDocumento) {
+      toast("El número de documento es obligatorio.", "warning");
+      return;
+    }
+    if (!telefono) {
+      toast("El teléfono es obligatorio.", "warning");
+      return;
+    }
     if (!validEmail(form.email)) {
       toast("Revisá el formato del correo electrónico.", "warning");
       return;
@@ -65,9 +80,9 @@ export function CreateClienteDrawer({ open, onClose, onCreated }: Props) {
     try {
       const cliente = await createCliente({
         nombre,
-        tipo_documento: form.tipo_documento.trim() || null,
-        numero_documento: form.numero_documento.trim() || null,
-        telefono: form.telefono.trim() || null,
+        tipo_documento: tipoDocumento,
+        numero_documento: numeroDocumento,
+        telefono,
         email: form.email.trim() || null,
       });
       onCreated(cliente);
@@ -110,11 +125,12 @@ export function CreateClienteDrawer({ open, onClose, onCreated }: Props) {
         </label>
         <div className="field-row create-cliente-drawer-doc">
           <label className="field">
-            <span>Tipo documento</span>
+            <span>Tipo documento *</span>
             <select
               value={form.tipo_documento}
               onChange={(e) => setForm((f) => ({ ...f, tipo_documento: e.target.value }))}
               disabled={busy}
+              required
             >
               {TIPO_DOCUMENTO_OPTS.map((o) => (
                 <option key={o.value || "empty"} value={o.value}>
@@ -124,23 +140,25 @@ export function CreateClienteDrawer({ open, onClose, onCreated }: Props) {
             </select>
           </label>
           <label className="field">
-            <span>Número documento</span>
+            <span>Número documento *</span>
             <input
               value={form.numero_documento}
               onChange={(e) => setForm((f) => ({ ...f, numero_documento: e.target.value }))}
               autoComplete="off"
               disabled={busy}
+              required
             />
           </label>
         </div>
         <label className="field">
-          <span>Teléfono</span>
+          <span>Teléfono *</span>
           <input
             type="tel"
             value={form.telefono}
             onChange={(e) => setForm((f) => ({ ...f, telefono: e.target.value }))}
             autoComplete="tel"
             disabled={busy}
+            required
           />
         </label>
         <label className="field">

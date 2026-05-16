@@ -5,7 +5,25 @@ import { isOurMediaUrl, saveImageDataUrl, unlinkMediaPublicPath } from "../lib/m
 import { db, recordSyncEvent } from "../db.js";
 import { usuariosRepo } from "../repositories/usuarios.js";
 import { rolesService } from "./roles.service.js";
+import { esSalarioFijo } from "../lib/nominaEmpleado.js";
 import { parseTurnoPlantillaSemanal, turnoService } from "./turno.service.js";
+
+function normalizarComision(
+  rol: string,
+  tipo?: string,
+  valor?: number
+): { tipo: string; valor: number } {
+  if (esSalarioFijo(rol, tipo)) {
+    const v =
+      valor != null && Number.isFinite(Number(valor)) ? Math.max(0, Number(valor)) : 0;
+    return { tipo: "salario", valor: v };
+  }
+  let tipoCom = (tipo ?? "porcentaje").trim().toLowerCase();
+  if (tipoCom !== "porcentaje" && tipoCom !== "fijo") tipoCom = "porcentaje";
+  const valorCom =
+    valor != null && Number.isFinite(Number(valor)) ? Math.max(0, Number(valor)) : 0;
+  return { tipo: tipoCom, valor: valorCom };
+}
 
 export const usuarioService = {
   async list() {
@@ -37,12 +55,11 @@ export const usuarioService = {
       throw new AppError("Rol inválido o inexistente");
     }
     const hash = await bcrypt.hash(params.password, BCRYPT_ROUNDS);
-    let tipoCom = (params.tipo_comision ?? "porcentaje").trim().toLowerCase();
-    if (tipoCom !== "porcentaje" && tipoCom !== "fijo") tipoCom = "porcentaje";
-    const valorCom =
-      params.valor_comision != null && Number.isFinite(Number(params.valor_comision))
-        ? Number(params.valor_comision)
-        : 0;
+    const { tipo: tipoCom, valor: valorCom } = normalizarComision(
+      rol,
+      params.tipo_comision,
+      params.valor_comision
+    );
 
     let foto_url = params.foto_url?.trim() || null;
     if (foto_url?.toLowerCase().startsWith("data:image/")) {
@@ -149,13 +166,15 @@ export const usuarioService = {
       await usuariosRepo.setActivo(id, params.activo);
     }
 
-    if (params.tipo_comision !== undefined || params.valor_comision !== undefined) {
-      let tipo = params.tipo_comision != null ? params.tipo_comision.trim().toLowerCase() : u.tipo_comision;
-      if (tipo !== "porcentaje" && tipo !== "fijo") tipo = "porcentaje";
-      const valor =
-        params.valor_comision !== undefined && Number.isFinite(Number(params.valor_comision))
-          ? Number(params.valor_comision)
-          : Number((u as { valor_comision?: number }).valor_comision ?? 0);
+    if (params.tipo_comision !== undefined || params.valor_comision !== undefined || nextRol != null) {
+      const rolActual = nextRol ?? u.rol;
+      const { tipo, valor } = normalizarComision(
+        rolActual,
+        params.tipo_comision ?? u.tipo_comision,
+        params.valor_comision !== undefined
+          ? params.valor_comision
+          : Number((u as { valor_comision?: number }).valor_comision ?? 0)
+      );
       await usuariosRepo.updateComision(id, tipo, valor);
     }
 

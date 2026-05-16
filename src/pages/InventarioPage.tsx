@@ -74,9 +74,6 @@ export function InventarioPage() {
   const [viewingProduct, setViewingProduct] = useState<Producto | null>(null);
   const [estadoSavingId, setEstadoSavingId] = useState<number | null>(null);
   const [filtroBusqueda, setFiltroBusqueda] = useState("");
-  const [filtroEstado, setFiltroEstado] = useState<"todos" | "activo" | "inactivo">("todos");
-  /** "todos" | "sin" (sin proveedor) | id numérico como string */
-  const [filtroProveedor, setFiltroProveedor] = useState<string>("todos");
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; p: Producto } | null>(null);
   /** Si no es null, el drawer de creación está rellenado desde este producto (flujo “Duplicar”). */
   const [duplicateDraftSource, setDuplicateDraftSource] = useState<Producto | null>(null);
@@ -324,6 +321,10 @@ export function InventarioPage() {
     setViewingProduct(null);
   }
 
+  function proveedorActivoEnCatalogo(id: number): boolean {
+    return inventarioCatalogoRef.current?.proveedores.some((pr) => pr.id === id) ?? false;
+  }
+
   function onEditar(p: Producto) {
     setViewingProduct(null);
     setDuplicateDraftSource(null);
@@ -333,11 +334,12 @@ export function InventarioPage() {
     setNombre(p.nombre);
     setMarca(p.marca ?? "");
     setCategoria(p.categoria ?? "");
-    setProveedorId(
+    const pidRaw =
       p.proveedor_id != null && Number.isFinite(Number(p.proveedor_id)) && Number(p.proveedor_id) > 0
         ? Number(p.proveedor_id)
-        : ""
-    );
+        : null;
+    const pidActivo = pidRaw != null && proveedorActivoEnCatalogo(pidRaw) ? pidRaw : "";
+    setProveedorId(pidActivo);
     setDescripcion(p.descripcion ?? "");
     setImagenUrl(p.imagen_url ?? "");
     setStock(p.stock);
@@ -345,7 +347,11 @@ export function InventarioPage() {
     setPrecioVenta(p.precio_venta ?? p.precio ?? "");
     setStockMinimo(p.stock_minimo ?? "");
     setFechaVencimiento(p.fecha_vencimiento?.slice(0, 10) ?? "");
-    setLookupHint(null);
+    setLookupHint(
+      pidRaw != null && pidActivo === ""
+        ? "El proveedor de este producto está inactivo. Elegí un proveedor activo."
+        : null
+    );
   }
 
   function abrirDuplicarProducto(p: Producto) {
@@ -358,11 +364,12 @@ export function InventarioPage() {
     setNombre(p.nombre.trim());
     setMarca(p.marca ?? "");
     setCategoria(p.categoria ?? "");
-    setProveedorId(
+    const dupPidRaw =
       p.proveedor_id != null && Number.isFinite(Number(p.proveedor_id)) && Number(p.proveedor_id) > 0
         ? Number(p.proveedor_id)
-        : ""
-    );
+        : null;
+    const dupPidActivo = dupPidRaw != null && proveedorActivoEnCatalogo(dupPidRaw) ? dupPidRaw : "";
+    setProveedorId(dupPidActivo);
     setDescripcion(p.descripcion ?? "");
     setImagenUrl(p.imagen_url ?? "");
     setStock(0);
@@ -373,12 +380,13 @@ export function InventarioPage() {
     setLookupHint(
       "Copiado del producto original: revisá el nombre y el código de barras; categoría, proveedor y precios podés mantenerlos o ajustarlos."
     );
-    if (
-      p.proveedor_id == null ||
-      !Number.isFinite(Number(p.proveedor_id)) ||
-      Number(p.proveedor_id) <= 0
-    ) {
-      toast("Este producto no tenía proveedor (marca) asignado: elegí uno en el formulario antes de guardar.", "info");
+    if (dupPidActivo === "") {
+      toast(
+        dupPidRaw != null
+          ? "El proveedor del producto original está inactivo: elegí uno activo antes de guardar."
+          : "Este producto no tenía proveedor (marca) asignado: elegí uno en el formulario antes de guardar.",
+        "info"
+      );
     }
   }
 
@@ -479,27 +487,37 @@ export function InventarioPage() {
     requestEliminarProducto(p);
   }
 
+  const proveedorNombrePorId = useMemo(() => {
+    const m = new Map<number, string>();
+    for (const pr of inventarioCatalogo?.proveedores ?? []) {
+      m.set(pr.id, pr.nombre);
+    }
+    return m;
+  }, [inventarioCatalogo]);
+
   const productosFiltrados = useMemo(() => {
     const q = filtroBusqueda.trim().toLowerCase();
+    if (!q) return productos;
     return productos.filter((p) => {
-      if (filtroEstado === "activo" && p.estado === "inactivo") return false;
-      if (filtroEstado === "inactivo" && p.estado !== "inactivo") return false;
-      if (filtroProveedor !== "todos") {
-        const pid =
-          p.proveedor_id != null && Number.isFinite(Number(p.proveedor_id)) ? Number(p.proveedor_id) : null;
-        if (filtroProveedor === "sin") {
-          if (pid != null && pid > 0) return false;
-        } else {
-          const want = Number(filtroProveedor);
-          if (!Number.isFinite(want) || pid !== want) return false;
-        }
-      }
-      if (!q) return true;
-      const nombre = p.nombre?.toLowerCase() ?? "";
-      const codigo = p.codigo_barras?.toLowerCase() ?? "";
-      return nombre.includes(q) || codigo.includes(q);
+      const pid =
+        p.proveedor_id != null && Number.isFinite(Number(p.proveedor_id))
+          ? Number(p.proveedor_id)
+          : null;
+      const proveedorNombre = pid != null ? proveedorNombrePorId.get(pid) : null;
+      const campos = [
+        p.nombre,
+        p.codigo_barras,
+        p.marca,
+        p.categoria,
+        p.descripcion,
+        proveedorNombre,
+        p.estado === "inactivo" ? "inactivo" : "activo",
+      ];
+      return campos.some((s) => (s ?? "").toLowerCase().includes(q));
     });
-  }, [productos, filtroBusqueda, filtroEstado, filtroProveedor]);
+  }, [productos, filtroBusqueda, proveedorNombrePorId]);
+
+  const filtrosInventarioActivos = filtroBusqueda.trim() !== "";
 
   const productosOrdenados = useMemo(() => {
     return [...productosFiltrados].sort((a, b) => {
@@ -649,55 +667,20 @@ export function InventarioPage() {
               type="search"
               value={filtroBusqueda}
               onChange={(e) => setFiltroBusqueda(e.target.value)}
-              placeholder="Nombre o código de barras…"
+              placeholder="Producto, categoría, proveedor, código de barras, marca…"
               autoComplete="off"
             />
           </label>
-          <label className="field inventario-filtros__proveedor">
-            <span>Proveedor</span>
-            <select
-              value={filtroProveedor}
-              onChange={(e) => setFiltroProveedor(e.target.value)}
-              aria-label="Filtrar por proveedor (marca)"
-            >
-              <option value="todos">Todos</option>
-              <option value="sin">Sin proveedor</option>
-              {[...(inventarioCatalogo?.proveedores ?? [])]
-                .sort((a, b) => a.nombre.localeCompare(b.nombre, "es", { sensitivity: "base" }))
-                .map((pr) => (
-                  <option key={pr.id} value={String(pr.id)}>
-                    {pr.nombre}
-                  </option>
-                ))}
-            </select>
-          </label>
-          <label className="field inventario-filtros__estado">
-            <span>Estado</span>
-            <select
-              value={filtroEstado}
-              onChange={(e) =>
-                setFiltroEstado(e.target.value as "todos" | "activo" | "inactivo")
-              }
-            >
-              <option value="todos">Todos</option>
-              <option value="activo">Activos</option>
-              <option value="inactivo">Inactivos</option>
-            </select>
-          </label>
-          {(filtroBusqueda || filtroEstado !== "todos" || filtroProveedor !== "todos") && !loading ? (
+          {filtrosInventarioActivos && !loading ? (
             <span className="muted small inventario-filtros__count">
               {productosFiltrados.length} de {productos.length}
             </span>
           ) : null}
-          {filtroBusqueda || filtroEstado !== "todos" || filtroProveedor !== "todos" ? (
+          {filtrosInventarioActivos ? (
             <button
               type="button"
               className="btn ghost small"
-              onClick={() => {
-                setFiltroBusqueda("");
-                setFiltroEstado("todos");
-                setFiltroProveedor("todos");
-              }}
+              onClick={() => setFiltroBusqueda("")}
             >
               Limpiar
             </button>
@@ -719,16 +702,13 @@ export function InventarioPage() {
           </div>
         ) : productosOrdenados.length === 0 ? (
           <div className="empty-state empty-state--compact card-pro">
-            <p>No hay productos que coincidan con los filtros.</p>
+            <p>No hay productos que coincidan con la búsqueda.</p>
             <button
               type="button"
               className="btn ghost small"
-              onClick={() => {
-                setFiltroBusqueda("");
-                setFiltroEstado("todos");
-              }}
+              onClick={() => setFiltroBusqueda("")}
             >
-              Limpiar filtros
+              Limpiar búsqueda
             </button>
           </div>
         ) : (

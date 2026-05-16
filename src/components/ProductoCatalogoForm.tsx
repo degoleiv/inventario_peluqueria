@@ -202,6 +202,10 @@ export function ProductoCatalogoForm({
   inventarioCatalogo,
 }: Props) {
   const cat = inventarioCatalogo;
+  const proveedorInactivoSeleccionado =
+    cat != null &&
+    values.proveedorId !== "" &&
+    !cat.proveedores.some((p) => p.id === values.proveedorId);
   const catEmptySlot = (
     <div className="searchable-select__empty-actions">
       <p className="muted small" style={{ marginBottom: "0.5rem" }}>
@@ -343,7 +347,13 @@ export function ProductoCatalogoForm({
                   disabled={cat.loading}
                   onPanelOpen={cat.onCatalogPanelOpen}
                   emptySlot={provEmptySlot}
-                  hint={cat.loading ? "Cargando proveedores…" : null}
+                  hint={
+                    proveedorInactivoSeleccionado
+                      ? "El proveedor asignado está inactivo. Elegí uno de la lista."
+                      : cat.loading
+                        ? "Cargando proveedores…"
+                        : null
+                  }
                 />
                 <SearchableSelect
                   label="Categoría *"

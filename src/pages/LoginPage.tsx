@@ -62,10 +62,10 @@ export function LoginPage({ onLoggedIn }: Props) {
           password,
           nombre: nombre.trim() || undefined,
         });
-        setAccessToken(r.accessToken);
+        setAccessToken(r.accessToken, r.expiresIn);
       } else {
         const r = await loginApi({ email, password });
-        setAccessToken(r.accessToken);
+        setAccessToken(r.accessToken, r.expiresIn);
       }
       onLoggedIn();
     } catch (err) {

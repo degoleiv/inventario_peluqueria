@@ -67,6 +67,20 @@ export const proveedorRepository = {
     return row?.c ?? 0;
   },
 
+  async isActivo(id: number): Promise<boolean> {
+    const row = (await db
+      .prepare(`SELECT id FROM proveedores WHERE id = ? AND estado = 'activo'`)
+      .get(id)) as { id: number } | undefined;
+    return row != null;
+  },
+
+  async countProductosByProveedorId(proveedorId: number): Promise<number> {
+    const row = (await db
+      .prepare(`SELECT COUNT(*) AS c FROM productos WHERE proveedor_id = ?`)
+      .get(proveedorId)) as { c: number } | undefined;
+    return row?.c ?? 0;
+  },
+
   async deleteById(id: number): Promise<void> {
     await db.prepare(`DELETE FROM proveedores WHERE id = ?`).run(id);
   },

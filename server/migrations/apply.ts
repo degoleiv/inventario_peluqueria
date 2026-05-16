@@ -751,6 +751,49 @@ const MIGRATIONS: Migration[] = [
       await db.exec(`DROP INDEX IF EXISTS idx_proveedores_nit_unique`);
     },
   },
+
+  // ══════════════════════════════════════════
+  // 005 — Cierres de día (conciliación caja / cuentas)
+  // ══════════════════════════════════════════
+  {
+    id: "005_cierres_dia",
+    up: async (db) => {
+      await db.exec(`
+        CREATE TABLE IF NOT EXISTS cierres_dia (
+          id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+          fecha              TEXT NOT NULL UNIQUE,
+          ventas_cantidad    INTEGER NOT NULL DEFAULT 0,
+          ventas_total       REAL NOT NULL DEFAULT 0,
+          montos_reportados  TEXT NOT NULL,
+          montos_reales      TEXT NOT NULL,
+          montos_diferencia  TEXT NOT NULL,
+          nota_final         TEXT,
+          usuario_id         INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+          usuario_nombre     TEXT,
+          created_at         TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_cierres_dia_fecha ON cierres_dia(fecha DESC);
+      `);
+    },
+  },
+
+  // ══════════════════════════════════════════
+  // 006 — Medios de pago por transferencia (configurables)
+  // ══════════════════════════════════════════
+  {
+    id: "006_medios_pago_transferencia",
+    up: async (db) => {
+      const defaultJson = JSON.stringify([
+        { id: "nequi", label: "Nequi", activo: true, orden: 0 },
+        { id: "daviplata", label: "Daviplata", activo: true, orden: 1 },
+        { id: "llave", label: "Llave", activo: true, orden: 2 },
+        { id: "bold", label: "Bold", activo: true, orden: 3 },
+      ]);
+      await db.exec(
+        `INSERT OR IGNORE INTO configuracion (clave, valor) VALUES ('medios_pago_transferencia', '${defaultJson.replace(/'/g, "''")}')`
+      );
+    },
+  },
 ];
 
 // ─────────────────────────────────────────────

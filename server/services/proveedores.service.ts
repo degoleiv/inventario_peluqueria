@@ -269,16 +269,22 @@ export const proveedoresService = {
   },
 
   /**
-   * Elimina el registro si no hay pedidos asociados (FK RESTRICT).
-   * Si hay pedidos, responde error claro (409).
+   * Elimina el registro si no hay pedidos ni productos asociados.
    */
   async deletePermanently(id: number): Promise<void> {
     const cur = await proveedorRepository.findById(id);
     if (!cur) throw new AppError("Proveedor no encontrado", 404);
-    const n = await proveedorRepository.countPedidosByProveedorId(id);
-    if (n > 0) {
+    const nProductos = await proveedorRepository.countProductosByProveedorId(id);
+    if (nProductos > 0) {
       throw new AppError(
-        `No se puede eliminar: el proveedor tiene ${n} pedido(s) asociado(s). Podés desactivarlo desde el interruptor de estado.`,
+        `No se puede eliminar: el proveedor tiene ${nProductos} producto(s) asociado(s). Reasigná o quitá el proveedor en Inventario, o desactivá el proveedor.`,
+        409
+      );
+    }
+    const nPedidos = await proveedorRepository.countPedidosByProveedorId(id);
+    if (nPedidos > 0) {
+      throw new AppError(
+        `No se puede eliminar: el proveedor tiene ${nPedidos} pedido(s) asociado(s). Podés desactivarlo desde el interruptor de estado.`,
         409
       );
     }
@@ -287,7 +293,7 @@ export const proveedoresService = {
     } catch (e) {
       if (isAnyConstraint(e)) {
         throw new AppError(
-          "No se puede eliminar: el proveedor está referenciado en pedidos u otros registros.",
+          "No se puede eliminar: el proveedor está referenciado en productos, pedidos u otros registros.",
           409
         );
       }

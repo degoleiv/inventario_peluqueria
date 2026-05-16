@@ -15,7 +15,7 @@ import {
 } from "../components/config/CategoriasProductoPanel";
 import { CategoriasFinanzaConceptoPanel } from "../components/config/CategoriasFinanzaConceptoPanel";
 import { CertificadoLaboralEmisorPanel } from "../components/config/CertificadoLaboralEmisorPanel";
-import { PuntosFidelidadConfigSection } from "../components/config/PuntosFidelidadConfigSection";
+import { MediosPagoTransferenciaPanel } from "../components/config/MediosPagoTransferenciaPanel";
 import { SubNav } from "../components/SubNav";
 import { applyBrandingToDocument } from "../lib/brandingDocument";
 import { CONFIG_TABS, readConfigTab, type ConfigTab } from "../lib/moduleRoutes";
@@ -208,13 +208,15 @@ export function ConfiguracionPage() {
             </button>
           </div>
           <div className="config-cat-board-wrap">
+            <div className="config-cat-board-full-row">
+              <MediosPagoTransferenciaPanel />
+            </div>
             <CategoriasProductoPanel />
             <CategoriasServicioPanel />
             <div className="config-cat-board-full-row">
               <CategoriasFinanzaConceptoPanel />
             </div>
           </div>
-          <PuntosFidelidadConfigSection />
           <CertificadoLaboralEmisorPanel />
         </section>
       ) : null}

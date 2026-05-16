@@ -9,9 +9,24 @@ export const MEDIA_PUBLIC_PREFIX = "/api/media";
 
 const DATA_URL_RE = /^data:([^;]+);base64,([\s\S]+)$/i;
 
-export type MediaScope = "branding" | "cert" | "productos" | "proveedores" | "usuarios" | "gastos";
+export type MediaScope =
+  | "branding"
+  | "cert"
+  | "productos"
+  | "proveedores"
+  | "usuarios"
+  | "fotos"
+  | "gastos";
 
-const SCOPES = new Set<string>(["branding", "cert", "productos", "proveedores", "usuarios", "gastos"]);
+const SCOPES = new Set<string>([
+  "branding",
+  "cert",
+  "productos",
+  "proveedores",
+  "usuarios",
+  "fotos",
+  "gastos",
+]);
 
 const MIME_EXT: Record<string, string> = {
   "image/png": ".png",
@@ -133,6 +148,35 @@ export async function saveDataUrlToDisk(dataUrl: string, opts: SaveDataUrlOption
 }
 
 /** Imagen para branding / productos / iconos (no PDF). */
+/** Guarda bytes de imagen en `media/<scope>/` y devuelve la ruta pública `/api/media/...`. */
+export async function saveImageBuffer(
+  buf: Buffer,
+  mimeRaw: string,
+  scope: MediaScope,
+  maxBytes: number
+): Promise<string> {
+  assertScope(scope);
+  const mime = mimeRaw.toLowerCase().split(";")[0].trim();
+  if (!mime.startsWith("image/")) {
+    throw new AppError("Solo se permiten archivos de imagen", 400);
+  }
+  if (!MIME_EXT[mime]) {
+    throw new AppError("Formato de imagen no soportado", 400);
+  }
+  if (buf.length === 0) throw new AppError("Archivo vacío", 400);
+  if (buf.length > maxBytes) {
+    throw new AppError(`Archivo demasiado grande (máx. ${Math.ceil(maxBytes / 1024 / 1024)} MB)`, 400);
+  }
+  const root = inventarioMediaRoot();
+  const dir = path.join(root, scope);
+  await ensureDir(dir);
+  const ext = extForMime(mime);
+  const name = `${randomUUID()}${ext}`;
+  const abs = path.join(dir, name);
+  await fs.writeFile(abs, buf);
+  return `${MEDIA_PUBLIC_PREFIX}/${scope}/${name}`;
+}
+
 export async function saveImageDataUrl(dataUrl: string, scope: MediaScope, maxBytes: number): Promise<string> {
   const trimmed = dataUrl.trim();
   if (!trimmed.toLowerCase().startsWith("data:image/")) {

@@ -906,7 +906,7 @@ export function ProveedoresPage() {
             </h3>
             <p className="muted">
               ¿Estás seguro de eliminar el proveedor <strong>«{deleteTarget.nombre}»</strong>? Esta acción no se
-              puede deshacer. Si tiene pedidos asociados, el sistema no permitirá borrarlo.
+              puede deshacer. No es posible si tiene productos o pedidos asociados. Si tiene pedidos asociados, el sistema no permitirá borrarlo.
             </p>
             <div className="actions" style={{ marginTop: "1rem" }}>
               <button type="button" className="btn ghost" disabled={deleteBusy} onClick={() => setDeleteTarget(null)}>

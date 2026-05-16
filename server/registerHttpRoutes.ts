@@ -12,6 +12,7 @@ import { productoService } from "./services/producto.service.js";
 import { clienteService } from "./services/cliente.service.js";
 import { citaService } from "./services/cita.service.js";
 import { ventaService } from "./services/venta.service.js";
+import { cierreDiaService } from "./services/cierreDia.service.js";
 import { pedidoProveedorService } from "./services/pedidoProveedor.service.js";
 import { facturaElectronicaService } from "./services/facturaElectronica.service.js";
 import { configuracionService } from "./services/configuracion.service.js";
@@ -37,7 +38,7 @@ import { certificadoController } from "./controllers/certificado.controller.js";
 import { proveedoresController } from "./controllers/proveedores.controller.js";
 import { AppError } from "./lib/AppError.js";
 import { mediaPublicPathToAbsolute } from "./lib/mediaStore.js";
-import { businessHours } from "./config.js";
+import { businessHours, JWT_EXPIRY_SEC } from "./config.js";
 
 function parseId(req: Request, res: Response): number | null {
   const id = Number(req.params.id);
@@ -136,6 +137,13 @@ export function registerHttpRoutes(app: Express) {
     })
   );
 
+  app.get(
+    "/api/auth/session-config",
+    asyncHandler(async (_req, res) => {
+      res.json({ expiresIn: JWT_EXPIRY_SEC });
+    })
+  );
+
   /** GET sin JWT: pantalla de login, favicon y lecturas que ocurren antes de `requireAuth`. */
   app.get(
     "/api/configuracion/branding",
@@ -228,6 +236,23 @@ export function registerHttpRoutes(app: Express) {
     requireAdmin,
     asyncHandler(async (req, res) => {
       res.json(await configuracionService.updatePuntosConfig(req.body as Record<string, unknown>));
+    })
+  );
+
+  api.get(
+    "/configuracion/medios-pago-transferencia",
+    asyncHandler(async (_req, res) => {
+      res.json(await configuracionService.getMediosPagoTransferencia());
+    })
+  );
+
+  api.patch(
+    "/configuracion/medios-pago-transferencia",
+    requireAdmin,
+    asyncHandler(async (req, res) => {
+      res.json(
+        await configuracionService.updateMediosPagoTransferencia(req.body as Record<string, unknown>)
+      );
     })
   );
 
@@ -934,6 +959,54 @@ export function registerHttpRoutes(app: Express) {
         const status = msg.includes("ya tiene") ? 409 : 400;
         res.status(status).json({ error: msg });
       }
+    })
+  );
+
+  api.get(
+    "/cierres-dia/resumen",
+    requirePermiso("ventas"),
+    asyncHandler(async (req, res) => {
+      const fecha = typeof req.query.fecha === "string" ? req.query.fecha : undefined;
+      res.json(await cierreDiaService.resumen(fecha));
+    })
+  );
+
+  api.get(
+    "/cierres-dia",
+    requirePermiso("ventas"),
+    asyncHandler(async (req, res) => {
+      const limit = typeof req.query.limit === "string" ? Number(req.query.limit) : 60;
+      res.json(await cierreDiaService.list(Number.isFinite(limit) ? limit : 60));
+    })
+  );
+
+  api.get(
+    "/cierres-dia/:id",
+    requirePermiso("ventas"),
+    asyncHandler(async (req, res) => {
+      const id = parseId(req, res);
+      if (id == null) return;
+      res.json(await cierreDiaService.getById(id));
+    })
+  );
+
+  api.post(
+    "/cierres-dia",
+    requirePermiso("ventas"),
+    asyncHandler(async (req, res) => {
+      const uid = req.user?.sub;
+      if (uid == null) {
+        res.status(401).json({ error: "No autenticado" });
+        return;
+      }
+      const u = await usuariosRepo.findById(uid);
+      const nombre = u && typeof (u as { nombre?: string }).nombre === "string" ? (u as { nombre: string }).nombre : null;
+      res.status(201).json(
+        await cierreDiaService.crear(req.body as Record<string, unknown>, {
+          id: uid,
+          nombre,
+        })
+      );
     })
   );
 

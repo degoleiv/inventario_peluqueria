@@ -9,7 +9,6 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import data from "@emoji-mart/data";
 import {
   createCategoriaProducto,
   createCategoriaServicio,
@@ -21,6 +20,7 @@ import {
   updateCategoriaServicio,
   type CategoriaProducto,
 } from "../../api";
+import { emojiMartPickerEsProps } from "../../lib/emojiMartLocale";
 import { readDataTheme, subscribeDataTheme } from "../../lib/emojiMartTheme";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { Drawer } from "../Drawer";
@@ -34,9 +34,8 @@ function CategoriaEmojiMartPopover({ onPick }: { onPick: (native: string) => voi
     <div className="cat-nueva-emoji-mart" role="listbox" aria-label="Elegir emoji">
       <Suspense fallback={<div className="cat-nueva-emoji-mart-fallback muted">Cargando emojis…</div>}>
         <EmojiPickerLazy
-          data={data}
+          {...emojiMartPickerEsProps}
           theme={appTheme}
-          locale="es"
           onEmojiSelect={(emoji: { native: string }) => onPick(emoji.native)}
           previewPosition="top"
           searchPosition="sticky"

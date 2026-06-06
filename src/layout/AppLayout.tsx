@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { resolveImageSrc } from "../api";
 import { WorkspaceTabsBar } from "../components/WorkspaceTabsBar";
+import { usePosFocus } from "../context/PosFocusContext";
+import { ArrowsIn } from "@phosphor-icons/react";
 import {
   NAV_GROUPS,
   NAV_LABEL,
@@ -179,9 +181,33 @@ export function AppLayout({
 }: Props) {
   const pageTitle = NAV_LABEL[nav];
   const displayBrand = brandTitle?.trim() || "Peluquería";
+  const { chromeHidden, setPosFocus } = usePosFocus();
 
   if (fullscreenContent) {
     return <div className="app-root app-root--customer-display">{children}</div>;
+  }
+
+  if (chromeHidden) {
+    return (
+      <div className="app-root app-root--pos-focus">
+        <div className="pos-focus-toolbar">
+          <span className="pos-focus-toolbar-title">Nueva venta</span>
+          <button
+            type="button"
+            className="btn ghost small pos-focus-exit"
+            onClick={() => {
+              setPosFocus(false);
+              if (document.fullscreenElement) void document.exitFullscreen();
+            }}
+          >
+            <ArrowsIn size={18} aria-hidden />
+            Salir de pantalla completa
+          </button>
+          <kbd className="pos-focus-kbd">Esc</kbd>
+        </div>
+        <div className="pos-focus-body">{children}</div>
+      </div>
+    );
   }
 
   const sidebarGroups = NAV_GROUPS.map((g) => ({

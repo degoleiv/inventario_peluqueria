@@ -307,11 +307,7 @@ export function AuthenticatedShell() {
           onCommandPalette={() => setPaletteOpen(true)}
           onQuickSale={() => navigate(getModuleEntryPath("ventas"))}
           onQuickCita={() => navigate(getModuleEntryPath("citas"))}
-          breadcrumb={[
-            { label: "Inicio", onClick: () => navigate("/inicio") },
-            { label: NAV_LABEL[nav] },
-          ]}
-          hideModuleHeader={nav === "ventas" || nav === "clientes"}
+          hideModuleHeader
         >
           <Outlet />
         </AppLayout>

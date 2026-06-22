@@ -142,13 +142,6 @@ export function FacturasPage() {
           <div className="card-head">
             <h2 className="card-title">Correo (SMTP)</h2>
           </div>
-          <p className="hint">
-            La contraseña del buzón solo se define por variables de entorno{" "}
-            <code className="mono">SMTP_PASSWORD</code> o <code className="mono">SMTP_PASS</code>{" "}
-            (no se guarda en la base). Host, puerto y remitente pueden cargarse acá o por{" "}
-            <code className="mono">SMTP_HOST</code>, <code className="mono">SMTP_PORT</code>,{" "}
-            <code className="mono">SMTP_FROM</code>.
-          </p>
           {smtpCfg == null ? (
             <p className="muted">Cargando SMTP…</p>
           ) : (
@@ -244,10 +237,6 @@ export function FacturasPage() {
             Actualizar
           </button>
         </div>
-        <p className="hint">
-          Comprobantes generados al vender (si dejaste activada la emisión). Descargá XML o JSON con
-          firma HMAC local; podés enviar ambos adjuntos por correo si SMTP está configurado.
-        </p>
         {loading ? (
           <p className="muted">Cargando…</p>
         ) : rows.length === 0 ? (

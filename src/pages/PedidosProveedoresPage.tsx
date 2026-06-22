@@ -7,7 +7,7 @@ import {
   useState,
   type FormEvent,
 } from "react";
-import { Check, MagnifyingGlass, Plus, Truck } from "@phosphor-icons/react";
+import { Check, MagnifyingGlass, Plus } from "@phosphor-icons/react";
 import {
   createPedidoProveedor,
   createProducto,
@@ -615,20 +615,6 @@ export function PedidosProveedoresPage() {
 
   return (
     <div className="page-pedidos">
-      <header className="pedidos-hero">
-        <div className="pedidos-hero__icon" aria-hidden>
-          <Truck size={26} weight="duotone" />
-        </div>
-        <div className="pedidos-hero__copy">
-          <p className="pedidos-hero__eyebrow">Compras y stock</p>
-          <h1 className="pedidos-hero__title">Pedidos a proveedor</h1>
-          <p className="pedidos-hero__lede">
-            Flujo guiado en cuatro pasos: elegí proveedor, cargá productos, definí pagos y cerrá con resumen y notas.
-            Podés moverte entre pasos con el stepper o con Anterior / Siguiente.
-          </p>
-        </div>
-      </header>
-
       <nav className="pedidos-segmented" aria-label="Navegación de pedidos" role="tablist">
         {(
           [
@@ -659,9 +645,6 @@ export function PedidosProveedoresPage() {
         <section className="pedidos-wizard-card">
           <div className="pedidos-wizard-card__intro">
             <h2 className="pedidos-wizard-card__title">Nuevo pedido</h2>
-            <p className="pedidos-wizard-card__subtitle">
-              Completá los pasos en orden. Podés volver atrás en cualquier momento.
-            </p>
           </div>
 
           <ol className="pedidos-stepper" aria-label="Progreso del pedido">
@@ -780,9 +763,6 @@ export function PedidosProveedoresPage() {
                     <div className="pedidos-dash-layout__main">
                       <div className="pedidos-lines-head">
                         <h3 className="pedidos-lines-head__title">Líneas del pedido</h3>
-                        <p className="pedidos-lines-head__hint">
-                          Sumá ítems desde el catálogo del proveedor a la derecha o creá uno nuevo en el panel lateral.
-                        </p>
                       </div>
                       <div className="pedidos-actions-row">
                         <button type="button" className="pedidos-btn pedidos-btn--ghost" onClick={openDrawerNuevoProducto}>
@@ -896,9 +876,6 @@ export function PedidosProveedoresPage() {
                       <div className="pedidos-sidebar-card__head">
                         <div>
                           <h3 className="pedidos-sidebar-card__title">Catálogo del proveedor</h3>
-                          <p className="pedidos-sidebar-card__hint">
-                            Productos generales del salón y los asociados a {proveedorSeleccionado?.nombre ?? "este proveedor"}. Tocá uno para sumarlo al pedido.
-                          </p>
                         </div>
                       </div>
                       <label className="pedidos-field pedidos-field--compact">

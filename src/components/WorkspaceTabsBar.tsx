@@ -65,7 +65,7 @@ export function WorkspaceTabsBar() {
           aria-haspopup="menu"
           title="Abrir otra vista en una pestaña nueva"
         >
-          + Nueva pestaña
+          +
         </button>
         {menuOpen ? (
           <div className="workspace-tabs-menu" role="menu">

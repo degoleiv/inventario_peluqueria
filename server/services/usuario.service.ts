@@ -102,10 +102,13 @@ export const usuarioService = {
       activo?: boolean;
       tipo_comision?: string;
       valor_comision?: number;
+      /** Si viene informado, reemplaza los turnos activos del rango por la nueva plantilla. */
+      turno_inicial?: unknown;
     }
   ) {
     const u = await usuariosRepo.findById(id);
     if (!u) throw new AppError("Usuario no encontrado", 404);
+    const plantilla = parseTurnoPlantillaSemanal(params.turno_inicial);
 
     const nextRol =
       params.rol != null ? params.rol.trim().toLowerCase() : undefined;
@@ -178,10 +181,15 @@ export const usuarioService = {
       await usuariosRepo.updateComision(id, tipo, valor);
     }
 
+    let turnos_creados: number | undefined;
+    if (plantilla) {
+      turnos_creados = await turnoService.reemplazarFuturosPorPlantilla(id, plantilla);
+    }
+
     await recordSyncEvent("usuario", "actualizado", { id });
     const row = (await usuariosRepo.findById(id))!;
     const { password_hash: _p, ...safe } = row;
-    return safe;
+    return turnos_creados != null ? { ...safe, turnos_creados } : safe;
   },
 
   async delete(id: number) {

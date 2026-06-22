@@ -1520,6 +1520,19 @@ export function registerHttpRoutes(app: Express) {
   );
 
   api.post(
+    "/inventario/categorias-producto",
+    requirePermiso("inventario"),
+    asyncHandler(async (req, res) => {
+      const row = await categoriaProductoService.create(req.body as Record<string, unknown>);
+      await auditService.log(req.user?.sub, "crear", "categoria_producto", row.id, {
+        nombre_categoria: row.nombre_categoria,
+        origen: "inventario",
+      });
+      res.status(201).json(row);
+    })
+  );
+
+  api.post(
     "/inventario/ajuste-stock",
     requirePermiso("inventario"),
     asyncHandler(async (req, res) => {
@@ -1731,6 +1744,7 @@ export function registerHttpRoutes(app: Express) {
           b.valor_comision != null && Number.isFinite(Number(b.valor_comision))
             ? Number(b.valor_comision)
             : undefined,
+        turno_inicial: b.turno_inicial,
       });
       res.json(row);
     })

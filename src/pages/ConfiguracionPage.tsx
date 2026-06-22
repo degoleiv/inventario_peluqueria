@@ -198,10 +198,6 @@ export function ConfiguracionPage() {
       {tab === "parametros" ? (
         <section className="card config-settings-card">
           <h2 className="card-title">Parámetros generales</h2>
-          <p className="muted small">
-            Volvé a cargar marca, sistema y demás preferencias desde el servidor si hubo cambios en otro
-            equipo o tras un error.
-          </p>
           <div className="actions" style={{ marginTop: "0.75rem" }}>
             <button type="button" className="btn secondary" onClick={() => void load()}>
               Recargar valores
@@ -224,11 +220,6 @@ export function ConfiguracionPage() {
       {tab === "apariencia" && branding ? (
         <section className="card config-settings-card">
           <h2 className="card-title">Marca e interfaz</h2>
-          <p className="muted small" style={{ marginBottom: "1rem" }}>
-            Aquí puedes darle tu toque a la aplicación. Cambia el nombre, el icono y ajusta los colores y
-            estilos visuales para que todo se vea como quieres.
-          </p>
-
           <span className="config-section-label">Marca</span>
           <label className="field" style={{ marginBottom: "1rem" }}>
             <span>Nombre del negocio</span>
@@ -246,7 +237,7 @@ export function ConfiguracionPage() {
             {!branding.logo_data_url ? (
               <>
                 <p className="muted small" style={{ margin: "0.25rem 0 0.5rem" }}>
-                  Sube un icono para tu aplicación (PNG, JPG o SVG; hasta 25 MB — se guarda en el equipo).
+                  PNG, JPG o SVG (hasta 25 MB).
                 </p>
                 <input
                   ref={iconoInputRef}
@@ -280,9 +271,6 @@ export function ConfiguracionPage() {
               </div>
             ) : (
               <>
-                <p className="muted small" style={{ margin: "0.25rem 0 0.5rem" }}>
-                  Elegí un archivo PNG, JPG o SVG (hasta 25 MB).
-                </p>
                 <input
                   ref={iconoInputRef}
                   type="file"
@@ -305,10 +293,6 @@ export function ConfiguracionPage() {
           <span className="config-section-label" style={{ marginTop: "0.25rem" }}>
             Interfaz
           </span>
-          <p className="muted small" style={{ marginBottom: "0.75rem" }}>
-            Se aplica al elegir cada opción: paleta, densidad, escala de pantalla, bordes y relieve clay.
-          </p>
-
           <span className="config-section-label">Paleta</span>
           <div className="config-palette-grid">
             {THEME_CATALOG.map((t) => {
@@ -410,10 +394,6 @@ export function ConfiguracionPage() {
       {tab === "sistema" && sistema ? (
         <section className="card config-settings-card">
           <h2 className="card-title">Sistema</h2>
-          <p className="muted small">
-            Preferencias almacenadas localmente en el servidor. Backup automático y modo offline
-            amplían el comportamiento en futuras versiones.
-          </p>
           {syncColaPendiente != null ? (
             <p className="muted small" style={{ marginBottom: "0.85rem" }}>
               Cola de sincronización con la nube:{" "}

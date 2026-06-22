@@ -309,8 +309,24 @@ export function EmpleadosPage({ onChanged }: Props) {
       const vc = Number(form.valor_comision.replace(",", "."));
       const salarioFijo = esEmpleadoSalarioFijo(form.rol, form.tipo_comision);
       const tipoComision = salarioFijo ? "salario" : form.tipo_comision;
+      let turno_inicial: TurnoPlantillaInicial | undefined;
+      if (form.registrar_turnos_plantilla) {
+        if (form.turno_dias_semana.length === 0) {
+          toast("Elegí al menos un día de la semana para los turnos.", "error");
+          return;
+        }
+        const fechaDesde = isoToday();
+        const fechaHasta = addDaysIso(fechaDesde, 55);
+        turno_inicial = {
+          fecha_desde: fechaDesde,
+          fecha_hasta: fechaHasta,
+          dias_semana: [...form.turno_dias_semana].sort((a, b) => a - b),
+          hora_inicio: form.turno_hora_inicio.trim(),
+          hora_fin: form.turno_hora_fin.trim(),
+        };
+      }
       if (editing) {
-        await updateUsuario(editing.id, {
+        const updated = await updateUsuario(editing.id, {
           nombre: form.nombre.trim() || null,
           rol: form.rol,
           password: form.password.trim() || undefined,
@@ -320,25 +336,14 @@ export function EmpleadosPage({ onChanged }: Props) {
           tipo_comision: tipoComision,
           valor_comision: Number.isFinite(vc) ? vc : 0,
           activo: form.activo,
+          turno_inicial,
         });
-        toast("Empleado actualizado.", "success");
-      } else {
-        let turno_inicial: TurnoPlantillaInicial | undefined;
-        if (form.registrar_turnos_plantilla) {
-          if (form.turno_dias_semana.length === 0) {
-            toast("Elegí al menos un día de la semana para los turnos iniciales.", "error");
-            return;
-          }
-          const fechaDesde = isoToday();
-          const fechaHasta = addDaysIso(fechaDesde, 55);
-          turno_inicial = {
-            fecha_desde: fechaDesde,
-            fecha_hasta: fechaHasta,
-            dias_semana: [...form.turno_dias_semana].sort((a, b) => a - b),
-            hora_inicio: form.turno_hora_inicio.trim(),
-            hora_fin: form.turno_hora_fin.trim(),
-          };
+        if (updated.turnos_creados != null) {
+          toast(`Empleado actualizado. Se registraron ${updated.turnos_creados} turnos.`, "success");
+        } else {
+          toast("Empleado actualizado.", "success");
         }
+      } else {
         const created = await createUsuario({
           email: form.email.trim(),
           password: form.password,
@@ -817,9 +822,6 @@ export function EmpleadosPage({ onChanged }: Props) {
                 </button>
               </div>
             </div>
-            <p className="hint">
-              Horarios laborales por empleado. No se permiten solapes el mismo día. Usá HH:MM (ej. 09:00).
-            </p>
             <div className="field-row" style={{ marginBottom: "1rem", flexWrap: "wrap" }}>
               <label className="field">
                 <span>Empleado</span>
@@ -1011,10 +1013,6 @@ export function EmpleadosPage({ onChanged }: Props) {
               Actualizar
             </button>
           </div>
-          <p className="hint">
-            Pendientes se descuentan del saldo respecto de la remuneración del período (comisiones o
-            salario fijo): <strong>saldo ≈ remuneración − adelantos pendientes</strong>.
-          </p>
           <div className="field-row" style={{ marginBottom: "1rem", flexWrap: "wrap" }}>
             <label className="field">
               <span>Desde (resumen)</span>
@@ -1219,11 +1217,6 @@ export function EmpleadosPage({ onChanged }: Props) {
               Actualizar
             </button>
           </div>
-          <p className="hint">
-            Profesionales y empleados con comisión: las ventas y citas realizadas generan líneas según su
-            porcentaje o monto fijo. Los <strong>vendedores</strong> tienen salario mensual fijo (sin comisiones
-            por venta). Acá ves el total a pagar por persona, el detalle y los turnos de agenda del período.
-          </p>
           <div className="field-row" style={{ marginBottom: "1rem", flexWrap: "wrap", alignItems: "flex-end" }}>
             <label className="field">
               <span>Desde</span>
@@ -1432,10 +1425,6 @@ export function EmpleadosPage({ onChanged }: Props) {
               </button>
             </div>
           </div>
-          <p className="hint">
-            Los permisos controlan qué módulos ve cada usuario. Solo quien tiene acceso total (<code>*</code>)
-            puede abrir Configuración y Equipo.
-          </p>
           <table className="table table-wrap">
             <thead>
               <tr>
@@ -1478,11 +1467,6 @@ export function EmpleadosPage({ onChanged }: Props) {
         wide
       >
         <form className="form drawer-form" onSubmit={onSubmitRolDrawer}>
-          <p className="muted small" style={{ marginTop: 0 }}>
-            {rolForm.editingSlug
-              ? "Modificá el nombre visible y los permisos. El slug no se puede cambiar."
-              : "Definí un identificador único (slug), el nombre que verán los usuarios y los módulos permitidos."}
-          </p>
           <label className="field">
             <span>Slug *</span>
             <input
@@ -1566,9 +1550,8 @@ export function EmpleadosPage({ onChanged }: Props) {
 
       {tab === "nuevo" ? (
         <section className="card">
-          <p className="muted">Se abrió el panel lateral para dar de alta un empleado con login propio.</p>
           <button type="button" className="btn secondary" onClick={openNew}>
-            Abrir formulario otra vez
+            Abrir formulario
           </button>
         </section>
       ) : null}
@@ -1739,73 +1722,71 @@ export function EmpleadosPage({ onChanged }: Props) {
               </label>
             </div>
           ) : null}
-          {!editing ? (
-            <fieldset className="card" style={{ padding: "0.75rem", marginTop: "0.5rem", border: "1px solid var(--border)" }}>
-              <legend className="muted small" style={{ padding: "0 0.35rem" }}>
-                Horario en Turnos
-              </legend>
-              <label className="field inline-check" style={{ marginBottom: "0.5rem" }}>
-                <input
-                  type="checkbox"
-                  checked={form.registrar_turnos_plantilla}
-                  onChange={(e) =>
-                    setForm((x) => ({ ...x, registrar_turnos_plantilla: e.target.checked }))
-                  }
-                />
-                <span>Cargar turnos al guardar (mismo horario en los días elegidos)</span>
-              </label>
-              {form.registrar_turnos_plantilla ? (
-                <>
-                  <div className="field-row">
-                    <label className="field">
-                      <span>Hora inicio</span>
-                      <input
-                        type="time"
-                        value={form.turno_hora_inicio}
-                        onChange={(e) => setForm((x) => ({ ...x, turno_hora_inicio: e.target.value }))}
-                      />
-                    </label>
-                    <label className="field">
-                      <span>Hora fin</span>
-                      <input
-                        type="time"
-                        value={form.turno_hora_fin}
-                        onChange={(e) => setForm((x) => ({ ...x, turno_hora_fin: e.target.value }))}
-                      />
-                    </label>
+          <fieldset className="card" style={{ padding: "0.75rem", marginTop: "0.5rem", border: "1px solid var(--border)" }}>
+            <legend className="muted small" style={{ padding: "0 0.35rem" }}>
+              Horario en Turnos
+            </legend>
+            <label className="field inline-check" style={{ marginBottom: "0.5rem" }}>
+              <input
+                type="checkbox"
+                checked={form.registrar_turnos_plantilla}
+                onChange={(e) =>
+                  setForm((x) => ({ ...x, registrar_turnos_plantilla: e.target.checked }))
+                }
+              />
+              <span>
+                {editing
+                  ? "Actualizar turnos al guardar (mismo horario en los días elegidos)"
+                  : "Cargar turnos al guardar (mismo horario en los días elegidos)"}
+              </span>
+            </label>
+            {form.registrar_turnos_plantilla ? (
+              <>
+                <div className="field-row">
+                  <label className="field">
+                    <span>Hora inicio</span>
+                    <input
+                      type="time"
+                      value={form.turno_hora_inicio}
+                      onChange={(e) => setForm((x) => ({ ...x, turno_hora_inicio: e.target.value }))}
+                    />
+                  </label>
+                  <label className="field">
+                    <span>Hora fin</span>
+                    <input
+                      type="time"
+                      value={form.turno_hora_fin}
+                      onChange={(e) => setForm((x) => ({ ...x, turno_hora_fin: e.target.value }))}
+                    />
+                  </label>
+                </div>
+                <div className="field" style={{ marginBottom: "0.35rem" }}>
+                  <span className="block" style={{ marginBottom: "0.25rem" }}>
+                    Días
+                  </span>
+                  <div className="perm-grid" style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+                    {TURNO_DIAS_SEMANA_OPTS.map(({ v, lab }) => (
+                      <label key={v} className="field inline-check">
+                        <input
+                          type="checkbox"
+                          checked={form.turno_dias_semana.includes(v)}
+                          onChange={() =>
+                            setForm((x) => ({
+                              ...x,
+                              turno_dias_semana: x.turno_dias_semana.includes(v)
+                                ? x.turno_dias_semana.filter((d) => d !== v)
+                                : [...x.turno_dias_semana, v].sort((a, b) => a - b),
+                            }))
+                          }
+                        />
+                        <span>{lab}</span>
+                      </label>
+                    ))}
                   </div>
-                  <div className="field" style={{ marginBottom: "0.35rem" }}>
-                    <span className="block" style={{ marginBottom: "0.25rem" }}>
-                      Días
-                    </span>
-                    <div className="perm-grid" style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-                      {TURNO_DIAS_SEMANA_OPTS.map(({ v, lab }) => (
-                        <label key={v} className="field inline-check">
-                          <input
-                            type="checkbox"
-                            checked={form.turno_dias_semana.includes(v)}
-                            onChange={() =>
-                              setForm((x) => ({
-                                ...x,
-                                turno_dias_semana: x.turno_dias_semana.includes(v)
-                                  ? x.turno_dias_semana.filter((d) => d !== v)
-                                  : [...x.turno_dias_semana, v].sort((a, b) => a - b),
-                              }))
-                            }
-                          />
-                          <span>{lab}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                  <p className="muted small" style={{ margin: 0 }}>
-                    Se generan turnos desde hoy durante ~8 semanas en los días marcados. Podés ajustar fechas
-                    después en la pestaña Turnos.
-                  </p>
-                </>
-              ) : null}
-            </fieldset>
-          ) : null}
+                </div>
+              </>
+            ) : null}
+          </fieldset>
           <div className="drawer-actions">
             <button type="submit" className="btn primary btn-lg">
               Guardar

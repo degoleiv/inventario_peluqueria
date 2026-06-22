@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useParams } from "react-router-dom";
 import {
+  createInventarioCategoriaProducto,
   createProducto,
   deleteProducto,
   fetchInventarioCatalogo,
@@ -103,6 +104,30 @@ export function InventarioPage() {
       }
     },
     [toast]
+  );
+
+  const crearCategoriaDesdeFormulario = useCallback(
+    async (nombreCategoria: string) => {
+      const row = await createInventarioCategoriaProducto({
+        nombre_categoria: nombreCategoria,
+      });
+      setInventarioCatalogo((prev) => {
+        if (!prev) {
+          return { categorias: [row], proveedores: [] };
+        }
+        const exists = prev.categorias.some((c) => c.id === row.id);
+        const categorias = exists
+          ? prev.categorias.map((c) => (c.id === row.id ? row : c))
+          : [...prev.categorias, row].sort((a, b) =>
+              a.nombre_categoria.localeCompare(b.nombre_categoria, "es", { sensitivity: "base" })
+            );
+        return { ...prev, categorias };
+      });
+      await loadInventarioCatalogo("silent");
+      toast("Categoría creada.", "success");
+      return row.nombre_categoria;
+    },
+    [loadInventarioCatalogo, toast]
   );
 
   const aplicarRespuestaBarcode = useCallback(
@@ -579,12 +604,6 @@ export function InventarioPage() {
           className="form drawer-form"
           onSubmit={onGuardar}
         >
-          {duplicateDraftSource ? (
-            <p className="muted small" style={{ margin: "0 0 0.75rem" }}>
-              Copia basada en <strong>{duplicateDraftSource.nombre}</strong>. El código de barras quedó vacío para
-              evitar duplicados; el stock inicia en 0.
-            </p>
-          ) : null}
           <ProductoCatalogoForm
             values={catalogoValues}
             onChange={patchCatalogo}
@@ -600,6 +619,7 @@ export function InventarioPage() {
               categorias: inventarioCatalogo?.categorias ?? [],
               proveedores: inventarioCatalogo?.proveedores ?? [],
               onCatalogPanelOpen: () => void loadInventarioCatalogo("silent"),
+              onCreateCategoria: crearCategoriaDesdeFormulario,
             }}
           />
 
@@ -629,9 +649,6 @@ export function InventarioPage() {
                     {activo ? "Activo" : "Inactivo"}
                   </span>
                 </label>
-                <p className="muted small" style={{ margin: "0.25rem 0 0" }}>
-                  Los productos inactivos no aparecen en ventas pero conservan su historial.
-                </p>
               </div>
             );
           })()}

@@ -7,7 +7,6 @@ import {
   CaretRight,
   ChartLineUp,
   Check,
-  CurrencyCircleDollar,
   FileArrowUp,
   Paperclip,
   Plus,
@@ -558,20 +557,6 @@ export function FinanzasPage() {
 
   return (
     <div className="page-pedidos page-finanzas">
-      <header className="pedidos-hero">
-        <div className="pedidos-hero__icon" aria-hidden>
-          <CurrencyCircleDollar size={26} weight="duotone" />
-        </div>
-        <div className="pedidos-hero__copy">
-          <p className="pedidos-hero__eyebrow">Control financiero</p>
-          <h1 className="pedidos-hero__title">Finanzas</h1>
-          <p className="pedidos-hero__lede">
-            Flujo de caja por período, registro de gastos operativos y seguimiento de cuentas por cobrar.
-            Usá las pestañas para enfocarte en cada área sin recorrer toda la página.
-          </p>
-        </div>
-      </header>
-
       <nav className="pedidos-segmented" aria-label="Secciones de finanzas" role="tablist">
         {(
           [

@@ -1178,6 +1178,23 @@ select::-ms-expand {
   font-size: 0.65rem;
 }
 
+.searchable-select--combobox .searchable-select__combobox-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.searchable-select__combobox-input {
+  padding-right: 1.65rem;
+  cursor: text;
+}
+
+.searchable-select__chevron--combobox {
+  position: absolute;
+  right: 0.55rem;
+  pointer-events: none;
+}
+
 .searchable-select__panel {
   position: absolute;
   z-index: 40;

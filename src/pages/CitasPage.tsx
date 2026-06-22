@@ -1303,13 +1303,10 @@ export function CitasPage() {
                   </Link>
                 </div>
               }
-              hint="¿No está en la lista? Cambiá a «Cliente nuevo» o registralo en Clientes."
+              hint=""
             />
           ) : (
             <>
-              <p className="muted small drawer-cita-datos-contacto-hint">
-                Solo hace falta nombre y teléfono.
-              </p>
               <div className="grid-2 drawer-cita-datos-contacto-grid">
                 <label className="field">
                   <span>Nombre *</span>
@@ -1343,10 +1340,6 @@ export function CitasPage() {
           <p className="muted small">Buscando horarios libres…</p>
         ) : slotsVisibles.length > 0 ? (
           <>
-            <p className="muted drawer-sugerencias-hint">
-              Sugerencias cada hora en punto. En la grilla mantené presionado y arrastrá para elegir la hora
-              (cada 5 min), usá el campo «Hora de inicio» o editá la cita.
-            </p>
             <div className="slots-grid">
             {slotsVisibles.slice(0, 18).map((iso) => {
               const seleccionado = inicio.trim() !== "" && mismoMinutoQueInicio(iso, inicio);
@@ -1387,10 +1380,6 @@ export function CitasPage() {
             ))}
           </select>
           {clientesPickLoading ? <span className="muted small">Cargando clientes…</span> : null}
-          <p className="muted small drawer-cita-cliente-nuevo">
-            <Link to="/clientes/nuevo">Registrar o editar en Clientes</Link>
-            {". Al volver a esta ventana se actualiza la lista."}
-          </p>
         </label>
       ) : null}
       {editingId != null ? (
@@ -1560,19 +1549,12 @@ export function CitasPage() {
             ))}
           </select>
         </label>
-        {filtroProf === "todos" ? (
-          <p className="muted small agenda-ocupacion-leyenda agenda-ocupacion-leyenda--solo-texto">
-            Elegí un empleado para ver su grilla con turnos de Empleados y la ocupación por bloques de 5 minutos.
-          </p>
-        ) : null}
       </div>
       {loading ? (
         <p className="muted">Cargando…</p>
       ) : filtroProf === "todos" ? (
         <div className="banner banner-info agenda-requiere-empleado-grilla" role="status">
-          <strong>Seleccioná un profesional</strong> en «Agenda por empleado» para ver la grilla del día: los
-          bloques de 5 minutos muestran en color si el horario está libre u ocupado por citas; tocá o arrastrá
-          en un hueco libre para elegir la hora de la cita.
+          Seleccioná un profesional para ver la grilla del día.
         </div>
       ) : (
         <DailyTimeline
@@ -1676,12 +1658,6 @@ export function CitasPage() {
         <section className="card citas-busqueda-card" aria-label="Búsqueda y gestión de citas">
           <div className="card-head citas-busqueda-head">
             <h2 className="card-title">Buscar citas</h2>
-            <p className="muted small citas-busqueda-hint">
-              Se listan las citas del rango y empleado elegidos arriba. Usá el botón de tres puntos en la columna
-              Acciones o <strong>clic derecho</strong> en la fila para ver Editar, Confirmar, Cobrar en POS o
-              Cancelar (en Ventas se precargan cliente y servicio; si el servicio coincide con un producto del
-              inventario, también el producto).
-            </p>
           </div>
           {proximasCitas.length > 0 ? (
             <div className="citas-busqueda-proximas" role="region" aria-labelledby="citas-busqueda-proximas-title">

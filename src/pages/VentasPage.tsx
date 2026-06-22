@@ -2,7 +2,6 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { Link, Navigate, useParams, useLocation, useNavigate } from "react-router-dom";
 import {
   Barcode,
-  ClockCounterClockwise,
   LockSimple,
   MagnifyingGlass,
   Minus,
@@ -35,6 +34,7 @@ import {
   type Venta,
 } from "../api";
 import { CreateClienteDrawer } from "../components/CreateClienteDrawer";
+import { SearchableSelect } from "../components/SearchableSelect";
 import { SkeletonCard } from "../components/Skeleton";
 import { useToast } from "../context/ToastContext";
 import {
@@ -78,6 +78,8 @@ type ServicioLine = {
   profesional_id: number | "";
   valor_unitario: number;
 };
+
+type VentaStep = "items" | "pagos";
 
 function mergeClienteLista(prev: Cliente[], c: Cliente): Cliente[] {
   const rest = prev.filter((x) => x.id !== c.id);
@@ -138,6 +140,7 @@ export function VentasPage() {
   const [clienteOpen, setClienteOpen] = useState(false);
   const [clienteHover, setClienteHover] = useState(0);
   const clienteComboRef = useRef<HTMLDivElement>(null);
+  const [ventaStep, setVentaStep] = useState<VentaStep>("items");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -311,6 +314,7 @@ export function VentasPage() {
     setNotasVenta("");
     setPuntosCanjeados("");
     setMetodoPagoVenta({ ...METODO_PAGO_VENTA_INICIAL });
+    setVentaStep("items");
     toast("Nueva venta lista", "info");
     window.setTimeout(() => barcodeRef.current?.focus(), 0);
   }, [toast]);
@@ -323,6 +327,7 @@ export function VentasPage() {
     setCitaOrigenInfo(null);
     setSearch("");
     setCartSel(null);
+    setVentaStep("items");
     toast("Venta cancelada", "warning");
     window.setTimeout(() => barcodeRef.current?.focus(), 0);
   }, [cart.length, cartServicios.length, search, toast]);
@@ -812,6 +817,16 @@ export function VentasPage() {
     [cartServicios]
   );
   const total = totalProductos + totalServicios;
+  const tieneItemsVenta = cart.length > 0 || cartServicios.length > 0;
+
+  function irPasoPagos() {
+    if (!tieneItemsVenta) {
+      posBeepErr();
+      toast("Agregá productos o servicios antes de pasar a pagos", "warning");
+      return;
+    }
+    setVentaStep("pagos");
+  }
 
   useEffect(() => {
     publishPosClienteDisplay({
@@ -831,13 +846,59 @@ export function VentasPage() {
     });
   }, [cart, cartServicios, total]);
 
-  const abrirPantallaCliente = useCallback(() => {
+  const abrirPantallaCliente = useCallback(async () => {
+    const fallbackOpen = () => {
+      try {
+        const u = new URL(window.location.href);
+        u.hash = "#/ventas/pantalla-cliente";
+        window.open(u.toString(), "peluqueria_pos_cliente", "noopener,noreferrer");
+      } catch {
+        window.open("#/ventas/pantalla-cliente", "peluqueria_pos_cliente", "noopener,noreferrer");
+      }
+    };
+
     try {
       const u = new URL(window.location.href);
       u.hash = "#/ventas/pantalla-cliente";
-      window.open(u.toString(), "peluqueria_pos_cliente", "noopener,noreferrer");
+
+      if (!("__TAURI_INTERNALS__" in window)) {
+        fallbackOpen();
+        return;
+      }
+
+      const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+      const label = "peluqueria-pos-cliente";
+      const existing =
+        typeof WebviewWindow.getByLabel === "function"
+          ? await WebviewWindow.getByLabel(label)
+          : null;
+
+      if (existing) {
+        await existing.show();
+        await existing.setFocus();
+        return;
+      }
+
+      const win = new WebviewWindow(label, {
+        url: u.toString(),
+        title: "Pantalla cliente",
+        width: 820,
+        height: 520,
+        minWidth: 520,
+        minHeight: 320,
+        resizable: true,
+        center: true,
+      });
+
+      await new Promise<void>((resolve, reject) => {
+        win.once("tauri://created", () => {
+          void win.setFocus();
+          resolve();
+        });
+        win.once("tauri://error", (event) => reject(event.payload));
+      });
     } catch {
-      window.open("#/ventas/pantalla-cliente", "peluqueria_pos_cliente", "noopener,noreferrer");
+      fallbackOpen();
     }
   }, []);
 
@@ -974,6 +1035,7 @@ export function VentasPage() {
       setNotasVenta("");
       setPuntosCanjeados("");
       setMetodoPagoVenta({ ...METODO_PAGO_VENTA_INICIAL });
+      setVentaStep("items");
       await load();
     } catch (err) {
       posBeepErr();
@@ -1001,11 +1063,8 @@ export function VentasPage() {
         quickActions={
           tab === "ventas" ? (
             <>
-              <button type="button" className="btn ghost small" onClick={abrirPantallaCliente}>
+              <button type="button" className="btn ghost small" onClick={() => void abrirPantallaCliente()}>
                 Pantalla cliente
-              </button>
-              <button type="button" className="btn ghost small" onClick={() => void load()}>
-                Sincronizar datos
               </button>
             </>
           ) : tab === "historial" ? (
@@ -1018,28 +1077,18 @@ export function VentasPage() {
 
       {tab === "ventas" ? (
         <div className="page-pos page-pos--saas">
-          <header className="pos-saas-head">
-            <div className="pos-saas-head-text">
-              <h1 className="pos-saas-head-title">
-                <ShoppingCart className="pos-saas-head-icon" size={28} weight="duotone" aria-hidden />
-                Nueva venta
-              </h1>
-            </div>
-            <div className="pos-saas-head-actions">
-              <Link to="/ventas/historial" className="btn ghost small pos-saas-link-history">
-                <ClockCounterClockwise size={18} aria-hidden />
-                Historial de ventas
-              </Link>
-            </div>
-          </header>
-
-          <form ref={saleFormRef} className="pos-saas-grid pos-saas-grid--triple pos-sale-form" onSubmit={pagar}>
+          <form
+            ref={saleFormRef}
+            className={`pos-saas-grid pos-saas-grid--triple pos-sale-form ${
+              ventaStep === "items" ? "pos-sale-form--items" : "pos-sale-form--pagos"
+            }`}
+            onSubmit={pagar}
+          >
             <div className="pos-saas-col pos-saas-col--cart">
               <section className="pos-saas-card pos-saas-card--cart pos-exempt-focus">
                 <div className="pos-saas-card-head pos-saas-card-head--row">
                   <div className="pos-saas-card-head-textblock">
                     <div className="pos-saas-card-head-left">
-                      <span className="pos-saas-step">1</span>
                       <h2 className="pos-saas-card-title">Servicios y productos</h2>
                     </div>
                     <p className="pos-saas-card-desc muted">
@@ -1275,11 +1324,6 @@ export function VentasPage() {
                         actualizar la agenda.
                       </p>
                     ) : null}
-                    {citaOrigenId != null ? (
-                      <p className="muted small pos-cart-cita-sync-hint">
-                        Los nombres de servicio se guardan en la agenda al editarlos aquí.
-                      </p>
-                    ) : null}
                   </div>
                   <div className="pos-cart-subhead">
                     <span className="pos-cart-subhead-tag pos-cart-subhead-tag--svc">
@@ -1468,20 +1512,19 @@ export function VentasPage() {
                 <div className="pos-saas-panel-sticky">
                 <div className="pos-saas-card-head pos-saas-card-head--stack">
                   <div className="pos-saas-card-head-left">
-                    <span className="pos-saas-step">2</span>
                     <h2 className="pos-saas-card-title">Catálogo de productos</h2>
                   </div>
                   <p className="pos-saas-card-desc muted">
                     Filtrá por categoría o proveedor, buscá o escaneá y tocá un producto para agregarlo.
                   </p>
                 </div>
-                <div className="pos-saas-search-row">
+                <div className="pos-saas-catalog-toolbar">
                   <div className="pos-saas-search-wrap">
-                    <MagnifyingGlass className="pos-saas-search-ico" size={22} aria-hidden />
+                    <MagnifyingGlass className="pos-saas-search-ico" size={20} aria-hidden />
                     <input
                       ref={barcodeRef}
                       className="pos-saas-search-input"
-                      placeholder="Buscar por código, nombre o escanear código de barras"
+                      placeholder="Buscar o escanear código"
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                       onKeyDown={(e) => {
@@ -1524,54 +1567,43 @@ export function VentasPage() {
                     title="Confirmar búsqueda o código"
                     onClick={() => void onBarcodeEnter()}
                   >
-                    <Barcode size={22} weight="duotone" aria-hidden />
+                    <Barcode size={20} weight="duotone" aria-hidden />
                   </button>
-                  {lookupBusy ? <span className="muted pos-saas-busy">Buscando…</span> : null}
-                </div>
-
-                <div className="pos-saas-catalog-filters">
-                  <label className="field pos-saas-catalog-filters__field">
-                    <span className="pos-saas-field-label">Categoría</span>
-                    <select
-                      className="pos-saas-select"
+                  <div className="pos-saas-catalog-toolbar__filter">
+                    <SearchableSelect
+                      variant="combobox"
+                      label="Categoría"
                       value={filtroCategoriaCatalogo}
-                      onChange={(e) => setFiltroCategoriaCatalogo(e.target.value)}
-                      aria-label="Filtrar por categoría"
-                    >
-                      {opcionesFiltroCategoriaCatalogo.map((o) => (
-                        <option key={o.value} value={o.value}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="field pos-saas-catalog-filters__field">
-                    <span className="pos-saas-field-label">Proveedor</span>
-                    <select
-                      className="pos-saas-select"
+                      onChange={setFiltroCategoriaCatalogo}
+                      options={opcionesFiltroCategoriaCatalogo}
+                      placeholder="Buscar categoría…"
+                      idleTextWhenEmpty="Todas las categorías"
+                    />
+                  </div>
+                  <div className="pos-saas-catalog-toolbar__filter">
+                    <SearchableSelect
+                      variant="combobox"
+                      label="Proveedor"
                       value={filtroProveedorCatalogo}
-                      onChange={(e) => setFiltroProveedorCatalogo(e.target.value)}
-                      aria-label="Filtrar por proveedor"
-                    >
-                      {opcionesFiltroProveedorCatalogo.map((o) => (
-                        <option key={o.value} value={o.value}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                      onChange={setFiltroProveedorCatalogo}
+                      options={opcionesFiltroProveedorCatalogo}
+                      placeholder="Buscar proveedor…"
+                      idleTextWhenEmpty="Todos los proveedores"
+                    />
+                  </div>
                   {(filtroCategoriaCatalogo !== "todos" || filtroProveedorCatalogo !== "todos") && (
                     <button
                       type="button"
-                      className="btn ghost small pos-saas-catalog-filters__clear"
+                      className="btn ghost small pos-saas-catalog-toolbar__clear"
                       onClick={() => {
                         setFiltroCategoriaCatalogo("todos");
                         setFiltroProveedorCatalogo("todos");
                       }}
                     >
-                      Limpiar filtros
+                      Limpiar
                     </button>
                   )}
+                  {lookupBusy ? <span className="muted pos-saas-catalog-toolbar__busy">…</span> : null}
                 </div>
 
                 </div>
@@ -1674,11 +1706,16 @@ export function VentasPage() {
               </section>
             </div>
 
+            <div className="pos-sale-step-actions pos-sale-step-actions--items">
+              <button type="button" className="btn primary" onClick={irPasoPagos}>
+                Continuar a pagos
+              </button>
+            </div>
+
             <div className="pos-saas-col pos-saas-col--aside">
               <section className="pos-saas-card pos-saas-card--pago pos-saas-card--sticky pos-exempt-focus">
                 <div className="pos-saas-card-head pos-saas-card-head--stack">
                   <div className="pos-saas-card-head-left">
-                    <span className="pos-saas-step">3</span>
                     <h2 className="pos-saas-card-title">Pago</h2>
                   </div>
                   <p className="pos-saas-card-desc muted">Elegí el método de pago y cobrá la venta.</p>
@@ -1847,7 +1884,7 @@ export function VentasPage() {
                 <button
                   type="submit"
                   className="pos-saas-cobrar btn primary"
-                  disabled={cart.length === 0 && cartServicios.length === 0}
+                  disabled={!tieneItemsVenta}
                 >
                   <LockSimple size={20} weight="fill" className="pos-saas-cobrar-icon" aria-hidden />
                   Cobrar {formatMoney(total)}
@@ -1859,6 +1896,16 @@ export function VentasPage() {
                 </p>
                 </div>
               </section>
+            </div>
+
+            <div className="pos-sale-step-actions pos-sale-step-actions--pagos">
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={() => setVentaStep("items")}
+              >
+                Volver a productos/servicios
+              </button>
             </div>
           </form>
 

@@ -60,16 +60,8 @@ export function CreateClienteDrawer({ open, onClose, onCreated }: Props) {
     const tipoDocumento = form.tipo_documento.trim();
     const numeroDocumento = form.numero_documento.trim();
     const telefono = form.telefono.trim();
-    if (!tipoDocumento) {
-      toast("El tipo de documento es obligatorio.", "warning");
-      return;
-    }
-    if (!numeroDocumento) {
-      toast("El número de documento es obligatorio.", "warning");
-      return;
-    }
-    if (!telefono) {
-      toast("El teléfono es obligatorio.", "warning");
+    if (!numeroDocumento && !telefono) {
+      toast("Ingresá la cédula o el teléfono del cliente.", "warning");
       return;
     }
     if (!validEmail(form.email)) {
@@ -123,14 +115,14 @@ export function CreateClienteDrawer({ open, onClose, onCreated }: Props) {
             required
           />
         </label>
+        <p className="hint">Para identificar al cliente, completá cédula/número de documento o teléfono.</p>
         <div className="field-row create-cliente-drawer-doc">
           <label className="field">
-            <span>Tipo documento *</span>
+            <span>Tipo documento</span>
             <select
               value={form.tipo_documento}
               onChange={(e) => setForm((f) => ({ ...f, tipo_documento: e.target.value }))}
               disabled={busy}
-              required
             >
               {TIPO_DOCUMENTO_OPTS.map((o) => (
                 <option key={o.value || "empty"} value={o.value}>
@@ -140,25 +132,23 @@ export function CreateClienteDrawer({ open, onClose, onCreated }: Props) {
             </select>
           </label>
           <label className="field">
-            <span>Número documento *</span>
+            <span>Número documento / cédula</span>
             <input
               value={form.numero_documento}
               onChange={(e) => setForm((f) => ({ ...f, numero_documento: e.target.value }))}
               autoComplete="off"
               disabled={busy}
-              required
             />
           </label>
         </div>
         <label className="field">
-          <span>Teléfono *</span>
+          <span>Teléfono</span>
           <input
             type="tel"
             value={form.telefono}
             onChange={(e) => setForm((f) => ({ ...f, telefono: e.target.value }))}
             autoComplete="tel"
             disabled={busy}
-            required
           />
         </label>
         <label className="field">

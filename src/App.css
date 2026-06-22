@@ -46,11 +46,11 @@
 .layout {
   max-width: 960px;
   margin: 0 auto;
-  padding: 1.5rem 1.25rem 3rem;
+  padding: 0.75rem 0.85rem 1.5rem;
 }
 
 .header {
-  margin-bottom: 1.5rem;
+  margin-bottom: 0.65rem;
 }
 
 .title {
@@ -68,10 +68,10 @@
 }
 
 .banner {
-  padding: 0.75rem 1rem;
-  border-radius: 10px;
-  margin-bottom: 1rem;
-  font-size: 0.9rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+  font-size: 0.85rem;
 }
 
 .banner-error {
@@ -84,32 +84,33 @@
   background: #e8f4fc;
   color: #1a4d6e;
   border: 1px solid #b8d9ea;
-  padding: 0.75rem 1rem;
-  border-radius: 10px;
-  margin-bottom: 1rem;
-  font-size: 0.9rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+  font-size: 0.85rem;
 }
 
 .card {
   background: #fffdf9;
   border: 1px solid #e8ddd4;
-  border-radius: 14px;
-  padding: 1.25rem 1.35rem;
-  margin-bottom: 1.25rem;
-  box-shadow: 0 8px 24px rgba(44, 36, 32, 0.06);
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.75rem;
+  box-shadow: 0 1px 3px rgba(44, 36, 32, 0.04);
 }
 
 .card-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 0.75rem;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
 }
 
 .card-title {
-  margin: 0 0 1rem;
-  font-size: 1.1rem;
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  font-weight: 650;
   color: #3a322e;
 }
 
@@ -120,22 +121,22 @@
 .form {
   display: flex;
   flex-direction: column;
-  gap: 0.9rem;
+  gap: 0.6rem;
 }
 
 .field-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.65rem;
+  gap: 0.45rem;
   align-items: flex-end;
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.2rem;
   flex: 1;
-  min-width: 180px;
+  min-width: 160px;
 }
 
 .field span {
@@ -147,8 +148,8 @@
 input,
 textarea {
   border: 1px solid #d5c9bf;
-  border-radius: 10px;
-  padding: 0.55rem 0.7rem;
+  border-radius: 8px;
+  padding: 0.4rem 0.6rem;
   background: #fff;
   color: #1a1614;
 }
@@ -162,13 +163,13 @@ textarea:focus {
 
 textarea {
   resize: vertical;
-  min-height: 72px;
+  min-height: 56px;
 }
 
 .grid-2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.85rem;
+  gap: 0.5rem;
 }
 
 @media (max-width: 640px) {
@@ -192,10 +193,10 @@ textarea {
 
 .btn {
   border: none;
-  border-radius: 10px;
-  padding: 0.55rem 1rem;
+  border-radius: 8px;
+  padding: 0.4rem 0.85rem;
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
 }
 
 .btn.primary {
@@ -242,30 +243,32 @@ textarea {
 .table-wrap {
   overflow-x: auto;
   overflow-y: auto;
-  max-height: min(52vh, 560px);
-  border-radius: 10px;
+  max-height: min(60vh, 640px);
+  border-radius: 8px;
   border: 1px solid #ebe3dc;
 }
 
 .table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.92rem;
+  font-size: 0.85rem;
 }
 
 .table th,
 .table td {
   text-align: left;
-  padding: 0.6rem 0.5rem;
+  padding: 0.4rem 0.45rem;
   border-bottom: 1px solid #ebe3dc;
   vertical-align: top;
 }
 
 .table th {
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: #7a6f68;
+  padding-top: 0.3rem;
+  padding-bottom: 0.3rem;
 }
 
 .cell-main {
@@ -335,7 +338,7 @@ textarea {
 
 .table.table--empleados-equipo > thead > tr > th,
 .table.table--empleados-equipo > tbody > tr > td {
-  padding: 12px 16px;
+  padding: 6px 10px;
   vertical-align: middle;
   box-sizing: border-box;
 }
@@ -863,12 +866,12 @@ textarea {
 .main {
   flex: 1;
   min-width: 0;
-  padding: 1.25rem 1.5rem 2.5rem;
+  padding: 0.65rem 0.85rem 1rem;
   background: #f6f0eb;
 }
 
 .main-header {
-  margin-bottom: 1.25rem;
+  margin-bottom: 0.5rem;
 }
 
 .layout {
@@ -880,20 +883,20 @@ textarea {
 /* Dashboard */
 .dashboard-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.55rem;
 }
 
 .dashboard-puntos-card {
-  margin-top: 1.25rem;
+  margin-top: 0.65rem;
 }
 
 .stat-card {
   background: #fffdf9;
   border: 1px solid #e8ddd4;
-  border-radius: 12px;
-  padding: 1rem;
-  box-shadow: 0 4px 16px rgba(44, 36, 32, 0.06);
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  box-shadow: 0 1px 4px rgba(44, 36, 32, 0.05);
 }
 
 .stat-card.wide {
@@ -921,9 +924,9 @@ textarea {
 
 .stat-row {
   display: flex;
-  gap: 1.5rem;
+  gap: 0.75rem;
   flex-wrap: wrap;
-  margin-top: 0.35rem;
+  margin-top: 0.25rem;
   font-size: 0.95rem;
 }
 
@@ -980,9 +983,9 @@ select {
 .filtros-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
+  gap: 0.5rem;
   align-items: flex-end;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.5rem;
 }
 
 .field.inline {
@@ -1154,11 +1157,11 @@ select {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 0.5rem 0.75rem 0.5rem 0.5rem;
-  background: #fffdf9;
+  gap: 0.75rem;
+  padding: 0.3rem 0.65rem 0.3rem 0.4rem;
+  background: rgba(255, 253, 249, 0.88);
   border-bottom: 1px solid #e8ddd4;
-  box-shadow: 0 1px 0 rgba(44, 36, 32, 0.06);
+  box-shadow: none;
   flex-shrink: 0;
   z-index: 30;
 }
@@ -1168,7 +1171,7 @@ select {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.5rem 0.75rem;
+  gap: 0.35rem 0.5rem;
 }
 
 .topbar-brand {
@@ -1190,45 +1193,43 @@ select {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 2rem;
+  height: 2rem;
   border: none;
-  border-radius: 10px;
-  background: #efe6dc;
+  border-radius: 8px;
+  background: transparent;
   color: #2c2420;
   cursor: pointer;
 }
 
 .btn-icon:hover {
-  background: #e4d8cc;
+  background: rgba(0, 0, 0, 0.06);
 }
 
 .conn-badge {
-  font-size: 0.75rem;
+  font-size: 0.68rem;
   font-weight: 600;
-  padding: 0.2rem 0.5rem;
+  padding: 0.15rem 0.4rem;
   border-radius: 999px;
-  border: 1px solid #d5c9bf;
+  border: none;
 }
 
 .conn-badge--on {
-  background: #e6f4ea;
-  color: #1b5e2a;
-  border-color: #a3d9b0;
+  background: #d1fae5;
+  color: #065f46;
 }
 
 .conn-badge--off {
-  background: #fff3e0;
-  color: #8a4a00;
-  border-color: #e0c28a;
+  background: #fef3c7;
+  color: #92400e;
 }
 
 .btn-quick {
-  padding: 0.5rem 1rem;
+  padding: 0.3rem 0.75rem;
   font-weight: 600;
-  border-radius: 10px;
+  border-radius: 8px;
   border: none;
-  font-size: 0.9rem;
+  font-size: 0.82rem;
   cursor: pointer;
 }
 
@@ -1283,11 +1284,11 @@ select {
 
 .topbar-user-avatar {
   flex-shrink: 0;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   object-fit: cover;
-  border: 1px solid rgba(90, 82, 77, 0.28);
+  border: 1px solid rgba(90, 82, 77, 0.18);
 }
 
 .topbar-user-avatar--ph {
@@ -1302,13 +1303,13 @@ select {
 }
 
 .sidebar-pro {
-  width: 240px;
+  width: 200px;
   flex-shrink: 0;
   background: #2c2420;
   color: #f6f0eb;
   display: flex;
   flex-direction: column;
-  padding: 0.5rem 0.35rem 0.5rem;
+  padding: 0.35rem 0.25rem 0.35rem;
   border-right: 1px solid #1a1512;
   transition: width 0.2s ease;
   overflow-x: hidden;
@@ -1318,14 +1319,14 @@ select {
 }
 
 .app-root--collapsed .sidebar-pro {
-  width: 64px;
+  width: 52px;
 }
 
 .sidebar-nav {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  padding-top: 0.25rem;
+  gap: 0.35rem;
+  padding-top: 0.15rem;
   flex: 1 1 auto;
   min-height: 0;
   overflow-x: hidden;
@@ -1355,15 +1356,15 @@ select {
 .sidebar-link {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.5rem;
   width: 100%;
   text-align: left;
   border: none;
-  border-radius: 10px;
-  padding: 0.5rem 0.55rem;
+  border-radius: 8px;
+  padding: 0.35rem 0.45rem;
   background: transparent;
   color: #e8ddd4;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   cursor: pointer;
   transition: background 0.12s ease, color 0.12s ease;
 }
@@ -1401,7 +1402,7 @@ select {
 
 .main-pro-header {
   flex-shrink: 0;
-  padding: 0.35rem 1.25rem 0;
+  padding: 0 1rem;
 }
 
 /* Pestañas de trabajo (varias rutas sin perder atajos entre módulos) */
@@ -1409,11 +1410,11 @@ select {
   flex-shrink: 0;
   display: flex;
   align-items: stretch;
-  gap: 0.35rem;
-  padding: 0.25rem 1.15rem 0.35rem;
-  border-bottom: 1px solid rgba(44, 36, 32, 0.1);
-  background: rgba(255, 255, 255, 0.45);
-  max-width: 1280px;
+  gap: 0.25rem;
+  padding: 0.15rem 0.85rem 0.2rem;
+  border-bottom: 1px solid rgba(44, 36, 32, 0.08);
+  background: transparent;
+  max-width: 1400px;
   width: 100%;
   margin: 0 auto;
   position: relative;
@@ -1451,9 +1452,9 @@ select {
   border: none;
   background: transparent;
   color: #5c534d;
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  padding: 0.35rem 0.5rem 0.35rem 0.65rem;
+  padding: 0.25rem 0.4rem 0.25rem 0.55rem;
   cursor: pointer;
   max-width: 11rem;
   overflow: hidden;
@@ -1490,12 +1491,16 @@ select {
   border: 1px dashed rgba(44, 36, 32, 0.22);
   background: rgba(255, 255, 255, 0.5);
   color: #4a423c;
-  font-size: 0.75rem;
+  font-size: 0.88rem;
   font-weight: 600;
-  padding: 0.35rem 0.55rem;
-  border-radius: 8px;
+  width: 1.6rem;
+  height: 1.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
   cursor: pointer;
-  white-space: nowrap;
+  line-height: 1;
 }
 
 .workspace-tabs-add:hover {
@@ -1551,7 +1556,7 @@ select {
 
 .main-pro-title {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 1rem;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: #2c2420;
@@ -1565,8 +1570,8 @@ select {
   overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 0.5rem 1.15rem 0.85rem;
-  max-width: 1280px;
+  padding: 0.35rem 0.85rem 0.5rem;
+  max-width: 1400px;
   width: 100%;
   margin: 0 auto;
 }
@@ -1650,7 +1655,7 @@ select {
 .citas-filtros-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 0.65rem 1rem;
+  gap: 0.4rem 0.65rem;
   align-items: end;
 }
 
@@ -1683,8 +1688,8 @@ select {
 }
 
 .agenda-section.agenda-section--calendario.card {
-  padding-top: 0.75rem;
-  padding-bottom: 0.75rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
 }
 
 .main-pro-content > .citas-busqueda-card {
@@ -2550,9 +2555,9 @@ select {
   flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 0.75rem 1rem;
-  margin: -0.25rem 0 0.65rem;
-  padding: 0.35rem 0 0.55rem;
+  gap: 0.5rem 0.75rem;
+  margin: 0 0 0.35rem;
+  padding: 0.2rem 0 0.3rem;
   border-bottom: 1px solid #e8ddd4;
   position: sticky;
   top: 0;
@@ -2569,15 +2574,15 @@ select {
 
 .subnav--tabs {
   gap: 0;
-  border-radius: 12px;
-  padding: 3px;
+  border-radius: 8px;
+  padding: 2px;
   background: rgba(196, 168, 130, 0.14);
   border: 1px solid #e4d8cc;
 }
 
 .subnav--tabs .subnav-link {
-  border-radius: 9px;
-  padding: 0.45rem 0.85rem;
+  border-radius: 6px;
+  padding: 0.3rem 0.7rem;
 }
 
 .subnav--tabs .subnav-link--active {
@@ -2588,10 +2593,10 @@ select {
 .subnav-link {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.25rem;
   text-decoration: none;
   font-weight: 600;
-  font-size: 0.92rem;
+  font-size: 0.84rem;
   color: #5a524d;
   border: 1px solid transparent;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
@@ -2644,7 +2649,7 @@ select {
 }
 
 .drawer-form {
-  padding-bottom: 1rem;
+  padding-bottom: 0.5rem;
 }
 
 .drawer-cita-cliente-nuevo {
@@ -2806,8 +2811,8 @@ select {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.9rem 1rem;
+  gap: 0.4rem;
+  padding: 0.4rem 0.75rem;
   border-bottom: 1px solid #e8ddd4;
   flex-shrink: 0;
 }
@@ -2818,12 +2823,13 @@ select {
 
 .drawer-title {
   margin: 0;
-  font-size: 1.1rem;
+  font-size: 0.92rem;
+  font-weight: 650;
   color: #2c2420;
 }
 
 .drawer-body {
-  padding: 1rem 1.1rem 1.5rem;
+  padding: 0.5rem 0.75rem 0.75rem;
   overflow: auto;
   flex: 1;
 }
@@ -2935,27 +2941,27 @@ select {
 
 .palette-panel {
   position: relative;
-  width: min(480px, calc(100vw - 2rem));
+  width: min(440px, calc(100vw - 2rem));
   background: #fffdf9;
-  border-radius: 14px;
+  border-radius: 10px;
   border: 1px solid #e8ddd4;
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.18);
-  padding: 0.75rem;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.16);
+  padding: 0.55rem;
 }
 
 .palette-head {
   font-weight: 700;
-  font-size: 0.95rem;
-  margin-bottom: 0.5rem;
+  font-size: 0.88rem;
+  margin-bottom: 0.35rem;
   color: #2c2420;
 }
 
 .palette-input {
   width: 100%;
-  padding: 0.55rem 0.65rem;
-  border-radius: 10px;
+  padding: 0.4rem 0.55rem;
+  border-radius: 8px;
   border: 1px solid #d5c9bf;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.35rem;
 }
 
 .palette-list {
@@ -2971,14 +2977,14 @@ select {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.5rem;
+  gap: 0.35rem;
   text-align: left;
-  padding: 0.55rem 0.65rem;
+  padding: 0.4rem 0.55rem;
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   background: transparent;
   cursor: pointer;
-  font-size: 0.92rem;
+  font-size: 0.85rem;
   color: #2c2420;
   transition: background 0.1s ease;
 }
@@ -3007,22 +3013,22 @@ select {
 .card-pro {
   background: #fffdf9;
   border: 1px solid #e8ddd4;
-  border-radius: 14px;
-  padding: 1.1rem 1.2rem;
-  margin-bottom: 1.1rem;
-  box-shadow: 0 6px 20px rgba(44, 36, 32, 0.05);
+  border-radius: 10px;
+  padding: 0.65rem 0.85rem;
+  margin-bottom: 0.55rem;
+  box-shadow: 0 1px 4px rgba(44, 36, 32, 0.04);
 }
 
 .card-pro-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.4rem;
 }
 
 .card-pro-title {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: 0.92rem;
   color: #2c2420;
 }
 
@@ -3034,8 +3040,8 @@ select {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: 0.75rem;
-  margin-bottom: 0.9rem;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
 }
 
 .pos-scan {
@@ -3055,9 +3061,9 @@ select {
 }
 
 .input-xl {
-  font-size: 1.1rem;
-  padding: 0.65rem 0.75rem;
-  border-radius: 12px;
+  font-size: 1rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
 }
 
 .pos-split {
@@ -3087,7 +3093,7 @@ select {
 .pos-cart-column {
   display: flex;
   flex-direction: column;
-  gap: 0.65rem;
+  gap: 0.4rem;
   min-width: 0;
 }
 
@@ -3105,8 +3111,8 @@ select {
 }
 
 .cart-total-block--hero {
-  padding-top: 0.65rem;
-  margin-top: 0.25rem;
+  padding-top: 0.4rem;
+  margin-top: 0.15rem;
 }
 
 .cart-total-block--hero .cart-total-value {
@@ -3121,9 +3127,9 @@ select {
 
 .pos-pay-chip {
   flex: 1;
-  min-width: 6.5rem;
-  padding: 0.55rem 0.65rem;
-  border-radius: 10px;
+  min-width: 6rem;
+  padding: 0.4rem 0.55rem;
+  border-radius: 8px;
   border: 1px solid #d5c9bf;
   background: #faf7f3;
   font-weight: 700;
@@ -3192,8 +3198,8 @@ select {
 
 .product-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 0.55rem;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.4rem;
 }
 
 .product-tile {
@@ -3202,8 +3208,8 @@ select {
   align-items: flex-start;
   text-align: left;
   border: 1px solid #e0d5cb;
-  border-radius: 12px;
-  padding: 0.6rem 0.65rem;
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
   background: #fff;
   cursor: pointer;
   transition: border-color 0.12s ease, box-shadow 0.12s ease, transform 0.1s ease;
@@ -3221,9 +3227,9 @@ select {
 
 .product-tile-name {
   font-weight: 600;
-  font-size: 0.88rem;
+  font-size: 0.82rem;
   color: #2c2420;
-  line-height: 1.3;
+  line-height: 1.25;
 }
 
 .product-tile-meta {
@@ -3235,14 +3241,14 @@ select {
 .pos-cart {
   background: #faf7f3;
   border: 1px solid #e4d8cc;
-  border-radius: 12px;
-  padding: 0.75rem 0.85rem;
+  border-radius: 8px;
+  padding: 0.55rem 0.7rem;
 }
 
 .pos-cart-inner {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.5rem;
 }
 
 .cart-lines {
@@ -3257,8 +3263,8 @@ select {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0.4rem 0.25rem;
+  gap: 0.35rem;
+  padding: 0.3rem 0.2rem;
   border-bottom: 1px dashed #e0d5cb;
 }
 
@@ -3270,7 +3276,7 @@ select {
 .cart-line-name {
   display: block;
   font-weight: 600;
-  font-size: 0.88rem;
+  font-size: 0.82rem;
 }
 
 .cart-line-sub {
@@ -3304,9 +3310,9 @@ select {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  padding: 0.5rem 0.15rem 0.25rem;
+  padding: 0.35rem 0.1rem 0.15rem;
   border-top: 2px solid #2c2420;
-  margin-top: 0.25rem;
+  margin-top: 0.15rem;
 }
 
 .cart-total-label {
@@ -3317,7 +3323,7 @@ select {
 }
 
 .cart-total-value {
-  font-size: 1.75rem;
+  font-size: 1.5rem;
   font-weight: 800;
   letter-spacing: -0.02em;
   color: #2c2420;
@@ -3377,9 +3383,9 @@ select {
 }
 
 .btn-xl {
-  padding: 0.85rem 1rem;
-  font-size: 1.05rem;
-  border-radius: 12px;
+  padding: 0.6rem 0.85rem;
+  font-size: 0.95rem;
+  border-radius: 8px;
 }
 
 .sale-list {
@@ -3391,21 +3397,21 @@ select {
 .sale-list-item {
   display: grid;
   grid-template-columns: 1fr 1fr auto auto;
-  gap: 0.5rem;
+  gap: 0.4rem;
   align-items: center;
-  padding: 0.45rem 0.35rem;
+  padding: 0.35rem 0.25rem;
   border-bottom: 1px solid #ebe3dc;
-  font-size: 0.88rem;
+  font-size: 0.84rem;
 }
 
 .empty-state {
   text-align: center;
-  padding: 2rem 1rem;
+  padding: 1rem 0.75rem;
   color: #5a524d;
 }
 
 .empty-state--compact {
-  padding: 1.25rem 0.75rem;
+  padding: 0.75rem 0.5rem;
 }
 
 .pos-skel-grid {
@@ -3589,22 +3595,22 @@ select {
 }
 
 .page-pos .empty-state {
-  font-size: 1.05rem;
+  font-size: 0.92rem;
 }
 
 .page-pos .empty-state--compact {
-  padding: 1.5rem 1rem;
+  padding: 0.75rem 0.5rem;
 }
 
 .page-pos .btn.small {
-  font-size: 0.95rem;
-  padding: 0.45rem 0.75rem;
+  font-size: 0.85rem;
+  padding: 0.35rem 0.65rem;
 }
 
 .page-pos .product-tile-fav {
-  width: 2.15rem;
-  height: 2.15rem;
-  font-size: 1rem;
+  width: 1.6rem;
+  height: 1.6rem;
+  font-size: 0.82rem;
 }
 
 /* —— Ventas: layout tipo POS SaaS —— */
@@ -3643,18 +3649,18 @@ select {
 
 .page-pos--saas .pos-saas-head {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 1rem;
+  gap: 0.5rem;
   flex-shrink: 0;
-  margin-bottom: 0.75rem;
-  padding: 0.15rem 0.1rem 0;
+  margin-bottom: 0.35rem;
+  padding: 0;
 }
 
 .page-pos--saas .pos-saas-head-title {
   margin: 0;
-  font-size: clamp(1.35rem, 2.2vw, 1.75rem);
+  font-size: clamp(1rem, 1.8vw, 1.25rem);
   font-weight: 700;
   color: var(--pos-saas-text);
   display: flex;
@@ -3682,9 +3688,9 @@ select {
 
 .page-pos--saas .pos-saas-grid {
   display: grid;
-  grid-template-columns: minmax(340px, 1fr) minmax(260px, 34%);
+  grid-template-columns: minmax(300px, 1fr) minmax(240px, 34%);
   grid-template-rows: minmax(0, 1fr);
-  gap: 1rem;
+  gap: 0.6rem;
   align-items: stretch;
   flex: 1 1 0;
   min-height: 0;
@@ -3698,6 +3704,144 @@ select {
 .page-pos--saas .pos-sale-form {
   flex: 1 1 0;
   min-height: 0;
+}
+
+.pos-step-tabs {
+  display: flex;
+  gap: 0;
+  flex-shrink: 0;
+  border-radius: 6px;
+  padding: 2px;
+  background: rgba(196, 168, 130, 0.12);
+  border: 1px solid #e4d8cc;
+  margin-bottom: 0.3rem;
+  align-self: flex-start;
+}
+
+.pos-step-tab {
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  color: #7a6f68;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.pos-step-tab:hover {
+  color: #2c2420;
+}
+
+.pos-step-tab--on {
+  background: #fffdf9;
+  color: #2c2420;
+  box-shadow: 0 1px 3px rgba(44, 36, 32, 0.08);
+}
+
+[data-theme="dark"] .pos-step-tabs {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: #3a3530;
+}
+
+[data-theme="dark"] .pos-step-tab {
+  color: #a39a92;
+}
+
+[data-theme="dark"] .pos-step-tab:hover {
+  color: #faf6f1;
+}
+
+[data-theme="dark"] .pos-step-tab--on {
+  background: #1e1d1b;
+  color: #faf6f1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.page-pos--saas .pos-sale-stepper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.3rem;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--pos-saas-border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--pos-saas-card) 92%, var(--pos-saas-accent) 8%);
+  box-shadow: 0 4px 18px var(--pos-saas-elev);
+}
+
+.page-pos--saas .pos-sale-stepper__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2rem;
+  padding: 0.25rem 0.5rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--pos-saas-muted);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.page-pos--saas .pos-sale-stepper__item.is-active {
+  background: var(--pos-saas-accent);
+  color: #fff;
+}
+
+.page-pos--saas .pos-sale-stepper__num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 28%, transparent);
+}
+
+.page-pos--saas .pos-sale-stepper__line {
+  flex: 1 1 auto;
+  height: 1px;
+  min-width: 1.5rem;
+  background: var(--pos-saas-border);
+}
+
+.page-pos--saas .pos-sale-form--items {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.page-pos--saas .pos-sale-form--items .pos-saas-col--aside {
+  display: none;
+}
+
+.page-pos--saas .pos-sale-form--pagos {
+  grid-template-columns: minmax(340px, 560px);
+  justify-content: center;
+}
+
+.page-pos--saas .pos-sale-form--pagos .pos-saas-col--cart,
+.page-pos--saas .pos-sale-form--pagos .pos-saas-col--catalog,
+.page-pos--saas .pos-sale-form--pagos .pos-sale-step-actions--items {
+  display: none;
+}
+
+.page-pos--saas .pos-sale-form--items .pos-sale-step-actions--pagos {
+  display: none;
+}
+
+.page-pos--saas .pos-sale-step-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.page-pos--saas .pos-sale-step-actions--pagos {
+  justify-content: flex-start;
 }
 
 /* Panel POS: cabecera fija + cuerpo con scroll solo si hace falta (overflow-y: auto) */
@@ -3769,11 +3913,11 @@ select {
 
   .page-pos--saas .pos-saas-grid--triple > .pos-saas-col > .pos-saas-card {
     height: auto;
-    max-height: min(52vh, 520px);
+    max-height: min(60vh, 600px);
   }
 
   .page-pos--saas .pos-saas-panel-scroll {
-    max-height: min(46vh, 480px);
+    max-height: min(55vh, 560px);
   }
 }
 
@@ -4322,9 +4466,9 @@ select {
 .page-pos--saas .pos-saas-card {
   background: var(--pos-saas-card);
   border: 1px solid var(--pos-saas-border);
-  border-radius: 14px;
-  padding: 1.1rem 1.2rem;
-  box-shadow: 0 4px 24px var(--pos-saas-elev);
+  border-radius: 10px;
+  padding: 0.5rem 0.7rem;
+  box-shadow: 0 1px 6px var(--pos-saas-elev);
 }
 
 .page-pos--saas .pos-saas-card--muted {
@@ -4342,33 +4486,112 @@ select {
 }
 
 .page-pos--saas .pos-saas-card--catalog > .pos-saas-card-head,
-.page-pos--saas .pos-saas-card--catalog > .pos-saas-search-row,
-.page-pos--saas .pos-saas-card--catalog > .pos-saas-catalog-filters,
+.page-pos--saas .pos-saas-card--catalog > .pos-saas-catalog-toolbar,
 .page-pos--saas .pos-saas-card--catalog > .pos-saas-chips {
   flex-shrink: 0;
 }
 
-.page-pos--saas .pos-saas-catalog-filters {
+.page-pos--saas .pos-saas-catalog-toolbar {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 0.5rem 0.65rem;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.4rem;
 }
 
-.page-pos--saas .pos-saas-catalog-filters__field {
-  flex: 1 1 160px;
-  min-width: 140px;
+.page-pos--saas .pos-saas-catalog-toolbar .pos-saas-search-wrap {
+  flex: 1 1 0;
+  min-width: 7rem;
+}
+
+.page-pos--saas .pos-saas-catalog-toolbar .pos-saas-search-input {
+  padding: 0.6rem 0.85rem 0.6rem 2.35rem;
+  font-size: 0.88rem;
+  border-radius: 10px;
+}
+
+.page-pos--saas .pos-saas-catalog-toolbar .pos-saas-search-ico {
+  left: 0.7rem;
+}
+
+.page-pos--saas .pos-saas-catalog-toolbar .pos-saas-scan-side {
+  flex-shrink: 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: 10px;
+}
+
+.page-pos--saas .pos-saas-catalog-toolbar__filter {
+  flex: 0 1 9.5rem;
+  min-width: 7.5rem;
   margin: 0;
 }
 
-.page-pos--saas .pos-saas-catalog-filters__field .pos-saas-select {
-  width: 100%;
+.page-pos--saas .pos-saas-catalog-toolbar__filter .searchable-select {
+  margin: 0;
+  gap: 0;
 }
 
-.page-pos--saas .pos-saas-catalog-filters__clear {
+.page-pos--saas .pos-saas-catalog-toolbar__filter .searchable-select__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.page-pos--saas .pos-saas-catalog-toolbar__filter .searchable-select__trigger,
+.page-pos--saas .pos-saas-catalog-toolbar__filter .searchable-select__combobox-input {
+  min-height: 0;
+  padding: 0.6rem 0.45rem;
+  font-size: 0.8rem;
+  border-radius: 10px;
+  border-color: var(--pos-saas-border);
+  background: var(--pos-saas-input-bg);
+  color: var(--pos-saas-text);
+}
+
+.page-pos--saas .pos-saas-catalog-toolbar__filter .searchable-select__combobox-input {
+  width: 100%;
+  padding-right: 1.5rem;
+}
+
+.page-pos--saas .pos-saas-catalog-toolbar__filter .searchable-select__panel {
+  min-width: 11rem;
+  z-index: 80;
+}
+
+.page-pos--saas .pos-saas-card--catalog .pos-saas-panel-sticky,
+.page-pos--saas .pos-saas-catalog-toolbar {
+  overflow: visible;
+}
+
+.page-pos--saas .pos-saas-catalog-toolbar__clear {
   flex: 0 0 auto;
-  align-self: flex-end;
-  margin-bottom: 0.15rem;
+  white-space: nowrap;
+  padding-inline: 0.55rem;
+}
+
+.page-pos--saas .pos-saas-catalog-toolbar__busy {
+  flex: 0 0 auto;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 820px) {
+  .page-pos--saas .pos-saas-catalog-toolbar {
+    flex-wrap: wrap;
+  }
+
+  .page-pos--saas .pos-saas-catalog-toolbar .pos-saas-search-wrap {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .page-pos--saas .pos-saas-catalog-toolbar__filter {
+    flex: 1 1 7.5rem;
+  }
 }
 
 /* Catálogo: lista de productos (hereda .pos-saas-panel-scroll) */
@@ -4399,14 +4622,14 @@ select {
 .page-pos--saas .pos-saas-card-head {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
-  margin-bottom: 1rem;
+  gap: 0.35rem;
+  margin-bottom: 0.35rem;
 }
 
 .page-pos--saas .pos-saas-card-head--row {
   justify-content: space-between;
   align-items: flex-start;
-  gap: 0.75rem;
+  gap: 0.5rem;
 }
 
 .page-pos--saas .pos-saas-card-head--stack {
@@ -4421,9 +4644,7 @@ select {
 }
 
 .page-pos--saas .pos-saas-card-desc {
-  margin: 0;
-  font-size: 0.82rem;
-  line-height: 1.4;
+  display: none;
 }
 
 .page-pos--saas .pos-saas-card-title--plain {
@@ -4483,9 +4704,9 @@ select {
 .page-pos--saas .pos-saas-select {
   width: 100%;
   border: 1px solid var(--pos-saas-border);
-  border-radius: 10px;
-  padding: 0.65rem 0.75rem;
-  font-size: 0.95rem;
+  border-radius: 8px;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.85rem;
   background: var(--pos-saas-input-bg);
   color: var(--pos-saas-text);
 }
@@ -4514,8 +4735,8 @@ select {
 .page-pos--saas .pos-saas-aside-block {
   display: flex;
   flex-direction: column;
-  gap: 0.55rem;
-  margin-bottom: 0.15rem;
+  gap: 0.35rem;
+  margin-bottom: 0.1rem;
 }
 
 .page-pos--saas .pos-saas-cliente-actions {
@@ -4525,7 +4746,7 @@ select {
 .page-pos--saas .pos-saas-btn-registrar-cliente {
   width: 100%;
   justify-content: center;
-  font-size: 0.88rem;
+  font-size: 0.82rem;
 }
 
 .create-cliente-drawer-form .create-cliente-drawer-doc {
@@ -4551,7 +4772,7 @@ select {
 }
 
 .page-pos--saas .pos-saas-field-label--spaced {
-  margin-top: 1rem;
+  margin-top: 0.5rem;
 }
 
 .page-pos--saas .pos-saas-link-clear {
@@ -4567,15 +4788,15 @@ select {
 }
 
 .page-pos--saas .pos-saas-table-wrap {
-  border-radius: 10px;
+  border-radius: 8px;
   border: 1px solid var(--pos-saas-border);
   overflow: auto;
   min-height: 0;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
 }
 
 .page-pos--saas .pos-saas-empty-cart {
-  padding: 1.5rem 1rem;
+  padding: 0.75rem 0.65rem;
   text-align: center;
 }
 
@@ -4586,12 +4807,12 @@ select {
 .page-pos--saas .pos-saas-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.88rem;
+  font-size: 0.82rem;
 }
 
 .page-pos--saas .pos-saas-table th {
   text-align: left;
-  padding: 0.55rem 0.65rem;
+  padding: 0.35rem 0.5rem;
   background: color-mix(in srgb, var(--pos-saas-input-bg) 88%, var(--pos-saas-border) 12%);
   color: var(--pos-saas-muted);
   font-weight: 600;
@@ -4610,7 +4831,7 @@ select {
 }
 
 .page-pos--saas .pos-saas-table td {
-  padding: 0.5rem 0.6rem;
+  padding: 0.3rem 0.45rem;
   vertical-align: middle;
   border-bottom: 1px solid color-mix(in srgb, var(--pos-saas-border) 85%, var(--surface) 15%);
 }
@@ -4620,9 +4841,9 @@ select {
 }
 
 .page-pos--saas .pos-saas-thumb {
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 8px;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 6px;
   overflow: hidden;
   background: color-mix(in srgb, var(--pos-saas-input-bg) 90%, var(--pos-saas-border) 10%);
   display: flex;
@@ -4711,9 +4932,9 @@ select {
 .page-pos--saas .pos-saas-totals {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  margin-bottom: 0.75rem;
-  font-size: 0.9rem;
+  gap: 0.2rem;
+  margin-bottom: 0.4rem;
+  font-size: 0.84rem;
   color: var(--pos-saas-muted);
 }
 
@@ -4763,8 +4984,8 @@ select {
 .page-pos--saas .pos-saas-pay-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 0.6rem;
-  margin-bottom: 1rem;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
 }
 
 @media (min-width: 520px) {
@@ -4788,9 +5009,9 @@ select {
 
 .page-pos--saas .pos-saas-pay-card {
   border: 1px solid var(--pos-saas-border);
-  border-radius: 12px;
-  padding: 0.75rem 0.5rem;
-  font-size: 0.88rem;
+  border-radius: 8px;
+  padding: 0.5rem 0.4rem;
+  font-size: 0.82rem;
   font-weight: 600;
   background: color-mix(in srgb, var(--surface) 92%, var(--pos-saas-input-bg) 8%);
   color: var(--pos-saas-text);
@@ -4814,20 +5035,20 @@ select {
 }
 
 .page-pos--saas .pos-saas-pay-card--compact {
-  min-height: 2.35rem;
-  padding: 0.4rem 0.55rem;
-  font-size: 0.82rem;
+  min-height: 2rem;
+  padding: 0.3rem 0.45rem;
+  font-size: 0.78rem;
 }
 
 .page-pos--saas .pos-saas-pago-detalle {
-  margin-top: 0.65rem;
+  margin-top: 0.35rem;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.35rem;
 }
 
 .page-pos--saas .pos-saas-pago-detalle--mixto {
-  gap: 0.75rem;
+  gap: 0.5rem;
 }
 
 .page-pos--saas .pos-saas-mixto-hint {
@@ -4842,11 +5063,11 @@ select {
 
 .page-pos--saas .pos-saas-transfer-key {
   flex: 1 1 auto;
-  min-width: 5.5rem;
+  min-width: 5rem;
   border: 1px solid var(--pos-saas-line, #e8e0d8);
-  border-radius: 10px;
-  padding: 0.45rem 0.65rem;
-  font-size: 0.82rem;
+  border-radius: 8px;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.78rem;
   background: var(--pos-saas-surface, #fff);
   color: var(--pos-saas-text);
   cursor: pointer;
@@ -5271,17 +5492,17 @@ select {
 .page-pos--saas .pos-saas-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.45rem;
+  gap: 0.3rem;
 }
 
 .page-pos--saas .pos-saas-chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.25rem;
   border: 1px solid var(--pos-saas-border);
   border-radius: 999px;
-  padding: 0.38rem 0.85rem;
-  font-size: 0.82rem;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.78rem;
   font-weight: 600;
   background: var(--surface);
   color: var(--pos-saas-text);
@@ -5309,39 +5530,45 @@ select {
 
 .page-pos--saas .pos-saas-pro-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
-  gap: 0.5rem;
+  /* Máximo 4 columnas: cada tarjeta ocupa al menos 25% del ancho disponible */
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(max(7.5rem, calc((100% - 1.05rem) / 4)), 1fr)
+  );
+  gap: 0.35rem;
   overflow-y: auto;
   flex: 1;
   min-height: 0;
-  padding: 0.15rem 0.1rem 0.5rem;
+  padding: 0.1rem 0.05rem 0.3rem;
   align-content: start;
 }
 
 .page-pos--saas .pos-saas-pro-grid--skel {
-  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(max(7.5rem, calc((100% - 1.05rem) / 4)), 1fr)
+  );
 }
 
 .page-pos--saas .pos-saas-empty-catalog {
-  padding: 2rem 1rem;
+  padding: 0.75rem 0.65rem;
   text-align: center;
 }
 
 .page-pos--saas .pos-saas-pro-card {
   position: relative;
-  border-radius: 10px;
+  border-radius: 8px;
   border: 1px solid var(--pos-saas-border);
   background: var(--surface);
   overflow: hidden;
-  box-shadow: 0 1px 6px var(--pos-saas-elev);
+  box-shadow: 0 1px 3px var(--pos-saas-elev);
   transition:
     box-shadow 0.18s ease,
     transform 0.18s ease;
 }
 
 .page-pos--saas .pos-saas-pro-card:hover:not(.pos-saas-pro-card--disabled) {
-  box-shadow: 0 8px 28px var(--pos-saas-elev-strong);
-  transform: translateY(-2px);
+  box-shadow: 0 3px 10px var(--pos-saas-elev-strong);
 }
 
 .page-pos--saas .pos-saas-pro-card--disabled {
@@ -5370,7 +5597,7 @@ select {
   border: none;
   background: transparent;
   cursor: pointer;
-  padding: 0.5rem 0.45rem 1.6rem;
+  padding: 0.5rem 0.45rem 0.6rem;
   min-height: 0;
 }
 
@@ -5379,12 +5606,12 @@ select {
 }
 
 .page-pos--saas .pos-saas-pro-img-wrap {
-  width: 3rem;
-  height: 3rem;
-  border-radius: 8px;
+  width: 50px;
+  height: 50px;
+  border-radius: 6px;
   overflow: hidden;
   background: color-mix(in srgb, var(--pos-saas-input-bg) 88%, var(--border) 12%);
-  margin-bottom: 0.35rem;
+  margin-bottom: 0.2rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -5404,7 +5631,7 @@ select {
 }
 
 .page-pos--saas .pos-saas-pro-name {
-  font-size: 0.74rem;
+  font-size: 0.8rem;
   font-weight: 600;
   color: var(--pos-saas-text);
   line-height: 1.25;
@@ -5437,10 +5664,10 @@ select {
 
 .page-pos--saas .pos-saas-pro-add {
   position: absolute;
-  right: 0.35rem;
-  bottom: 0.35rem;
-  width: 1.65rem;
-  height: 1.65rem;
+  right: 0.25rem;
+  bottom: 0.25rem;
+  width: 1.4rem;
+  height: 1.4rem;
   border-radius: 999px;
   border: none;
   background: var(--pos-saas-accent);
@@ -5449,13 +5676,13 @@ select {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--pos-saas-accent) 42%, transparent);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--pos-saas-accent) 35%, transparent);
   transition: transform 0.12s ease;
 }
 
 .page-pos--saas .pos-saas-pro-add svg {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
 }
 
 .page-pos--saas .pos-saas-pro-add:hover:not(:disabled) {
@@ -5496,12 +5723,13 @@ select {
 
 /* Ventas POS: llenar viewport bajo header + tabs + subnav; scroll solo en paneles */
 .main-pro-content:has(.page-pos--saas) {
-  max-width: 1680px;
+  max-width: 100%;
   flex: 1 1 0;
   min-height: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  padding: 0.35rem 0.85rem 0.5rem;
 }
 
 /* Historial / cierre: scroll del área principal */
@@ -5536,8 +5764,8 @@ select {
 
 /* Título y área principal más amplios cuando la vista es Ventas */
 .main-pro-content:has(.page-pos) {
-  padding: 0.45rem 1.1rem 0.5rem;
-  max-width: 1440px;
+  padding: 0.35rem 0.85rem 0.5rem;
+  max-width: 100%;
 }
 
 .main-pro-content:has(.page-pos) .main-pro-title {
@@ -5547,7 +5775,7 @@ select {
 /* Pedidos: aprovechar más ancho disponible del layout */
 .main-pro-content:has(.page-pedidos) {
   max-width: 1440px;
-  padding: 0.45rem 1.1rem 0.6rem;
+  padding: 0.35rem 0.85rem 0.5rem;
 }
 
 /*
@@ -5585,8 +5813,8 @@ select {
 }
 
 .page-pedidos.page-finanzas .pedidos-wizard-card {
-  border-radius: 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
 
 .page-pedidos.page-finanzas .pedidos-field__label {
@@ -5625,7 +5853,7 @@ select {
 }
 
 .page-pedidos.page-finanzas .finanzas-tab-panel {
-  margin-bottom: 24px;
+  margin-bottom: 14px;
 }
 
 /* Finanzas → Form gastos: combobox de categoría con emoji
@@ -6366,8 +6594,8 @@ select {
 }
 
 .page-pedidos.page-finanzas .finanzas-empty--compact {
-  margin-top: 16px;
-  padding: 1.5rem 1rem;
+  margin-top: 8px;
+  padding: 0.75rem 0.65rem;
 }
 
 .page-pedidos.page-finanzas .finanzas-empty__icon {
@@ -6661,9 +6889,9 @@ select {
 .page-pedidos .pedidos-hero {
   display: flex;
   align-items: flex-start;
-  gap: 20px;
-  padding: 24px 28px;
-  margin-bottom: 24px;
+  gap: 12px;
+  padding: 14px 18px;
+  margin-bottom: 12px;
   border-radius: var(--pp-radius-lg);
   border: 1px solid var(--pp-line);
   background: var(--pp-card);
@@ -6721,9 +6949,9 @@ select {
 .page-pedidos .pedidos-segmented {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  padding: 4px;
-  margin-bottom: 24px;
+  gap: 3px;
+  padding: 3px;
+  margin-bottom: 14px;
   border-radius: var(--pp-radius-md);
   border: 1px solid var(--pp-line);
   background: var(--pp-card);
@@ -6735,9 +6963,9 @@ select {
   min-width: 0;
   border: 0;
   border-radius: var(--pp-radius-sm);
-  padding: 10px 16px;
+  padding: 6px 12px;
   font-family: inherit;
-  font-size: 0.875rem;
+  font-size: 0.82rem;
   font-weight: 600;
   color: var(--pp-muted);
   background: transparent;
@@ -6764,37 +6992,37 @@ select {
   border: 1px solid var(--pp-line);
   background: var(--pp-card);
   box-shadow: var(--pp-shadow);
-  padding: 28px 28px 24px;
-  margin-bottom: 24px;
+  padding: 16px 18px 14px;
+  margin-bottom: 14px;
 }
 
 .page-pedidos .pedidos-wizard-card__intro {
-  margin-bottom: 24px;
+  margin-bottom: 12px;
 }
 
 .page-pedidos .pedidos-wizard-card__title {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 1rem;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--pp-text);
 }
 
 .page-pedidos .pedidos-wizard-card__subtitle {
-  margin: 8px 0 0;
-  font-size: 0.9rem;
+  margin: 4px 0 0;
+  font-size: 0.82rem;
   color: var(--pp-muted);
-  line-height: 1.5;
+  line-height: 1.4;
 }
 
 .page-pedidos .pedidos-stepper {
   list-style: none;
-  margin: 0 0 28px;
-  padding: 0 8px;
+  margin: 0 0 14px;
+  padding: 0 4px;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 8px;
+  gap: 4px;
   position: relative;
 }
 
@@ -6803,7 +7031,7 @@ select {
   position: absolute;
   left: 10%;
   right: 10%;
-  top: 19px;
+  top: 14px;
   height: 2px;
   background: var(--pp-line);
   border-radius: 2px;
@@ -6823,7 +7051,7 @@ select {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   width: 100%;
   max-width: 140px;
   margin: 0 auto;
@@ -6853,13 +7081,13 @@ select {
 }
 
 .page-pedidos .pedidos-stepper__disc {
-  width: 40px;
-  height: 40px;
+  width: 30px;
+  height: 30px;
   border-radius: 999px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.875rem;
+  font-size: 0.78rem;
   font-weight: 700;
   border: 2px solid var(--pp-line);
   background: var(--pp-card);
@@ -6908,7 +7136,7 @@ select {
 .page-pedidos .pedidos-panel {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 12px;
 }
 
 .page-pedidos .pedidos-panel--resumen:focus-visible {
@@ -6920,12 +7148,12 @@ select {
 .page-pedidos .pedidos-field {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
   min-width: 0;
 }
 
 .page-pedidos .pedidos-field--compact {
-  gap: 6px;
+  gap: 3px;
 }
 
 .page-pedidos .pedidos-field--toggle {
@@ -6947,14 +7175,14 @@ select {
 .page-pedidos .pedidos-input,
 .page-pedidos .pedidos-select {
   width: 100%;
-  min-height: 44px;
-  padding: 0 14px;
+  min-height: 34px;
+  padding: 0 10px;
   border-radius: var(--pp-radius-sm);
   border: 1px solid var(--pp-line);
   background: var(--pp-input-bg);
   color: var(--pp-text);
   font-family: inherit;
-  font-size: 0.9rem;
+  font-size: 0.84rem;
   transition:
     border-color 0.16s ease,
     box-shadow 0.16s ease;
@@ -6996,14 +7224,14 @@ select {
 
 .page-pedidos .pedidos-input[type="date"],
 .page-pedidos .pedidos-input[type="search"] {
-  min-height: 44px;
+  min-height: 34px;
 }
 
 .page-pedidos .pedidos-callout {
-  padding: 14px 16px;
+  padding: 8px 12px;
   border-radius: var(--pp-radius-sm);
-  font-size: 0.875rem;
-  line-height: 1.5;
+  font-size: 0.82rem;
+  line-height: 1.4;
   border: 1px solid var(--pp-line);
 }
 
@@ -7873,11 +8101,11 @@ select {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 44px;
-  padding: 0 22px;
+  min-height: 34px;
+  padding: 0 14px;
   border-radius: var(--pp-radius-sm);
   font-family: inherit;
-  font-size: 0.9rem;
+  font-size: 0.84rem;
   font-weight: 600;
   cursor: pointer;
   border: 1px solid transparent;
@@ -7933,7 +8161,7 @@ select {
   border: 1px solid var(--pp-line);
   background: var(--pp-card);
   box-shadow: var(--pp-shadow);
-  padding: 24px 28px 28px;
+  padding: 14px 18px 16px;
 }
 
 .page-pedidos .pedidos-historial-shell__head {
@@ -7941,33 +8169,33 @@ select {
   flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 20px;
+  gap: 8px;
+  margin-bottom: 10px;
 }
 
 .page-pedidos .pedidos-historial-shell__title {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 1rem;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--pp-text);
 }
 
 .page-pedidos .pedidos-historial-shell__lede {
-  margin: 8px 0 0;
-  font-size: 0.9rem;
+  margin: 4px 0 0;
+  font-size: 0.82rem;
   color: var(--pp-muted);
   max-width: 36rem;
-  line-height: 1.5;
+  line-height: 1.4;
 }
 
 .page-pedidos .pedidos-historial-filtros {
   display: flex;
   flex-wrap: wrap;
-  gap: 14px 16px;
+  gap: 8px 10px;
   align-items: flex-end;
-  margin-bottom: 20px;
-  padding: 16px 18px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
   border-radius: var(--pp-radius-md);
   border: 1px solid var(--pp-line);
   background: var(--pp-bg);
@@ -9528,8 +9756,8 @@ select {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.75rem;
-  margin-top: 0.75rem;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
 }
 
 .empleado-avatar {
@@ -9790,7 +10018,7 @@ select {
 }
 
 [data-theme="dark"] .topbar {
-  background: #1c1a18;
+  background: rgba(28, 26, 24, 0.88);
   border-color: #3a3530;
 }
 
@@ -10086,8 +10314,8 @@ select {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.25rem 0.35rem;
-  margin: 0 0 0.35rem;
+  gap: 0.15rem 0.25rem;
+  margin: 0 0 0.15rem;
   font-size: 0.82rem;
 }
 
@@ -10543,8 +10771,8 @@ select {
   flex-wrap: wrap;
   justify-content: center;
   align-items: flex-end;
-  gap: 0.85rem 1.35rem;
-  margin-top: 0.2rem;
+  gap: 0.5rem 0.85rem;
+  margin-top: 0.15rem;
 }
 
 .inventario-producto-card__stat {
@@ -10563,8 +10791,8 @@ select {
 
 /* Inventario — productos: rejilla densa y tarjetas compactas */
 .proveedores-grid.inventario-productos-grid {
-  gap: 0.75rem;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
 }
 
 @media (min-width: 520px) {
@@ -10580,9 +10808,9 @@ select {
 }
 
 .inventario-producto-card.prov-card {
-  padding: 0.6rem 0.65rem;
-  gap: 0.4rem;
-  border-radius: 12px;
+  padding: 0.45rem 0.55rem;
+  gap: 0.3rem;
+  border-radius: 8px;
 }
 
 .inventario-producto-card--inactivo {
@@ -10602,8 +10830,8 @@ select {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: 0.65rem 0.85rem;
-  margin: 0.65rem 0 0.9rem;
+  gap: 0.4rem 0.6rem;
+  margin: 0.35rem 0 0.5rem;
 }
 
 .inventario-filtros .field {
@@ -10769,7 +10997,7 @@ select {
 /* —— Proveedores: grid de cards + modal detalle —— */
 .proveedores-grid {
   display: grid;
-  gap: 1.1rem;
+  gap: 0.65rem;
   grid-template-columns: 1fr;
 }
 
@@ -10794,12 +11022,12 @@ select {
 .prov-card {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  padding: 1.1rem 1.15rem;
-  border-radius: 14px;
+  gap: 0.5rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
   border: 1px solid #e4ddf0;
   background: #fffdf9;
-  box-shadow: 0 2px 10px rgba(72, 58, 110, 0.06);
+  box-shadow: 0 1px 4px rgba(72, 58, 110, 0.06);
   transition:
     box-shadow 0.22s ease,
     transform 0.22s ease,
@@ -10807,9 +11035,8 @@ select {
 }
 
 .prov-card:hover {
-  transform: translateY(-2px);
   border-color: #c9b8e0;
-  box-shadow: 0 10px 28px rgba(72, 58, 110, 0.12);
+  box-shadow: 0 4px 12px rgba(72, 58, 110, 0.1);
 }
 
 .prov-card--stacked {
@@ -10832,14 +11059,14 @@ select {
   justify-content: center;
   padding: 0;
   margin: 0;
-  border-radius: 14px;
+  border-radius: 10px;
   line-height: 0;
 }
 
 .prov-card__img {
-  width: 72px;
-  height: 72px;
-  border-radius: 14px;
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
   object-fit: cover;
   display: block;
   border: 1px solid #d4c8ea;
@@ -10847,34 +11074,34 @@ select {
 
 .prov-card__avatar {
   flex-shrink: 0;
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  font-size: 1.05rem;
+  font-size: 0.9rem;
   color: #4a3d6e;
   background: linear-gradient(145deg, #ebe4f7 0%, #ddd4f0 100%);
   border: 1px solid #d4c8ea;
 }
 
 .prov-card__avatar--ph {
-  width: 72px;
-  height: 72px;
-  border-radius: 14px;
-  font-size: 1.35rem;
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+  font-size: 1.15rem;
 }
 
 .prov-card__nombre-text {
   margin: 0;
-  padding: 0.15rem 0.25rem;
+  padding: 0.1rem 0.15rem;
   max-width: 100%;
-  font-size: 1.05rem;
+  font-size: 0.88rem;
   font-weight: 650;
   color: #2c2420;
-  line-height: 1.3;
+  line-height: 1.25;
   word-break: break-word;
   text-align: center;
 }
@@ -10884,9 +11111,9 @@ select {
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 0.65rem 0.85rem;
+  gap: 0.4rem 0.55rem;
   width: 100%;
-  margin-top: 0.25rem;
+  margin-top: 0.15rem;
   cursor: default;
 }
 
@@ -11839,7 +12066,7 @@ select {
 }
 
 .ventas-historial-loading {
-  padding: 1.5rem 0;
+  padding: 0.75rem 0;
 }
 
 .ventas-historial-table-wrap {
@@ -11990,7 +12217,7 @@ select {
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 0.65rem;
 }
 
 .sales-history-header {
@@ -12189,10 +12416,10 @@ select {
 .sales-history-card {
   display: grid;
   grid-template-columns: minmax(140px, 1.1fr) minmax(160px, 1.4fr) auto;
-  gap: 1rem;
+  gap: 0.6rem;
   align-items: center;
-  padding: 1rem 1.15rem;
-  border-radius: 16px;
+  padding: 0.6rem 0.8rem;
+  border-radius: 10px;
   border: 1px solid var(--line, #ebe3dc);
   background: var(--card-bg, #fff);
   cursor: pointer;
@@ -12359,7 +12586,7 @@ select {
 .sales-history-drawer-body {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 0.65rem;
 }
 
 .sales-history-drawer-h {
@@ -12765,7 +12992,7 @@ select {
 }
 
 .cierre-dia-cerrado {
-  padding: 1.25rem;
+  padding: 0.65rem;
 }
 
 .cierre-dia-cerrado-head {
@@ -12903,5 +13130,262 @@ select {
   background: #1c1a18;
   border-color: #3d3550;
   color: inherit;
+}
+
+/* Scroll general de pestañas: el scroll vertical vive en .main-pro-content.
+   Los componentes dejan de crear scrolls internos; las tablas conservan scroll horizontal. */
+.main-pro-content {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.main-pro-content > *:only-child:not(.drawer-root),
+.main-pro-content > .subnav-wrap + *:not(.drawer-root),
+.main-pro-content:has(.page-pos--saas) > .subnav-wrap + *:not(.drawer-root),
+.main-pro-content:has(.sales-history-page) > .subnav-wrap + *:not(.drawer-root),
+.main-pro-content:has(.cierre-dia-page) > .subnav-wrap + *:not(.drawer-root),
+.main-pro-content > .page-pedidos:only-child,
+.main-pro-content > .page-finanzas:only-child {
+  flex: 0 1 auto;
+  min-height: min-content;
+  overflow-x: hidden;
+  overflow-y: visible;
+}
+
+.main-pro-content .table-wrap,
+.main-pro-content .cierre-table-wrap,
+.main-pro-content .finanzas-table-wrap,
+.main-pro-content .citas-busqueda-table-wrap,
+.main-pro-content .pos-saas-table-wrap {
+  max-height: none;
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+.main-pro-content .cart-lines,
+.main-pro-content .cart-lines--main,
+.main-pro-content .product-grid {
+  max-height: none;
+  overflow-y: visible;
+}
+
+/* POS: mantiene layout viewport-fill con scroll interno en paneles */
+.main-pro-content:has(.page-pos--saas) {
+  overflow: hidden;
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.main-pro-content:has(.page-pos--saas) > .subnav-wrap + *:not(.drawer-root) {
+  flex: 1 1 0;
+  min-height: 0;
+  max-height: 100%;
+  overflow: hidden;
+}
+
+/* =========================================================================
+   UX PROFESIONAL — Scroll, transiciones, hover, focus, micro-interacciones
+   ========================================================================= */
+
+/* —— Smooth scroll en el contenido principal —— */
+.main-pro-content {
+  scroll-behavior: smooth;
+  overscroll-behavior-y: contain;
+}
+
+.sidebar-nav {
+  overscroll-behavior-y: contain;
+}
+
+/* —— Topbar: backdrop blur para aspecto premium —— */
+.topbar {
+  backdrop-filter: blur(12px) saturate(1.4);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
+}
+
+[data-theme="dark"] .topbar {
+  backdrop-filter: blur(14px) saturate(1.3);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+}
+
+/* —— Sidebar: transiciones más suaves —— */
+.sidebar-pro {
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-link {
+  transition: background 0.18s ease, color 0.18s ease, transform 0.12s ease;
+}
+
+.sidebar-link:active:not(.sidebar-link--active) {
+  transform: scale(0.98);
+}
+
+.sidebar-link--active {
+  position: relative;
+}
+
+.sidebar-link--active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 20%;
+  bottom: 20%;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: #fff;
+  opacity: 0.75;
+}
+
+.app-root--collapsed .sidebar-link--active::before {
+  left: 0;
+  top: 30%;
+  bottom: 30%;
+}
+
+/* —— Cards: sutil elevación al hover —— */
+.card,
+.card-pro,
+.clay-card {
+  transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+}
+
+.card:hover,
+.card-pro:hover,
+.clay-card:hover {
+  box-shadow: 0 2px 8px rgba(44, 36, 32, 0.08);
+}
+
+[data-theme="dark"] .card:hover,
+[data-theme="dark"] .card-pro:hover,
+[data-theme="dark"] .clay-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+/* —— Botones: micro-animaciones profesionales —— */
+.btn,
+.clay-btn,
+.btn-quick {
+  transition: transform 0.14s ease, box-shadow 0.14s ease, filter 0.14s ease, background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+
+.btn:active:not(:disabled),
+.btn-quick:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* —— Inputs: transiciones suaves al focus —— */
+input,
+textarea,
+select {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, outline-color 0.2s ease;
+}
+
+/* —— Drawer: entrada más suave —— */
+.drawer-panel {
+  transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* —— Topbar user avatar: hover sutil —— */
+.topbar-user-avatar {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.topbar-user-avatar:hover {
+  transform: scale(1.06);
+}
+
+/* —— Badge conexión: pulso suave en línea —— */
+.conn-badge--on {
+  animation: conn-pulse 3s ease-in-out infinite;
+}
+
+@keyframes conn-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.82; }
+}
+
+/* —— Breadcrumb: mejor estilo profesional —— */
+.breadcrumb-link {
+  transition: color 0.15s ease, opacity 0.15s ease;
+}
+
+.breadcrumb-link:hover {
+  opacity: 0.75;
+}
+
+/* —— Tabla filas: transición hover —— */
+tr {
+  transition: background 0.12s ease;
+}
+
+/* —— Workspace tabs: transiciones —— */
+.workspace-tabs-item {
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.workspace-tabs-item-label {
+  transition: color 0.15s ease;
+}
+
+/* —— Main content area: fade-in sutil al cargar —— */
+.main-pro-content > *:first-child:not(.drawer-root):not(.subnav-wrap) {
+  animation: content-fadein 0.22s ease-out;
+}
+
+@keyframes content-fadein {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* —— Focus visible global: anillo profesional —— */
+:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--primary, #4f46e5) 65%, transparent);
+  outline-offset: 2px;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--primary, #4f46e5) 55%, transparent);
+  outline-offset: 2px;
+}
+
+/* —— Responsive: topbar compacta en móvil —— */
+@media (max-width: 640px) {
+  .topbar {
+    padding: 0.4rem 0.5rem;
+    gap: 0.5rem;
+  }
+
+  .topbar-user-email {
+    display: none;
+  }
+
+  .topbar-brand {
+    font-size: 0.95rem;
+  }
+
+  .main-pro-content {
+    padding: 0.35rem 0.75rem 0.65rem;
+  }
+
+  .main-pro-header {
+    padding: 0.25rem 0.85rem 0;
+  }
+}
+
+/* —— Reducir movimiento para usuarios que lo prefieren —— */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 

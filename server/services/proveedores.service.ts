@@ -4,6 +4,7 @@ import {
   saveImageDataUrl,
   unlinkMediaPublicPath,
 } from "../lib/mediaStore.js";
+import { db } from "../db.js";
 import { proveedorRepository, type ProveedorRow } from "../repositories/proveedor.repository.js";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -19,11 +20,12 @@ export type ProveedorDto = {
   vendedor_nombre: string | null;
   vendedor_celular: string | null;
   estado: "activo" | "inactivo";
+  categorias: string[];
   fecha_creacion: string;
   fecha_actualizacion: string;
 };
 
-function toDto(r: ProveedorRow): ProveedorDto {
+function toDto(r: ProveedorRow, categorias: string[] = []): ProveedorDto {
   const est = r.estado === "inactivo" ? "inactivo" : "activo";
   return {
     id: r.id,
@@ -36,9 +38,38 @@ function toDto(r: ProveedorRow): ProveedorDto {
     vendedor_nombre: r.vendedor_nombre ?? null,
     vendedor_celular: r.vendedor_celular ?? null,
     estado: est,
+    categorias,
     fecha_creacion: r.fecha_creacion,
     fecha_actualizacion: r.fecha_actualizacion,
   };
+}
+
+async function categoriasPorProveedor(ids: number[]): Promise<Map<number, string[]>> {
+  if (ids.length === 0) return new Map();
+  const placeholders = ids.map(() => "?").join(",");
+  const rows = (await db
+    .prepare(
+      `SELECT proveedor_id, categoria
+       FROM productos
+       WHERE proveedor_id IN (${placeholders})`
+    )
+    .all(...ids)) as { proveedor_id: number | null; categoria: string | null }[];
+  const map = new Map<number, Set<string>>();
+  for (const row of rows) {
+    const id = Number(row.proveedor_id);
+    if (!Number.isFinite(id) || id <= 0) continue;
+    const cat = row.categoria?.trim();
+    if (!cat) continue;
+    const current = map.get(id);
+    if (current) current.add(cat);
+    else map.set(id, new Set([cat]));
+  }
+  return new Map(
+    [...map.entries()].map(([id, names]) => [
+      id,
+      [...names].sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" })),
+    ])
+  );
 }
 
 function parseNombre(body: Record<string, unknown>): string {
@@ -170,13 +201,15 @@ export const proveedoresService = {
       estado: estadoF,
       searchPattern,
     });
-    return rows.map(toDto);
+    const categoriasMap = await categoriasPorProveedor(rows.map((r) => r.id));
+    return rows.map((r) => toDto(r, categoriasMap.get(r.id) ?? []));
   },
 
   async getById(id: number): Promise<ProveedorDto> {
     const r = await proveedorRepository.findById(id);
     if (!r) throw new AppError("Proveedor no encontrado", 404);
-    return toDto(r);
+    const categoriasMap = await categoriasPorProveedor([id]);
+    return toDto(r, categoriasMap.get(id) ?? []);
   },
 
   async create(body: Record<string, unknown>): Promise<ProveedorDto> {
@@ -251,7 +284,8 @@ export const proveedoresService = {
 
     const row = await proveedorRepository.findById(id);
     if (!row) throw new AppError("Proveedor no encontrado", 404);
-    return toDto(row);
+    const categoriasMap = await categoriasPorProveedor([id]);
+    return toDto(row, categoriasMap.get(id) ?? []);
   },
 
   async patchEstado(id: number, body: Record<string, unknown>): Promise<ProveedorDto> {
@@ -265,7 +299,8 @@ export const proveedoresService = {
     await proveedorRepository.setEstado(id, estado, now);
     const row = await proveedorRepository.findById(id);
     if (!row) throw new AppError("Proveedor no encontrado", 404);
-    return toDto(row);
+    const categoriasMap = await categoriasPorProveedor([id]);
+    return toDto(row, categoriasMap.get(id) ?? []);
   },
 
   /**

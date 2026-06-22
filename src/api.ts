@@ -89,6 +89,8 @@ export type Cliente = {
   telefono: string | null;
   email: string | null;
   notas: string | null;
+  tipo_documento?: string | null;
+  numero_documento?: string | null;
   puntos?: number;
   tipo_cliente?: "registrado" | "temporal";
   activo?: number;
@@ -412,7 +414,16 @@ export type UsuarioListado = {
   foto_url?: string | null;
   tipo_comision?: string;
   valor_comision?: number;
+  turnos_creados?: number;
   created_at: string;
+};
+
+export type TurnoPlantillaInicial = {
+  fecha_desde: string;
+  fecha_hasta: string;
+  dias_semana: number[];
+  hora_inicio: string;
+  hora_fin: string;
 };
 
 export type EquipoMiembro = {
@@ -461,6 +472,7 @@ export async function createUsuario(body: {
   foto_url?: string | null;
   tipo_comision?: string;
   valor_comision?: number;
+  turno_inicial?: TurnoPlantillaInicial;
 }): Promise<UsuarioListado> {
   return requestJson("/api/usuarios", { method: "POST", body: JSON.stringify(body) });
 }
@@ -477,6 +489,7 @@ export async function updateUsuario(
     activo: boolean;
     tipo_comision: string;
     valor_comision: number;
+    turno_inicial: TurnoPlantillaInicial;
   }>
 ): Promise<UsuarioListado> {
   return requestJson(`/api/usuarios/${id}`, { method: "PATCH", body: JSON.stringify(body) });
@@ -553,6 +566,15 @@ export type InventarioCatalogo = {
 
 export async function fetchInventarioCatalogo(): Promise<InventarioCatalogo> {
   return requestJson("/api/inventario/catalogo");
+}
+
+export async function createInventarioCategoriaProducto(body: {
+  nombre_categoria: string;
+}): Promise<InventarioCatalogoCategoria> {
+  return requestJson("/api/inventario/categorias-producto", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
 }
 
 export async function patchProductoEstado(
@@ -1173,6 +1195,7 @@ export type Proveedor = {
   vendedor_nombre: string | null;
   vendedor_celular: string | null;
   estado: "activo" | "inactivo";
+  categorias?: string[];
   fecha_creacion: string;
   fecha_actualizacion: string;
 };

@@ -15,6 +15,8 @@ type Props = {
   emptySlot?: ReactNode;
   /** Texto del botón que abre/cierra el panel */
   idleTextWhenEmpty?: string;
+  /** `combobox`: escribir en el campo filtra la lista sin abrir un panel aparte primero. */
+  variant?: "button" | "combobox";
 };
 
 export function SearchableSelect({
@@ -28,6 +30,7 @@ export function SearchableSelect({
   onPanelOpen,
   emptySlot,
   idleTextWhenEmpty = "Elegir…",
+  variant = "button",
 }: Props) {
   const baseId = useId();
   const listboxId = `${baseId}-listbox`;
@@ -68,73 +71,136 @@ export function SearchableSelect({
 
   const showList = open && !disabled;
   const noOptions = options.length === 0;
+  const isCombobox = variant === "combobox";
+
+  function openPanel() {
+    if (disabled) return;
+    setOpen(true);
+    onPanelOpen?.();
+  }
+
+  function selectOption(next: string) {
+    onChange(next);
+    setOpen(false);
+    setQ("");
+  }
+
+  function renderOptions() {
+    return (
+      <ul id={listboxId} className="searchable-select__list" role="listbox">
+        {filtered.map((o) => (
+          <li key={o.value} role="presentation">
+            <button
+              type="button"
+              role="option"
+              aria-selected={o.value === value}
+              className={`searchable-select__opt ${o.value === value ? "is-active" : ""}`}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => selectOption(o.value)}
+            >
+              {o.label}
+            </button>
+          </li>
+        ))}
+      </ul>
+    );
+  }
 
   return (
-    <div className={`field searchable-select ${disabled ? "searchable-select--disabled" : ""}`} ref={wrapRef}>
+    <div
+      className={`field searchable-select ${disabled ? "searchable-select--disabled" : ""} ${isCombobox ? "searchable-select--combobox" : ""}`}
+      ref={wrapRef}
+    >
       <span className="searchable-select__label">{label}</span>
-      <button
-        type="button"
-        className="searchable-select__trigger"
-        aria-expanded={showList}
-        aria-haspopup="listbox"
-        aria-controls={listboxId}
-        disabled={disabled}
-        onClick={() => {
-          if (disabled) return;
-          setOpen((prev) => {
-            const next = !prev;
-            if (!prev && next) onPanelOpen?.();
-            return next;
-          });
-        }}
-      >
-        <span className={selectedLabel ? "searchable-select__trigger-value" : "muted"}>
-          {selectedLabel || idleTextWhenEmpty}
-        </span>
-        <span className="searchable-select__chevron" aria-hidden>
-          ▾
-        </span>
-      </button>
+      {isCombobox ? (
+        <div className="searchable-select__combobox-wrap">
+          <input
+            ref={inputRef}
+            id={`${baseId}-q`}
+            className="searchable-select__trigger searchable-select__combobox-input"
+            type="search"
+            role="combobox"
+            aria-expanded={showList}
+            aria-controls={listboxId}
+            aria-autocomplete="list"
+            autoComplete="off"
+            disabled={disabled}
+            placeholder={idleTextWhenEmpty}
+            value={open ? q : selectedLabel}
+            onFocus={() => {
+              openPanel();
+              setQ("");
+            }}
+            onChange={(e) => {
+              setQ(e.target.value);
+              openPanel();
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.stopPropagation();
+                setOpen(false);
+                setQ("");
+                inputRef.current?.blur();
+              } else if (e.key === "Enter" && filtered[0]) {
+                e.preventDefault();
+                selectOption(filtered[0]!.value);
+              }
+            }}
+          />
+          <span className="searchable-select__chevron searchable-select__chevron--combobox" aria-hidden>
+            ▾
+          </span>
+        </div>
+      ) : (
+        <button
+          type="button"
+          className="searchable-select__trigger"
+          aria-expanded={showList}
+          aria-haspopup="listbox"
+          aria-controls={listboxId}
+          disabled={disabled}
+          onClick={() => {
+            if (disabled) return;
+            setOpen((prev) => {
+              const next = !prev;
+              if (!prev && next) onPanelOpen?.();
+              return next;
+            });
+          }}
+        >
+          <span className={selectedLabel ? "searchable-select__trigger-value" : "muted"}>
+            {selectedLabel || idleTextWhenEmpty}
+          </span>
+          <span className="searchable-select__chevron" aria-hidden>
+            ▾
+          </span>
+        </button>
+      )}
       {showList ? (
         <div className="searchable-select__panel card inner-line" role="presentation">
           {noOptions ? (
             <div className="searchable-select__empty">{emptySlot}</div>
           ) : (
             <>
-              <input
-                ref={inputRef}
-                id={`${baseId}-q`}
-                className="searchable-select__filter"
-                type="search"
-                autoComplete="off"
-                placeholder={placeholder}
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Escape") {
-                    e.stopPropagation();
-                    setOpen(false);
-                  }
-                }}
-              />
-              <ul id={listboxId} className="searchable-select__list" role="listbox">
-                {filtered.map((o) => (
-                  <li key={o.value} role="presentation">
-                    <button
-                      type="button"
-                      role="option"
-                      aria-selected={o.value === value}
-                      className={`searchable-select__opt ${o.value === value ? "is-active" : ""}`}
-                      onClick={() => {
-                        onChange(o.value);
-                        setOpen(false);
-                      }}
-                    >
-                      {o.label}
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              {!isCombobox ? (
+                <input
+                  ref={inputRef}
+                  id={`${baseId}-q`}
+                  className="searchable-select__filter"
+                  type="search"
+                  autoComplete="off"
+                  placeholder={placeholder}
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") {
+                      e.stopPropagation();
+                      setOpen(false);
+                    }
+                  }}
+                />
+              ) : null}
+              {renderOptions()}
               {filtered.length === 0 ? (
                 <p className="muted small searchable-select__no-hit">Sin coincidencias</p>
               ) : null}

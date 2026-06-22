@@ -11,6 +11,7 @@ import {
 } from "../api";
 import { ChoiceDialog } from "../components/ChoiceDialog";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { SearchableSelect } from "../components/SearchableSelect";
 import { useToast } from "../context/ToastContext";
 
 function fmtFecha(iso: string) {
@@ -200,6 +201,8 @@ export function ProveedoresPage() {
 
   const [searchText, setSearchText] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState<EstadoFiltro>("todos");
+  const [proveedorFiltro, setProveedorFiltro] = useState("todos");
+  const [categoriaFiltro, setCategoriaFiltro] = useState("todos");
 
   const [deleteTarget, setDeleteTarget] = useState<Proveedor | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
@@ -238,9 +241,46 @@ export function ProveedoresPage() {
     void load();
   }, [load]);
 
+  const proveedorFiltroOptions = useMemo(() => {
+    const sorted = [...rows].sort((a, b) => a.nombre.localeCompare(b.nombre, "es", { sensitivity: "base" }));
+    return [
+      { value: "todos", label: "Todos los proveedores" },
+      ...sorted.map((p) => ({ value: String(p.id), label: p.nombre })),
+    ];
+  }, [rows]);
+
+  const categoriaFiltroOptions = useMemo(() => {
+    const names = new Set<string>();
+    for (const p of rows) {
+      for (const cat of p.categorias ?? []) {
+        const n = cat.trim();
+        if (n) names.add(n);
+      }
+    }
+    const sorted = [...names].sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
+    return [
+      { value: "todos", label: "Todas las categorías" },
+      { value: "sin", label: "Sin categoría" },
+      ...sorted.map((n) => ({ value: n, label: n })),
+    ];
+  }, [rows]);
+
   const filteredRows = useMemo(() => {
-    return rows.filter((p) => matchesEstadoFiltro(p, estadoFiltro) && matchesSearch(p, searchText));
-  }, [rows, estadoFiltro, searchText]);
+    return rows.filter((p) => {
+      if (!matchesEstadoFiltro(p, estadoFiltro) || !matchesSearch(p, searchText)) return false;
+      if (proveedorFiltro !== "todos" && p.id !== Number(proveedorFiltro)) return false;
+      if (categoriaFiltro !== "todos") {
+        const categoriasProveedor = p.categorias ?? [];
+        if (categoriaFiltro === "sin") {
+          return categoriasProveedor.length === 0;
+        }
+        return categoriasProveedor.some(
+          (cat) => cat.trim().toLowerCase() === categoriaFiltro.toLowerCase()
+        );
+      }
+      return true;
+    });
+  }, [rows, estadoFiltro, searchText, proveedorFiltro, categoriaFiltro]);
 
   const detailDisplay = useMemo(() => {
     if (!detailProveedor) return null;
@@ -448,11 +488,6 @@ export function ProveedoresPage() {
             Nuevo proveedor
           </button>
         </div>
-        <p className="hint">
-          Alta y mantenimiento de contactos comerciales. Los pedidos a proveedor solo pueden elegir
-          contactos activos.
-        </p>
-
         {!loading && rows.length > 0 ? (
           <div className="module-filters-bar">
             <label className="field" style={{ flex: "1 1 220px", minWidth: 0 }}>
@@ -483,6 +518,39 @@ export function ProveedoresPage() {
                 <option value="inactivo">Inactivos</option>
               </select>
             </label>
+            <div style={{ flex: "0 1 240px", minWidth: 210 }}>
+              <SearchableSelect
+                label="Proveedor"
+                value={proveedorFiltro}
+                onChange={setProveedorFiltro}
+                options={proveedorFiltroOptions}
+                placeholder="Buscar proveedor…"
+                idleTextWhenEmpty="Todos los proveedores"
+              />
+            </div>
+            <div style={{ flex: "0 1 240px", minWidth: 210 }}>
+              <SearchableSelect
+                label="Categoría"
+                value={categoriaFiltro}
+                onChange={setCategoriaFiltro}
+                options={categoriaFiltroOptions}
+                placeholder="Buscar categoría…"
+                idleTextWhenEmpty="Todas las categorías"
+              />
+            </div>
+            {(proveedorFiltro !== "todos" || categoriaFiltro !== "todos") ? (
+              <button
+                type="button"
+                className="btn ghost small"
+                style={{ alignSelf: "end" }}
+                onClick={() => {
+                  setProveedorFiltro("todos");
+                  setCategoriaFiltro("todos");
+                }}
+              >
+                Limpiar filtros
+              </button>
+            ) : null}
           </div>
         ) : null}
 
@@ -494,7 +562,7 @@ export function ProveedoresPage() {
           </div>
         ) : filteredRows.length === 0 ? (
           <div className="clay-empty" role="status">
-            Ningún proveedor coincide con los filtros. Probá otra búsqueda o cambiá el estado.
+            Ningún proveedor coincide con los filtros. Probá otra búsqueda o cambiá proveedor, categoría o estado.
           </div>
         ) : (
           <div className="proveedores-grid" role="list">

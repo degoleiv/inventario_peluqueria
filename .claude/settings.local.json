@@ -4,7 +4,13 @@
       "Bash(npm install *)",
       "Bash(npx playwright *)",
       "Bash(Get-ChildItem -Recurse -Filter \"*logger*\" -ErrorAction SilentlyContinue)",
-      "Bash(findstr /S /R \"useToast\\\\|toast\\(\" src)"
+      "Bash(findstr /S /R \"useToast\\\\|toast\\(\" src)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('scripts',{}\\), indent=2\\)\\)\")",
+      "Bash(npm run *)",
+      "Bash(timeout 15)",
+      "Bash(findstr /i \"localhost ready vite\")",
+      "WebFetch(domain:localhost)",
+      "Bash(npx tsc *)"
     ]
   }
 }

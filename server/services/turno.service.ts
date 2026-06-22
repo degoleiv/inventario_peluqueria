@@ -179,6 +179,24 @@ export const turnoService = {
     return created;
   },
 
+  async reemplazarFuturosPorPlantilla(
+    empleado_id: number,
+    plantilla: TurnoPlantillaSemanal
+  ): Promise<number> {
+    return await db.transaction(async () => {
+      await db
+        .prepare(
+          `DELETE FROM turnos_empleado
+           WHERE empleado_id = ?
+             AND fecha >= ?
+             AND fecha <= ?
+             AND estado = 'activo'`
+        )
+        .run(empleado_id, plantilla.fecha_desde, plantilla.fecha_hasta);
+      return await this.bulkSemanal(empleado_id, plantilla);
+    });
+  },
+
   async update(id: number, body: Record<string, unknown>) {
     const ex = (await db
       .prepare(`SELECT * FROM turnos_empleado WHERE id = ?`)

@@ -144,16 +144,8 @@ export function ClientesPage() {
     const tipoDoc = tipoDocumento.trim();
     const numDoc = numeroDocumento.trim();
     if (editingId == null) {
-      if (!tipoDoc) {
-        toast("El tipo de documento es obligatorio.", "warning");
-        return;
-      }
-      if (!numDoc) {
-        toast("El número de documento es obligatorio.", "warning");
-        return;
-      }
-      if (!tel) {
-        toast("El teléfono es obligatorio.", "warning");
+      if (!numDoc && !tel) {
+        toast("Ingresá la cédula o el teléfono del cliente.", "warning");
         return;
       }
     }
@@ -262,11 +254,6 @@ export function ClientesPage() {
               Nuevo cliente
             </button>
           </div>
-          <p className="hint">
-            Contactos para ventas y citas. Los favoritos y recientes se muestran primero; tocá una tarjeta
-            para editar o usá los iconos de la fila inferior.
-          </p>
-
           {!loading && rows.length > 0 ? (
             <div className="module-filters-bar">
               <label className="field" style={{ flex: "1 1 220px", minWidth: 0 }}>
@@ -380,12 +367,6 @@ export function ClientesPage() {
         wide
       >
         <form className="form drawer-form create-cliente-drawer-form" onSubmit={onSubmit}>
-          {editingTemporal ? (
-            <p className="hint">
-              Contacto rápido sin registro completo. Cuando quieras, completá datos y pulsá{" "}
-              <strong>Registrar formalmente</strong> para fidelizar sin duplicar en el listado.
-            </p>
-          ) : null}
           <label className="field">
             <span>Nombre completo *</span>
             <input
@@ -397,11 +378,10 @@ export function ClientesPage() {
           </label>
           <div className="field-row create-cliente-drawer-doc">
             <label className="field">
-              <span>Tipo documento{editingId == null ? " *" : ""}</span>
+              <span>Tipo documento</span>
               <select
                 value={tipoDocumento}
                 onChange={(e) => setTipoDocumento(e.target.value)}
-                required={editingId == null}
               >
                 {TIPO_DOCUMENTO_OPTS.map((o) => (
                   <option key={o.value || "empty"} value={o.value}>
@@ -411,23 +391,21 @@ export function ClientesPage() {
               </select>
             </label>
             <label className="field">
-              <span>Número documento{editingId == null ? " *" : ""}</span>
+              <span>Número documento / cédula</span>
               <input
                 value={numeroDocumento}
                 onChange={(e) => setNumeroDocumento(e.target.value)}
                 autoComplete="off"
-                required={editingId == null}
               />
             </label>
           </div>
           <label className="field">
-            <span>Teléfono{editingId == null ? " *" : ""}</span>
+            <span>Teléfono</span>
             <input
               type="tel"
               value={telefono}
               onChange={(e) => setTelefono(e.target.value)}
               autoComplete="tel"
-              required={editingId == null}
             />
           </label>
           <label className="field">

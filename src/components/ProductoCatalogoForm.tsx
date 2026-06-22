@@ -4,6 +4,7 @@ import { resolveImageSrc } from "../api";
 import { filterIntegerTyping } from "../lib/decimalInput";
 import { SearchableSelect } from "./SearchableSelect";
 import { useToast } from "../context/ToastContext";
+import { PromptDialog } from "./PromptDialog";
 
 const MAX_PRODUCTO_IMG_BYTES = 700 * 1024;
 const ACCEPT_PRODUCTO_IMG = "image/png,image/jpeg,image/webp,image/gif";
@@ -160,6 +161,8 @@ export type InventarioCatalogoFormProps = {
   proveedores: { id: number; nombre: string }[];
   /** Al abrir marca o categoría se actualiza el catálogo (p. ej. tras crear registros en otro módulo). */
   onCatalogPanelOpen?: () => void;
+  /** Crea una categoría sin salir del formulario y devuelve el nombre que debe seleccionarse. */
+  onCreateCategoria?: (nombre: string) => Promise<string | void>;
 };
 
 type ProveedorResumen = {
@@ -201,20 +204,44 @@ export function ProductoCatalogoForm({
   quickCreateFromPedido,
   inventarioCatalogo,
 }: Props) {
+  const toast = useToast();
+  const [categoriaPromptOpen, setCategoriaPromptOpen] = useState(false);
+  const [categoriaPromptBusy, setCategoriaPromptBusy] = useState(false);
   const cat = inventarioCatalogo;
   const proveedorInactivoSeleccionado =
     cat != null &&
     values.proveedorId !== "" &&
     !cat.proveedores.some((p) => p.id === values.proveedorId);
+  const puedeCrearCategoria = Boolean(cat?.onCreateCategoria);
+
+  async function crearCategoria(nombre: string) {
+    if (!cat?.onCreateCategoria) return;
+    setCategoriaPromptBusy(true);
+    try {
+      const selected = await cat.onCreateCategoria(nombre);
+      onChange({ categoria: selected || nombre });
+      setCategoriaPromptOpen(false);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "No se pudo crear la categoría", "error");
+    } finally {
+      setCategoriaPromptBusy(false);
+    }
+  }
+
   const catEmptySlot = (
     <div className="searchable-select__empty-actions">
       <p className="muted small" style={{ marginBottom: "0.5rem" }}>
-        No hay categorías activas. Creá al menos una en Configuración → Parámetros generales → Categorías de
-        producto.
+        No hay categorías activas. Podés crear una sin salir del formulario.
       </p>
-      <Link to="/configuracion/parametros" className="btn secondary small">
-        Ir a categorías
-      </Link>
+      {puedeCrearCategoria ? (
+        <button type="button" className="btn secondary small" onClick={() => setCategoriaPromptOpen(true)}>
+          Crear categoría
+        </button>
+      ) : (
+        <Link to="/configuracion/parametros" className="btn secondary small">
+          Ir a categorías
+        </Link>
+      )}
     </div>
   );
   const provEmptySlot = (
@@ -355,19 +382,31 @@ export function ProductoCatalogoForm({
                         : null
                   }
                 />
-                <SearchableSelect
-                  label="Categoría *"
-                  value={values.categoria}
-                  onChange={(v) => onChange({ categoria: v })}
-                  options={cat.categorias.map((c) => ({
-                    value: c.nombre_categoria,
-                    label: c.nombre_categoria,
-                  }))}
-                  disabled={cat.loading}
-                  onPanelOpen={cat.onCatalogPanelOpen}
-                  emptySlot={catEmptySlot}
-                  hint={cat.loading ? "Cargando categorías…" : null}
-                />
+                <div className="producto-categoria-field">
+                  <SearchableSelect
+                    label="Categoría *"
+                    value={values.categoria}
+                    onChange={(v) => onChange({ categoria: v })}
+                    options={cat.categorias.map((c) => ({
+                      value: c.nombre_categoria,
+                      label: c.nombre_categoria,
+                    }))}
+                    disabled={cat.loading}
+                    onPanelOpen={cat.onCatalogPanelOpen}
+                    emptySlot={catEmptySlot}
+                    hint={cat.loading ? "Cargando categorías…" : null}
+                  />
+                  {puedeCrearCategoria ? (
+                    <button
+                      type="button"
+                      className="btn ghost small"
+                      onClick={() => setCategoriaPromptOpen(true)}
+                      disabled={cat.loading || categoriaPromptBusy}
+                    >
+                      Nueva categoría
+                    </button>
+                  ) : null}
+                </div>
               </div>
             </>
           ) : (
@@ -460,6 +499,26 @@ export function ProductoCatalogoForm({
           </label>
         </div>
       ) : null}
+
+      <PromptDialog
+        open={categoriaPromptOpen}
+        title="Nueva categoría"
+        description="Se creará en el catálogo de inventario y quedará seleccionada en este producto."
+        inputLabel="Nombre de la categoría"
+        placeholder="Ej. Shampoo"
+        confirmLabel="Crear categoría"
+        busy={categoriaPromptBusy}
+        validate={(nombre) => {
+          if (!nombre) return "Ingresá un nombre.";
+          const exists = cat?.categorias.some(
+            (c) => c.nombre_categoria.trim().toLowerCase() === nombre.toLowerCase()
+          );
+          if (exists) return "Esa categoría ya existe.";
+          return null;
+        }}
+        onConfirm={(nombre) => void crearCategoria(nombre)}
+        onCancel={() => !categoriaPromptBusy && setCategoriaPromptOpen(false)}
+      />
     </>
   );
 }

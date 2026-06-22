@@ -27,6 +27,7 @@ import {
   totalMontos,
   type MontosPorCanal,
 } from "../../lib/cierreDia";
+import { filterDecimalTyping } from "../../lib/decimalInput";
 
 type Vista = "cerrar" | "historial";
 
@@ -305,12 +306,12 @@ export function VentasCierreSection() {
                           <td className="mono">{moneyCierre.format(reportado[canal.id] ?? 0)}</td>
                           <td>
                             <input
-                              type="number"
-                              min={0}
-                              step="100"
-                              className="cierre-input-monto"
+                              type="text"
+                              inputMode="decimal"
+                              autoComplete="off"
+                              className="cierre-input-monto input-numeric"
                               value={reales[canal.id] === 0 ? "" : reales[canal.id]}
-                              onChange={(e) => patchReal(canal.id, e.target.value)}
+                              onChange={(e) => patchReal(canal.id, filterDecimalTyping(e.target.value))}
                               disabled={busy}
                               placeholder="0"
                             />

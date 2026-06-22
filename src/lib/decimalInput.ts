@@ -32,3 +32,19 @@ export function parseIntLoose(s: string, fallback: number): number {
   const n = parseInt(t, 10);
   return Number.isFinite(n) ? n : fallback;
 }
+
+/** Entero opcional ≥ 0 a partir de texto libre (solo dígitos). */
+export function parseOptionalNonNegativeInt(raw: string): number | "" {
+  const t = filterIntegerTyping(raw);
+  if (t === "") return "";
+  const n = parseInt(t, 10);
+  return Number.isFinite(n) && n >= 0 ? n : "";
+}
+
+/** Decimal opcional a partir de texto libre (sin letras). */
+export function parseOptionalDecimal(raw: string): number | "" {
+  const t = filterDecimalTyping(raw);
+  if (t === "" || t === ".") return "";
+  const n = Number(t);
+  return Number.isFinite(n) && n >= 0 ? n : "";
+}

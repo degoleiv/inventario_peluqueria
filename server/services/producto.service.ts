@@ -65,7 +65,7 @@ export const productoService = {
       .all();
   },
 
-  async create(body: Record<string, unknown>, _opts?: { relaxCatalog?: boolean }) {
+  async create(body: Record<string, unknown>, opts?: { relaxCatalog?: boolean }) {
     const nombre = typeof body.nombre === "string" ? body.nombre.trim() : "";
     if (!nombre) throw new AppError("nombre requerido");
 
@@ -94,6 +94,9 @@ export const productoService = {
     const now = new Date().toISOString();
     const codigo =
       typeof body.codigo_barras === "string" ? body.codigo_barras.trim() || null : null;
+    if (!codigo && !opts?.relaxCatalog) {
+      throw new AppError("El código de barras es obligatorio");
+    }
     if (codigo) {
       const dup = await db.prepare(`SELECT id FROM productos WHERE codigo_barras = ?`).get(codigo);
       if (dup) throw new AppError("Ya existe un producto con ese código de barras");

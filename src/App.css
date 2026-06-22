@@ -131,6 +131,34 @@
   align-items: flex-end;
 }
 
+.producto-categoria-field {
+  display: flex;
+  gap: 0.35rem;
+  align-items: flex-end;
+  min-width: 0;
+}
+
+.producto-categoria-field .searchable-select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.producto-categoria-field__add {
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+}
+
+.producto-categoria-field__add:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .field {
   display: flex;
   flex-direction: column;
@@ -3618,6 +3646,9 @@ select {
   flex: 1 1 0;
   min-height: 0;
   height: 100%;
+  width: 100%;
+  max-width: none;
+  align-self: stretch;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -3658,6 +3689,11 @@ select {
   padding: 0;
 }
 
+.page-pos--saas .pos-saas-head--compact {
+  margin-bottom: 0.5rem;
+  gap: 0.4rem 0.65rem;
+}
+
 .page-pos--saas .pos-saas-head-title {
   margin: 0;
   font-size: clamp(1rem, 1.8vw, 1.25rem);
@@ -3694,16 +3730,21 @@ select {
   align-items: stretch;
   flex: 1 1 0;
   min-height: 0;
+  width: 100%;
+  max-width: none;
   overflow: hidden;
 }
 
-.page-pos--saas .pos-saas-grid--triple {
+.page-pos--saas .pos-saas-grid--triple:not(.pos-sale-form--items):not(.pos-sale-form--pagos) {
   grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
 }
 
 .page-pos--saas .pos-sale-form {
   flex: 1 1 0;
   min-height: 0;
+  width: 100%;
+  max-width: none;
+  align-self: stretch;
 }
 
 .pos-step-tabs {
@@ -3811,7 +3852,9 @@ select {
 }
 
 .page-pos--saas .pos-sale-form--items {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  /* Paso productos: 2 columnas a ancho completo (la 3.ª queda oculta, no reservar fr) */
+  grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr);
+  width: 100%;
 }
 
 .page-pos--saas .pos-sale-form--items .pos-saas-col--aside {
@@ -3945,9 +3988,12 @@ select {
 }
 
 .page-pos--saas .pos-saas-catalog-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem 0.65rem;
   margin-top: 0.15rem;
   margin-bottom: 0.45rem;
-  gap: 0.55rem 0.75rem;
 }
 
 .page-pos--saas .pos-saas-catalog-scroll {
@@ -3963,42 +4009,109 @@ select {
 }
 
 @media (max-width: 1380px) {
-  .page-pos--saas .pos-saas-grid--triple {
+  .page-pos--saas .pos-saas-grid--triple:not(.pos-sale-form--items):not(.pos-sale-form--pagos) {
     grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .page-pos--saas .pos-sale-form--items {
+    grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr);
   }
 }
 
 @media (max-width: 1100px) {
+  /* POS apilado: ocupa todo el alto disponible; scroll solo dentro de carrito/catálogo/pago */
   .main-pro-content:has(.page-pos--saas) {
-    overflow-y: auto;
+    overflow: hidden;
+  }
+
+  .main-pro-content:has(.page-pos--saas) > .subnav-wrap + *:not(.drawer-root) {
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: 100%;
+    overflow: hidden;
   }
 
   .page-pos.page-pos--saas {
-    height: auto;
-    min-height: min(100%, 100dvh);
-    overflow: visible;
+    flex: 1 1 0;
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
   }
 
+  .page-pos--saas .pos-saas-head {
+    flex-shrink: 0;
+  }
+
+  .page-pos--saas .pos-sale-form,
   .page-pos--saas .pos-saas-grid,
   .page-pos--saas .pos-saas-grid--triple {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto;
-    flex: 0 1 auto;
-    overflow: visible;
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    flex: 1 1 0;
+    min-height: 0;
+    height: 100%;
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: stretch;
+    align-items: stretch;
+    overflow: hidden;
+  }
+
+  .page-pos--saas .pos-sale-form--items {
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+
+  .page-pos--saas .pos-sale-form--pagos {
+    grid-template-rows: minmax(0, 1fr) auto;
   }
 
   .page-pos--saas .pos-saas-grid--triple > .pos-saas-col {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    min-height: 0;
+    grid-column: 1 / -1;
     height: auto;
     max-height: none;
+    overflow: hidden;
+  }
+
+  .page-pos--saas .pos-saas-col--cart {
+    flex-shrink: 0;
+    max-height: min(36vh, 340px);
+  }
+
+  .page-pos--saas .pos-saas-col--catalog {
+    height: 100%;
+    min-height: 0;
+  }
+
+  .page-pos--saas .pos-saas-col--cart > .pos-saas-card--cart {
+    height: auto;
+    max-height: 100%;
+  }
+
+  .page-pos--saas .pos-saas-panel-scroll--cart {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+    overflow-y: auto;
+  }
+
+  .page-pos--saas .pos-saas-col--catalog .pos-saas-panel-scroll,
+  .page-pos--saas .pos-saas-col--aside .pos-saas-panel-scroll {
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: none;
+    overflow-y: auto;
   }
 
   .page-pos--saas .pos-saas-grid--triple > .pos-saas-col > .pos-saas-card {
-    height: auto;
-    max-height: min(60vh, 600px);
-  }
-
-  .page-pos--saas .pos-saas-panel-scroll {
-    max-height: min(55vh, 560px);
+    width: 100%;
+    max-height: none;
+    overflow: hidden;
   }
 }
 
@@ -4240,9 +4353,92 @@ select {
   text-transform: uppercase;
   color: color-mix(in srgb, var(--primary, #c4716b) 80%, var(--text) 20%);
   background: color-mix(in srgb, var(--primary, #c4716b) 12%, var(--surface) 88%);
-  border: 1px solid color-mix(in srgb, var(--primary, #c4716b) 25%, var(--border));
-  padding: 0.25rem 0.55rem;
   border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--primary, #c4716b) 25%, var(--border));
+}
+
+/* Acordeón productos (colapsable en pantalla estrecha) */
+.pos-cart-accordion-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  margin: 0;
+  padding: 0.15rem 0.1rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pos-cart-accordion-chevron {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.pos-cart-accordion-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.pos-cart-accordion-meta {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.pos-cart-accordion-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+@media (min-width: 1101px) {
+  .pos-cart-accordion-chevron {
+    display: none;
+  }
+
+  .pos-cart-accordion-toggle {
+    cursor: default;
+    pointer-events: none;
+    padding: 0;
+  }
+
+  .pos-cart-accordion--collapsed .pos-cart-accordion-body {
+    display: flex;
+  }
+
+  .pos-cart-subcard--prods .pos-cart-subhead {
+    margin-bottom: 0;
+  }
+
+  .pos-cart-subcard--prods .pos-cart-accordion-label,
+  .pos-cart-subcard--svcs .pos-cart-accordion-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: color-mix(in srgb, var(--primary, #c4716b) 80%, var(--text) 20%);
+    background: color-mix(in srgb, var(--primary, #c4716b) 12%, var(--surface) 88%);
+    border-radius: 999px;
+    padding: 0.2rem 0.55rem;
+    flex: 0 1 auto;
+  }
+
+  .pos-cart-subcard--svcs .pos-cart-accordion-head {
+    margin-bottom: 0;
+  }
+
+  .pos-cart-accordion-meta {
+    display: none;
+  }
 }
 
 .pos-cart-subhead-tag--svc {
@@ -4486,16 +4682,6 @@ select {
   text-align: right;
 }
 
-.pos-servicios-input::-webkit-outer-spin-button,
-.pos-servicios-input::-webkit-inner-spin-button {
-  appearance: none;
-  margin: 0;
-}
-
-.pos-servicios-input[type="number"] {
-  appearance: textfield;
-}
-
 @media (max-width: 720px) {
   .pos-servicios-table thead {
     display: none;
@@ -4568,15 +4754,20 @@ select {
 
 .page-pos--saas .pos-saas-card--catalog > .pos-saas-card-head,
 .page-pos--saas .pos-saas-card--catalog > .pos-saas-catalog-toolbar,
-.page-pos--saas .pos-saas-card--catalog > .pos-saas-chips {
+.page-pos--saas .pos-saas-card--catalog > .pos-saas-chips,
+.page-pos--saas .pos-saas-card--catalog > .pos-saas-panel-sticky,
+.page-pos--saas .pos-saas-panel-sticky .pos-saas-card-head,
+.page-pos--saas .pos-saas-panel-sticky .pos-saas-catalog-toolbar,
+.page-pos--saas .pos-saas-panel-sticky .pos-saas-catalog-filters {
   flex-shrink: 0;
 }
 
 .page-pos--saas .pos-saas-catalog-toolbar {
   display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
+  flex-wrap: wrap;
+  align-items: stretch;
   gap: 0.4rem;
+  min-height: 2.75rem;
 }
 
 .page-pos--saas .pos-saas-catalog-toolbar .pos-saas-search-wrap {
@@ -4585,8 +4776,11 @@ select {
 }
 
 .page-pos--saas .pos-saas-catalog-toolbar .pos-saas-search-input {
+  box-sizing: border-box;
+  min-height: 2.75rem;
   padding: 0.6rem 0.85rem 0.6rem 2.35rem;
   font-size: 0.88rem;
+  line-height: 1.35;
   border-radius: 10px;
 }
 
@@ -4596,6 +4790,10 @@ select {
 
 .page-pos--saas .pos-saas-catalog-toolbar .pos-saas-scan-side {
   flex-shrink: 0;
+  align-self: stretch;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 0.55rem 0.7rem;
   border-radius: 10px;
 }
@@ -4647,6 +4845,18 @@ select {
 
 .page-pos--saas .pos-saas-catalog-filters__field .pos-saas-select {
   width: 100%;
+}
+
+.page-pos--saas .pos-saas-catalog-filters__field {
+  flex: 1 1 160px;
+  min-width: 140px;
+  margin: 0;
+}
+
+.page-pos--saas .pos-saas-catalog-filters__clear {
+  flex: 0 0 auto;
+  align-self: flex-end;
+  margin-bottom: 0.15rem;
 }
 
 .page-pos--saas .pos-saas-catalog-toolbar__filter .searchable-select__label {
@@ -4731,6 +4941,178 @@ select {
 
 .page-pos--saas .pos-saas-catalog-scroll > .pos-saas-more-wrap {
   margin-top: 0.35rem;
+}
+
+/* Ventas POS responsive: ocultar chrome y priorizar catálogo en pantallas estrechas */
+@media (max-width: 1100px) {
+  /* Menos barras duplicadas arriba del POS */
+  .main-pro:has(.page-pos--saas) .main-pro-header {
+    display: none;
+  }
+
+  .main-pro:has(.page-pos--saas) .workspace-tabs {
+    display: none;
+  }
+
+  .main-pro-content:has(.page-pos--saas) {
+    padding: 0.2rem 0.45rem 0.35rem;
+  }
+
+  .main-pro-content:has(.page-pos--saas) .subnav-wrap {
+    margin-bottom: 0.1rem;
+    padding: 0.05rem 0 0.1rem;
+    border-bottom-width: 0;
+  }
+
+  .main-pro-content:has(.page-pos--saas) .subnav-kbd {
+    display: none;
+  }
+
+  .main-pro-content:has(.page-pos--saas) .subnav-quick {
+    display: none;
+  }
+
+  .main-pro-content:has(.page-pos--saas) .subnav-link {
+    padding: 0.22rem 0.45rem;
+    font-size: 0.78rem;
+  }
+
+  .page-pos--saas .pos-saas-head {
+    display: none;
+  }
+
+  .page-pos--saas .pos-saas-col--cart > .pos-saas-card--cart,
+  .page-pos--saas .pos-saas-col--catalog > .pos-saas-card--catalog,
+  .page-pos--saas .pos-saas-col--aside > .pos-saas-card--pago {
+    display: flex;
+    flex-direction: column;
+    padding: 0.4rem 0.5rem;
+    gap: 0.45rem;
+  }
+
+  .page-pos--saas .pos-saas-card--cart .pos-saas-card-head,
+  .page-pos--saas .pos-saas-card--catalog .pos-saas-card-head {
+    display: none;
+  }
+
+  .page-pos--saas .pos-cart-accordion--collapsed .pos-cart-accordion-body {
+    display: none;
+  }
+
+  .page-pos--saas .pos-cart-subcard--prods.pos-cart-accordion--collapsed,
+  .page-pos--saas .pos-cart-subcard--svcs.pos-cart-accordion--collapsed {
+    padding-bottom: 0.35rem;
+  }
+
+  .page-pos--saas .pos-cart-subcard--svcs {
+    flex-shrink: 0;
+  }
+
+  .page-pos--saas .pos-cart-svcs-actions-row {
+    justify-content: flex-end;
+  }
+
+  .page-pos--saas .pos-cart-grandtotal {
+    padding-top: 0.35rem;
+    margin-top: 0.15rem;
+    border-top: 1px dashed color-mix(in srgb, var(--border) 70%, transparent);
+    font-size: 0.88rem;
+    flex-shrink: 0;
+  }
+
+  .page-pos--saas .pos-saas-catalog-filters {
+    display: none;
+  }
+
+  .page-pos--saas .pos-saas-panel-sticky {
+    gap: 0.35rem;
+    padding-bottom: 0.15rem;
+  }
+
+  .page-pos--saas .pos-saas-catalog-toolbar {
+    flex-wrap: nowrap;
+    gap: 0.35rem;
+  }
+
+  .page-pos--saas .pos-saas-catalog-toolbar .pos-saas-search-wrap {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .page-pos--saas .pos-saas-search-input {
+    min-height: 2.35rem;
+    padding-top: 0.4rem;
+    padding-bottom: 0.4rem;
+    font-size: 0.92rem;
+  }
+
+  .page-pos--saas .pos-saas-scan-side {
+    flex-shrink: 0;
+    padding-inline: 0.55rem;
+  }
+
+  .page-pos--saas .pos-saas-catalog-scroll {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .page-pos--saas .pos-saas-pro-grid {
+    grid-template-columns: repeat(
+      auto-fill,
+      minmax(max(5.5rem, calc((100% - 0.7rem) / 3)), 1fr)
+    );
+    gap: 0.3rem;
+  }
+
+  .page-pos--saas .pos-sale-form--items,
+  .page-pos--saas .pos-sale-form--pagos {
+    grid-template-columns: minmax(0, 1fr);
+    justify-content: stretch;
+    justify-items: stretch;
+  }
+
+  .page-pos--saas .pos-sale-step-actions {
+    width: 100%;
+    max-width: none;
+    flex-shrink: 0;
+    padding: 0.45rem 0 0.55rem;
+    margin-top: 0;
+    border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  }
+
+  .page-pos--saas .pos-sale-step-actions .btn {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 2.65rem;
+  }
+
+  .page-pos--saas .pos-cart-subcard {
+    padding: 0.5rem 0.6rem 0.45rem;
+    gap: 0.4rem;
+  }
+
+  .page-pos--saas .pos-cart-cita-row {
+    margin-bottom: 0.35rem;
+    padding-bottom: 0.35rem;
+  }
+
+  .page-pos--saas .pos-cart-subtotal {
+    padding-top: 0.2rem;
+    font-size: 0.8rem;
+  }
+
+  .page-pos--saas .pos-saas-card-head--row .pos-saas-card-head-textblock .pos-saas-card-desc {
+    display: none;
+  }
+
+  .page-pos--saas .pos-saas-card--pago .pos-saas-card-desc {
+    display: none;
+  }
+
+  .page-pos--saas .pos-pago-secure {
+    display: none;
+  }
 }
 
 .page-pos--saas .pos-saas-card--sticky {
@@ -9544,17 +9926,50 @@ html.pos-focus-active body {
   font-size: 0.7rem;
   font-weight: 700;
   opacity: 0.9;
+  flex-shrink: 0;
+}
+
+.agenda-block-main {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  min-width: 0;
 }
 
 .agenda-block-name {
   font-size: 0.82rem;
   font-weight: 600;
-  line-height: 1.2;
+  line-height: 1.15;
+  min-width: 0;
+  flex: 1 1 auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agenda-block-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  font-size: 0.68rem;
+  line-height: 1.15;
+  opacity: 0.92;
+}
+
+.agenda-block-tel {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
 }
 
 .agenda-block-svc {
-  font-size: 0.72rem;
-  opacity: 0.9;
+  font-size: inherit;
+  opacity: 1;
+  min-width: 0;
+  flex: 1 1 auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .cita-estado--pendiente {
@@ -10098,8 +10513,11 @@ html.pos-focus-active body {
   .agenda-block-name {
     font-size: 0.76rem;
   }
+  .agenda-block-meta {
+    font-size: 0.62rem;
+  }
   .agenda-block-svc {
-    font-size: 0.66rem;
+    font-size: inherit;
   }
   .agenda-vista-hint {
     font-size: 0.78rem;
@@ -11050,9 +11468,19 @@ html.pos-focus-active body {
   text-align: left;
 }
 
-.inventario-filtros__estado {
+.inventario-filtros__estado,
+.inventario-filtros__stock {
   flex: 0 0 auto;
   min-width: 140px;
+}
+
+.inventario-filtros__stock {
+  min-width: 6.5rem;
+  max-width: 7.5rem;
+}
+
+.inventario-filtros__stock input {
+  width: 100%;
 }
 
 .inventario-filtros__count {
@@ -13332,8 +13760,7 @@ html.pos-focus-active body {
 }
 
 .main-pro-content > *:only-child:not(.drawer-root),
-.main-pro-content > .subnav-wrap + *:not(.drawer-root),
-.main-pro-content:has(.page-pos--saas) > .subnav-wrap + *:not(.drawer-root),
+.main-pro-content > .subnav-wrap + *:not(.drawer-root):not(.page-pos),
 .main-pro-content:has(.sales-history-page) > .subnav-wrap + *:not(.drawer-root),
 .main-pro-content:has(.cierre-dia-page) > .subnav-wrap + *:not(.drawer-root),
 .main-pro-content > .page-pedidos:only-child,
@@ -13370,6 +13797,10 @@ html.pos-focus-active body {
 
 .main-pro-content:has(.page-pos--saas) > .subnav-wrap + *:not(.drawer-root) {
   flex: 1 1 0;
+  align-self: stretch;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
   min-height: 0;
   max-height: 100%;
   overflow: hidden;

@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { Plus } from "@phosphor-icons/react";
 import { resolveImageSrc } from "../api";
-import { filterIntegerTyping } from "../lib/decimalInput";
+import {
+  filterDecimalTyping,
+  filterIntegerTyping,
+  parseOptionalDecimal,
+  parseOptionalNonNegativeInt,
+} from "../lib/decimalInput";
 import { SearchableSelect } from "./SearchableSelect";
 import { useToast } from "../context/ToastContext";
 import { PromptDialog } from "./PromptDialog";
@@ -281,12 +287,13 @@ export function ProductoCatalogoForm({
           <>
             <div className="field-row">
               <label className="field">
-                <span>Código de barras</span>
+                <span>{mode === "create" ? "Código de barras *" : "Código de barras"}</span>
                 <input
                   value={values.codigo}
                   onChange={(e) => onChange({ codigo: e.target.value })}
                   placeholder="EAN-13 / escáner"
                   autoComplete="off"
+                  required={mode === "create"}
                 />
               </label>
               {barcodeLookup ? (
@@ -356,7 +363,7 @@ export function ProductoCatalogoForm({
               ) : null}
               <div className="grid-2">
                 <SearchableSelect
-                  label="Marca (proveedor) *"
+                  label="Proveedor *"
                   value={values.proveedorId === "" ? "" : String(values.proveedorId)}
                   onChange={(v) => {
                     if (v === "") {
@@ -399,11 +406,13 @@ export function ProductoCatalogoForm({
                   {puedeCrearCategoria ? (
                     <button
                       type="button"
-                      className="btn ghost small"
+                      className="btn ghost small producto-categoria-field__add"
                       onClick={() => setCategoriaPromptOpen(true)}
                       disabled={cat.loading || categoriaPromptBusy}
+                      aria-label="Nueva categoría"
+                      title="Nueva categoría"
                     >
-                      Nueva categoría
+                      <Plus size={16} weight="bold" aria-hidden />
                     </button>
                   ) : null}
                 </div>
@@ -446,27 +455,25 @@ export function ProductoCatalogoForm({
         <label className="field">
           <span>Precio compra</span>
           <input
-            type="number"
-            step="0.01"
-            min={0}
-            value={values.precioCompra}
-            onChange={(e) =>
-              onChange({ precioCompra: e.target.value === "" ? "" : Number(e.target.value) })
-            }
+            type="text"
+            inputMode="decimal"
+            autoComplete="off"
+            className="input-numeric"
+            value={values.precioCompra === "" ? "" : String(values.precioCompra)}
+            onChange={(e) => onChange({ precioCompra: parseOptionalDecimal(e.target.value) })}
           />
         </label>
       ) : (
         <label className="field">
           <span>Precio venta *</span>
           <input
-            type="number"
-            step="0.01"
-            min={0}
+            type="text"
+            inputMode="decimal"
+            autoComplete="off"
+            className="input-numeric"
             required
-            value={values.precioVenta}
-            onChange={(e) =>
-              onChange({ precioVenta: e.target.value === "" ? "" : Number(e.target.value) })
-            }
+            value={values.precioVenta === "" ? "" : String(values.precioVenta)}
+            onChange={(e) => onChange({ precioVenta: parseOptionalDecimal(e.target.value) })}
             placeholder="Ej. 15000"
           />
         </label>
@@ -477,9 +484,11 @@ export function ProductoCatalogoForm({
           <label className="field">
             <span>Stock</span>
             <input
-              type="number"
-              min={0}
-              value={values.stock === "" ? "" : values.stock}
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              className="input-numeric"
+              value={values.stock === "" ? "" : String(values.stock)}
               onChange={(e) => {
                 const raw = filterIntegerTyping(e.target.value);
                 onChange({ stock: raw === "" ? "" : Number(raw) });
@@ -489,11 +498,13 @@ export function ProductoCatalogoForm({
           <label className="field">
             <span>Stock mínimo (alerta)</span>
             <input
-              type="number"
-              min={0}
-              value={values.stockMinimo}
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              className="input-numeric"
+              value={values.stockMinimo === "" ? "" : String(values.stockMinimo)}
               onChange={(e) =>
-                onChange({ stockMinimo: e.target.value === "" ? "" : Number(e.target.value) })
+                onChange({ stockMinimo: parseOptionalNonNegativeInt(e.target.value) })
               }
             />
           </label>

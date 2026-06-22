@@ -31,6 +31,7 @@ import {
   type GastoOperativo,
 } from "../api";
 import { useToast } from "../context/ToastContext";
+import { parseOptionalDecimal } from "../lib/decimalInput";
 import { SearchableSelect } from "../components/SearchableSelect";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { PromptDialog } from "../components/PromptDialog";
@@ -706,12 +707,12 @@ export function FinanzasPage() {
                 <div className="pedidos-field">
                   <span className="pedidos-field__label">Monto *</span>
                   <input
-                    className="pedidos-input"
-                    type="number"
-                    min={0}
-                    step={0.01}
-                    value={gMonto}
-                    onChange={(e) => setGMonto(e.target.value === "" ? "" : Number(e.target.value))}
+                    className="pedidos-input input-numeric"
+                    type="text"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    value={gMonto === "" ? "" : String(gMonto)}
+                    onChange={(e) => setGMonto(parseOptionalDecimal(e.target.value))}
                     placeholder="Ej: 450000"
                     required
                   />
@@ -1177,12 +1178,12 @@ export function FinanzasPage() {
                 <div className="pedidos-field">
                   <span className="pedidos-field__label">Monto</span>
                   <input
-                    className="pedidos-input"
-                    type="number"
-                    min={0}
-                    step={0.01}
-                    value={cMonto}
-                    onChange={(e) => setCMonto(e.target.value === "" ? "" : Number(e.target.value))}
+                    className="pedidos-input input-numeric"
+                    type="text"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    value={cMonto === "" ? "" : String(cMonto)}
+                    onChange={(e) => setCMonto(parseOptionalDecimal(e.target.value))}
                     placeholder="Ej: 125000"
                     required
                   />

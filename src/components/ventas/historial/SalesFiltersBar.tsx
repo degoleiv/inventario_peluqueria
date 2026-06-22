@@ -1,4 +1,5 @@
 import { MagnifyingGlass, Funnel, X } from "@phosphor-icons/react";
+import { filterDecimalTyping } from "../../../lib/decimalInput";
 import type { FiltrosHistorialState, RangoPreset } from "./utils";
 
 const PRESETS: { id: RangoPreset; label: string }[] = [
@@ -161,23 +162,25 @@ export function SalesFiltersBar({
           <label className="sales-history-field">
             <span>Monto mín.</span>
             <input
-              type="number"
-              min={0}
-              step="0.01"
+              type="text"
+              inputMode="decimal"
+              autoComplete="off"
+              className="input-numeric"
               placeholder="0"
               value={filtros.montoMin}
-              onChange={(e) => patch({ montoMin: e.target.value })}
+              onChange={(e) => patch({ montoMin: filterDecimalTyping(e.target.value) })}
             />
           </label>
           <label className="sales-history-field">
             <span>Monto máx.</span>
             <input
-              type="number"
-              min={0}
-              step="0.01"
+              type="text"
+              inputMode="decimal"
+              autoComplete="off"
+              className="input-numeric"
               placeholder="—"
               value={filtros.montoMax}
-              onChange={(e) => patch({ montoMax: e.target.value })}
+              onChange={(e) => patch({ montoMax: filterDecimalTyping(e.target.value) })}
             />
           </label>
         </div>

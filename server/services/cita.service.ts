@@ -152,7 +152,7 @@ async function assertNoOverlap(
   }
 }
 
-const rowSql = `SELECT c.*, cl.nombre AS cliente_nombre,
+const rowSql = `SELECT c.*, cl.nombre AS cliente_nombre, cl.telefono AS cliente_telefono,
     u.nombre AS empleado_nombre, u.color_agenda AS empleado_color
     FROM citas c
     JOIN clientes cl ON cl.id = c.cliente_id

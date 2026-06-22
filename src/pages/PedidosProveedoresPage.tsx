@@ -10,7 +10,7 @@ import {
 import { Check, MagnifyingGlass, Plus } from "@phosphor-icons/react";
 import {
   createPedidoProveedor,
-  createProducto,
+  createProductoRapidoProveedor,
   fetchPedidosProveedores,
   fetchProductos,
   fetchProveedores,
@@ -22,6 +22,11 @@ import {
 } from "../api";
 import { Drawer } from "../components/Drawer";
 import { useToast } from "../context/ToastContext";
+import {
+  filterDecimalTyping,
+  filterIntegerTyping,
+  parseOptionalDecimal,
+} from "../lib/decimalInput";
 import { ProveedoresPage } from "./ProveedoresPage";
 
 type Linea = {
@@ -344,12 +349,11 @@ export function PedidosProveedoresPage() {
     }
     setNuevoProdBusy(true);
     try {
-      const created = await createProducto({
+      const created = await createProductoRapidoProveedor(Number(proveedorId), {
         nombre: nom,
         codigo_barras: nuevoCodigo.trim() || null,
         precio_compra: pc,
         precio_venta: pv,
-        proveedor_id: Number(proveedorId),
         stock: 0,
       });
       await load();
@@ -822,26 +826,29 @@ export function PedidosProveedoresPage() {
                                     </td>
                                     <td className="pedidos-lineas-table__col-num">
                                       <input
-                                        className="pedidos-input pedidos-lineas-table__control pedidos-lineas-table__control--qty"
-                                        type="number"
-                                        min={1}
+                                        className="pedidos-input pedidos-lineas-table__control pedidos-lineas-table__control--qty input-numeric"
+                                        type="text"
+                                        inputMode="numeric"
+                                        autoComplete="off"
                                         value={ln.cantidad}
-                                        onChange={(e) =>
-                                          setLinea(idx, { cantidad: Math.max(1, Number(e.target.value) || 1) })
-                                        }
+                                        onChange={(e) => {
+                                          const raw = filterIntegerTyping(e.target.value);
+                                          const n = raw === "" ? 1 : Math.max(1, parseInt(raw, 10) || 1);
+                                          setLinea(idx, { cantidad: n });
+                                        }}
                                         aria-label="Cantidad"
                                       />
                                     </td>
                                     <td className="pedidos-lineas-table__col-num">
                                       <input
-                                        className="pedidos-input pedidos-lineas-table__control pedidos-lineas-table__control--money"
-                                        type="number"
-                                        min={0}
-                                        step="0.01"
-                                        value={ln.costo_unitario}
+                                        className="pedidos-input pedidos-lineas-table__control pedidos-lineas-table__control--money input-numeric"
+                                        type="text"
+                                        inputMode="decimal"
+                                        autoComplete="off"
+                                        value={ln.costo_unitario === "" ? "" : String(ln.costo_unitario)}
                                         onChange={(e) =>
                                           setLinea(idx, {
-                                            costo_unitario: e.target.value === "" ? "" : Number(e.target.value),
+                                            costo_unitario: parseOptionalDecimal(e.target.value),
                                           })
                                         }
                                         aria-label="Costo unitario"
@@ -1019,13 +1026,12 @@ export function PedidosProveedoresPage() {
                     <label className="pedidos-field">
                       <span className="pedidos-field__label">Valor con descuento (ARS)</span>
                       <input
-                        className="pedidos-input"
-                        type="number"
-                        step="0.01"
-                        min={0}
+                        className="pedidos-input input-numeric"
+                        type="text"
                         inputMode="decimal"
-                        value={valorDesc}
-                        onChange={(e) => setValorDesc(e.target.value === "" ? "" : Number(e.target.value))}
+                        autoComplete="off"
+                        value={valorDesc === "" ? "" : String(valorDesc)}
+                        onChange={(e) => setValorDesc(parseOptionalDecimal(e.target.value))}
                         onKeyDown={(e) => {
                           if (e.key === "Enter") e.preventDefault();
                         }}
@@ -1035,15 +1041,14 @@ export function PedidosProveedoresPage() {
                   <label className="pedidos-field">
                     <span className="pedidos-field__label">Valor sin descuento (ARS)</span>
                     <input
-                      className="pedidos-input"
-                      type="number"
-                      step="0.01"
-                      min={0}
+                      className="pedidos-input input-numeric"
+                      type="text"
                       inputMode="decimal"
-                      value={valorSinDesc}
+                      autoComplete="off"
+                      value={valorSinDesc === "" ? "" : String(valorSinDesc)}
                       onChange={(e) => {
                         setValorSinDescManual(true);
-                        setValorSinDesc(e.target.value === "" ? "" : Number(e.target.value));
+                        setValorSinDesc(parseOptionalDecimal(e.target.value));
                       }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") e.preventDefault();
@@ -1363,23 +1368,23 @@ export function PedidosProveedoresPage() {
               <label className="pedidos-field">
                 <span className="pedidos-field__label">Valor con descuento</span>
                 <input
-                  className="pedidos-input"
-                  type="number"
-                  step="0.01"
-                  min={0}
-                  value={editVd}
-                  onChange={(e) => setEditVd(e.target.value === "" ? "" : Number(e.target.value))}
+                  className="pedidos-input input-numeric"
+                  type="text"
+                  inputMode="decimal"
+                  autoComplete="off"
+                  value={editVd === "" ? "" : String(editVd)}
+                  onChange={(e) => setEditVd(parseOptionalDecimal(e.target.value))}
                 />
               </label>
               <label className="pedidos-field">
                 <span className="pedidos-field__label">Valor sin descuento</span>
                 <input
-                  className="pedidos-input"
-                  type="number"
-                  step="0.01"
-                  min={0}
-                  value={editVs}
-                  onChange={(e) => setEditVs(e.target.value === "" ? "" : Number(e.target.value))}
+                  className="pedidos-input input-numeric"
+                  type="text"
+                  inputMode="decimal"
+                  autoComplete="off"
+                  value={editVs === "" ? "" : String(editVs)}
+                  onChange={(e) => setEditVs(parseOptionalDecimal(e.target.value))}
                 />
               </label>
               <label className="pedidos-field">
@@ -1465,28 +1470,24 @@ export function PedidosProveedoresPage() {
           <label className="pedidos-field">
             <span className="pedidos-field__label">Precio de compra *</span>
             <input
-              className="pedidos-input"
-              type="number"
-              min={0}
-              step="0.01"
-              value={nuevoPrecioCompra}
-              onChange={(e) =>
-                setNuevoPrecioCompra(e.target.value === "" ? "" : Number(e.target.value))
-              }
+              className="pedidos-input input-numeric"
+              type="text"
+              inputMode="decimal"
+              autoComplete="off"
+              value={nuevoPrecioCompra === "" ? "" : String(nuevoPrecioCompra)}
+              onChange={(e) => setNuevoPrecioCompra(parseOptionalDecimal(e.target.value))}
               required
             />
           </label>
           <label className="pedidos-field">
             <span className="pedidos-field__label">Precio de venta (opcional)</span>
             <input
-              className="pedidos-input"
-              type="number"
-              min={0}
-              step="0.01"
-              value={nuevoPrecioVenta}
-              onChange={(e) =>
-                setNuevoPrecioVenta(e.target.value === "" ? "" : Number(e.target.value))
-              }
+              className="pedidos-input input-numeric"
+              type="text"
+              inputMode="decimal"
+              autoComplete="off"
+              value={nuevoPrecioVenta === "" ? "" : String(nuevoPrecioVenta)}
+              onChange={(e) => setNuevoPrecioVenta(parseOptionalDecimal(e.target.value))}
               placeholder="Si lo dejás vacío, usamos el de compra"
             />
           </label>

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useParams, useLocation, useNavigate } from "react-router-dom";
 import {
+  CaretDown,
+  CaretUp,
   Barcode,
   LockSimple,
   MagnifyingGlass,
@@ -40,6 +42,7 @@ import { CreateClienteDrawer } from "../components/CreateClienteDrawer";
 import { SearchableSelect } from "../components/SearchableSelect";
 import { SkeletonCard } from "../components/Skeleton";
 import { useToast } from "../context/ToastContext";
+import { filterDecimalTyping, filterIntegerTyping } from "../lib/decimalInput";
 import { usePosFocus } from "../context/PosFocusContext";
 import {
   getPinnedClienteIds,
@@ -145,6 +148,17 @@ export function VentasPage() {
   const [clienteHover, setClienteHover] = useState(0);
   const clienteComboRef = useRef<HTMLDivElement>(null);
   const [ventaStep, setVentaStep] = useState<VentaStep>("items");
+  /** En pantalla estrecha: acordeón de productos (servicios siempre visibles). */
+  const [cartProdsOpen, setCartProdsOpen] = useState(false);
+  const [cartSvcsOpen, setCartSvcsOpen] = useState(true);
+
+  useEffect(() => {
+    if (cart.length > 0) setCartProdsOpen(true);
+  }, [cart.length]);
+
+  useEffect(() => {
+    if (cartServicios.length > 0) setCartSvcsOpen(true);
+  }, [cartServicios.length]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1162,17 +1176,32 @@ export function VentasPage() {
                   ) : null}
                 </div>
 
-                <div className="pos-saas-panel-scroll">
-                <div className="pos-cart-subcard pos-cart-subcard--prods">
-                  <div className="pos-cart-subhead">
-                    <span className="pos-cart-subhead-tag">
+                <div className="pos-saas-panel-scroll pos-saas-panel-scroll--cart">
+                <div
+                  className={`pos-cart-subcard pos-cart-subcard--prods pos-cart-accordion${
+                    cartProdsOpen ? " pos-cart-accordion--open" : " pos-cart-accordion--collapsed"
+                  }`}
+                >
+                  <div className="pos-cart-subhead pos-cart-accordion-head">
+                    <button
+                      type="button"
+                      className="pos-cart-accordion-toggle"
+                      aria-expanded={cartProdsOpen}
+                      aria-controls="pos-cart-prods-body"
+                      onClick={() => setCartProdsOpen((o) => !o)}
+                    >
+                      <span className="pos-cart-accordion-chevron" aria-hidden>
+                        {cartProdsOpen ? <CaretUp size={16} weight="bold" /> : <CaretDown size={16} weight="bold" />}
+                      </span>
                       <ShoppingCart size={14} weight="duotone" aria-hidden />
-                      Productos ({cart.length})
-                    </span>
+                      <span className="pos-cart-accordion-label">Productos ({cart.length})</span>
+                      <span className="pos-cart-accordion-meta mono">{formatMoney(totalProductos)}</span>
+                    </button>
                   </div>
+                  <div className="pos-cart-accordion-body" id="pos-cart-prods-body">
                   {cart.length === 0 ? (
                     <p className="pos-cart-empty muted small">
-                      Sin productos. Agregalos desde el catálogo de la columna del medio.
+                      Sin productos. Agregalos desde el catálogo.
                     </p>
                   ) : (
                     <ul className="pos-cart-lines">
@@ -1242,9 +1271,29 @@ export function VentasPage() {
                     <span className="muted small">Subtotal productos</span>
                     <span className="mono">{formatMoney(totalProductos)}</span>
                   </div>
+                  </div>
                 </div>
 
-                <div className="pos-cart-subcard pos-cart-subcard--svcs">
+                <div className={`pos-cart-subcard pos-cart-subcard--svcs pos-cart-accordion${
+                    cartSvcsOpen ? " pos-cart-accordion--open" : " pos-cart-accordion--collapsed"
+                  }`}>
+                  <div className="pos-cart-subhead pos-cart-accordion-head">
+                    <button
+                      type="button"
+                      className="pos-cart-accordion-toggle"
+                      aria-expanded={cartSvcsOpen}
+                      aria-controls="pos-cart-svcs-body"
+                      onClick={() => setCartSvcsOpen((o) => !o)}
+                    >
+                      <span className="pos-cart-accordion-chevron" aria-hidden>
+                        {cartSvcsOpen ? <CaretUp size={16} weight="bold" /> : <CaretDown size={16} weight="bold" />}
+                      </span>
+                      <span aria-hidden>✂️</span>
+                      <span className="pos-cart-accordion-label">Servicios ({cartServicios.length})</span>
+                      <span className="pos-cart-accordion-meta mono">{formatMoney(totalServicios)}</span>
+                    </button>
+                  </div>
+                  <div className="pos-cart-accordion-body" id="pos-cart-svcs-body">
                   <div className="pos-cart-cita-row">
                     <span className="pos-saas-field-label">
                       Cita en agenda
@@ -1370,11 +1419,7 @@ export function VentasPage() {
                       </p>
                     ) : null}
                   </div>
-                  <div className="pos-cart-subhead">
-                    <span className="pos-cart-subhead-tag pos-cart-subhead-tag--svc">
-                      <span aria-hidden>✂️</span>
-                      Servicios ({cartServicios.length})
-                    </span>
+                  <div className="pos-cart-subhead pos-cart-svcs-actions-row">
                     <div className="pos-cart-subhead-actions">
                       <button
                         type="button"
@@ -1498,16 +1543,15 @@ export function VentasPage() {
                               </td>
                               <td className="pos-servicios-td-num">
                                 <input
-                                  type="number"
+                                  type="text"
                                   inputMode="decimal"
-                                  min={0}
-                                  step="any"
-                                  className="pos-servicios-input pos-servicios-input--price mono"
+                                  autoComplete="off"
+                                  className="pos-servicios-input pos-servicios-input--price mono input-numeric"
                                   value={sv.valor_unitario === 0 ? "" : sv.valor_unitario}
                                   placeholder="0"
                                   onChange={(e) => {
-                                    const raw = e.target.value;
-                                    const n = raw === "" ? 0 : Math.max(0, Number(raw) || 0);
+                                    const raw = filterDecimalTyping(e.target.value);
+                                    const n = raw === "" || raw === "." ? 0 : Math.max(0, Number(raw) || 0);
                                     setCartServicios((prev) =>
                                       prev.map((row, i) =>
                                         i === idx ? { ...row, valor_unitario: n } : row
@@ -1541,6 +1585,7 @@ export function VentasPage() {
                   <div className="pos-cart-subtotal">
                     <span className="muted small">Subtotal servicios</span>
                     <span className="mono">{formatMoney(totalServicios)}</span>
+                  </div>
                   </div>
                 </div>
 
@@ -2017,12 +2062,12 @@ export function VentasPage() {
                   <label className="pos-nueva-cita-field">
                     <span>Duración (min)</span>
                     <input
-                      type="number"
-                      min={10}
-                      step={5}
-                      className="pos-saas-input"
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="off"
+                      className="pos-saas-input input-numeric"
                       value={nuevaCitaDuracion}
-                      onChange={(e) => setNuevaCitaDuracion(e.target.value)}
+                      onChange={(e) => setNuevaCitaDuracion(filterIntegerTyping(e.target.value))}
                     />
                   </label>
                   <label className="pos-nueva-cita-field">

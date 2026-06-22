@@ -23,7 +23,9 @@ function mapCertFetchError(e: unknown): Error {
     );
   }
   if (e instanceof TypeError) {
-    return new Error("No se pudo conectar con el servidor. ¿Está el API en marcha (puerto 3010)?");
+    return new Error(
+      `No se pudo conectar con el servidor. ¿Está el API en marcha (puerto ${resolveApiPort()})?`
+    );
   }
   return e instanceof Error ? e : new Error(String(e));
 }
@@ -32,15 +34,34 @@ function stripTrailingSlashes(s: string): string {
   return s.replace(/\/+$/, "");
 }
 
+const DEFAULT_API_PORT = "3011";
+
+function isTauriRuntime(): boolean {
+  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+}
+
+function resolveApiPort(): string {
+  const fromEnv = import.meta.env.VITE_API_PORT?.trim();
+  if (fromEnv && /^\d+$/.test(fromEnv)) return fromEnv;
+  return DEFAULT_API_PORT;
+}
+
+function defaultApiBase(): string {
+  const fromUrl = import.meta.env.VITE_API_URL?.trim();
+  if (fromUrl) return stripTrailingSlashes(fromUrl);
+  // Tauri (dev o build): el webview no debe depender del proxy de Vite; habla directo al API local.
+  if (isTauriRuntime() || !import.meta.env.DEV) {
+    return `http://127.0.0.1:${resolveApiPort()}`;
+  }
+  // Navegador + Vite dev: `/api` pasa por el proxy de vite.config.ts
+  return "";
+}
+
 /**
  * Base del API para `fetch` y para resolver `<img src>` cuando la BD guarda rutas relativas `/api/...`.
- * En desarrollo con Vite, `""` hace que `/api` vaya al proxy. En build estática / Tauri hace falta el host del API.
+ * En desarrollo con Vite (solo navegador), `""` hace que `/api` vaya al proxy. Tauri y build usan host directo.
  */
-export const API_BASE = import.meta.env.VITE_API_URL?.trim()
-  ? stripTrailingSlashes(import.meta.env.VITE_API_URL.trim())
-  : import.meta.env.DEV
-    ? ""
-    : "http://127.0.0.1:3010";
+export const API_BASE = defaultApiBase();
 
 /** Convierte URLs guardadas como `/api/...` en absolutas usando `API_BASE` (necesario fuera del dev server de Vite). */
 export function resolveImageSrc(url: string | null | undefined): string | null {
@@ -112,6 +133,7 @@ export type Cita = {
   created_at: string;
   updated_at: string;
   cliente_nombre: string;
+  cliente_telefono?: string | null;
   empleado_nombre?: string | null;
   empleado_color?: string | null;
 };
@@ -237,6 +259,12 @@ async function requestJson<T>(
     res = await fetch(`${API_BASE}${path}`, { ...init, headers });
   } catch (e) {
     console.error(`[api] ${method} ${path} — error de red:`, e);
+    if (e instanceof TypeError) {
+      throw new Error(
+        `No se pudo conectar con el servidor (puerto ${resolveApiPort()}). ` +
+          "En dev/Tauri ejecutá `npm run dev` o `npm run dev:tauri` para levantar el API."
+      );
+    }
     throw e;
   }
   if (!res.ok) {
@@ -547,6 +575,17 @@ export async function fetchProductos(): Promise<Producto[]> {
 
 export async function createProducto(body: Partial<Producto>): Promise<Producto> {
   return requestJson("/api/productos", { method: "POST", body: JSON.stringify(body) });
+}
+
+/** Alta rápida desde pedidos: código de barras opcional. */
+export async function createProductoRapidoProveedor(
+  proveedorId: number,
+  body: Partial<Producto>
+): Promise<Producto> {
+  return requestJson(`/api/proveedores/${proveedorId}/productos-rapido`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
 }
 
 export async function updateProducto(id: number, body: Partial<Producto>): Promise<Producto> {

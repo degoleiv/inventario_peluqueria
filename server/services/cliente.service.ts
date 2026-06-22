@@ -32,7 +32,8 @@ export const clienteService = {
     if (!nombre) throw new AppError("nombre requerido");
     const telefonoRaw = typeof body.telefono === "string" ? body.telefono.trim() : "";
     const telefono = telefonoRaw || null;
-    if (telefono) {
+    if (!telefono) throw new AppError("El teléfono del cliente es obligatorio");
+    {
       const d = await db
         .prepare(`SELECT id FROM clientes WHERE telefono = ? AND telefono != ''`)
         .get(telefono);
@@ -49,9 +50,6 @@ export const clienteService = {
     const numero_documentoRaw =
       typeof body.numero_documento === "string" ? body.numero_documento.trim() : "";
     const numero_documento = numero_documentoRaw || null;
-    if (!numero_documento && !telefono) {
-      throw new AppError("Ingresá la cédula o el teléfono del cliente");
-    }
     if (numero_documento) {
       const dupDoc = await db
         .prepare(

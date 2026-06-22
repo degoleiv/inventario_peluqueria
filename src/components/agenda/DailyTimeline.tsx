@@ -441,16 +441,21 @@ function AgendaSegmentTrack({
                     ev.stopPropagation();
                     onEditCita(x);
                   }}
-                  title={`${x.cliente_nombre}${x.empleado_nombre ? ` · ${x.empleado_nombre}` : ""} — ${x.estado}${x.servicio ? ` · ${x.servicio}` : ""}`}
+                  title={`${x.cliente_nombre}${x.cliente_telefono?.trim() ? ` · ${x.cliente_telefono.trim()}` : ""}${x.empleado_nombre ? ` · ${x.empleado_nombre}` : ""} — ${x.estado}${x.servicio ? ` · ${x.servicio}` : ""}`}
                 >
-                  <span className="agenda-block-time">
-                    {new Date(x.inicio).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </span>
-                  <span className="agenda-block-name">{x.cliente_nombre}</span>
-                  <span className="agenda-block-svc">{x.servicio || "—"}</span>
+                  <div className="agenda-block-main">
+                    <span className="agenda-block-time">
+                      {new Date(x.inicio).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                    <span className="agenda-block-name">{x.cliente_nombre}</span>
+                  </div>
+                  <div className="agenda-block-meta">
+                    <span className="agenda-block-tel">{x.cliente_telefono?.trim() || "—"}</span>
+                    <span className="agenda-block-svc">{x.servicio?.trim() || "—"}</span>
+                  </div>
                 </button>
               );
             })

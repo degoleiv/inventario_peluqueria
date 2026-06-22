@@ -307,7 +307,7 @@ export const pedidoProveedorService = {
             stock: 0,
             precio_compra: costo_unitario,
             precio_venta: pv,
-          })) as { id: number };
+          }, { relaxCatalog: true })) as { id: number };
           producto_id = created.id;
         } else {
           producto_id = Number(raw.producto_id);

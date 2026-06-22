@@ -34,8 +34,6 @@ function validEmail(s: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t);
 }
 
-type TipoClienteFiltro = "todos" | "registrado" | "temporal";
-
 function matchesSearchCliente(c: Cliente, q: string): boolean {
   const s = q.trim().toLowerCase();
   if (!s) return true;
@@ -44,12 +42,6 @@ function matchesSearchCliente(c: Cliente, q: string): boolean {
   if (c.email?.toLowerCase().includes(s)) return true;
   if (c.numero_documento?.toLowerCase().includes(s)) return true;
   return false;
-}
-
-function matchesTipoCliente(c: Cliente, f: TipoClienteFiltro): boolean {
-  if (f === "todos") return true;
-  if (f === "registrado") return c.tipo_cliente !== "temporal";
-  return c.tipo_cliente === "temporal";
 }
 
 function ClienteCardAvatar({ nombre }: { nombre: string }) {
@@ -65,7 +57,6 @@ export function ClientesPage() {
   const [rows, setRows] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState("");
-  const [tipoClienteFiltro, setTipoClienteFiltro] = useState<TipoClienteFiltro>("todos");
 
   const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
@@ -141,15 +132,13 @@ export function ClientesPage() {
     e.preventDefault();
     if (!nombre.trim()) return;
     const tel = telefono.trim();
+    if (editingId == null && !tel) {
+      toast("El celular es obligatorio.", "warning");
+      return;
+    }
     const tipoDoc = tipoDocumento.trim();
     const numDoc = numeroDocumento.trim();
-    if (editingId == null) {
-      if (!numDoc && !tel) {
-        toast("Ingresá la cédula o el teléfono del cliente.", "warning");
-        return;
-      }
-    }
-    if (!validEmail(email)) {
+    if (editingId != null && !validEmail(email)) {
       toast("Revisá el formato del correo electrónico.", "warning");
       return;
     }
@@ -167,9 +156,6 @@ export function ClientesPage() {
         await createCliente({
           nombre: nombre.trim(),
           telefono: tel,
-          email: email.trim() || null,
-          tipo_documento: tipoDoc,
-          numero_documento: numDoc,
         });
         toast("Cliente creado correctamente.", "success");
       }
@@ -194,10 +180,8 @@ export function ClientesPage() {
   }, [rows, pinTick]);
 
   const filteredListaRows = useMemo(() => {
-    return displayRows.filter(
-      (c) => matchesSearchCliente(c, searchText) && matchesTipoCliente(c, tipoClienteFiltro)
-    );
-  }, [displayRows, searchText, tipoClienteFiltro]);
+    return displayRows.filter((c) => matchesSearchCliente(c, searchText));
+  }, [displayRows, searchText]);
 
   const editingTemporal =
     editingId != null &&
@@ -271,19 +255,6 @@ export function ClientesPage() {
                   aria-labelledby="cli-search-label"
                 />
               </label>
-              <label className="field" style={{ flex: "0 1 200px" }}>
-                <span id="cli-tipo-label">Tipo</span>
-                <select
-                  id="cli-tipo-filtro"
-                  value={tipoClienteFiltro}
-                  onChange={(e) => setTipoClienteFiltro(e.target.value as TipoClienteFiltro)}
-                  aria-labelledby="cli-tipo-label"
-                >
-                  <option value="todos">Todos</option>
-                  <option value="registrado">Registrados</option>
-                  <option value="temporal">Ocasionales</option>
-                </select>
-              </label>
             </div>
           ) : null}
 
@@ -299,7 +270,7 @@ export function ClientesPage() {
             </div>
           ) : filteredListaRows.length === 0 ? (
             <div className="clay-empty" role="status">
-              Ningún cliente coincide con los filtros. Probá otra búsqueda o cambiá el tipo.
+              Ningún cliente coincide con la búsqueda. Probá con otro término.
             </div>
           ) : (
             <div className="proveedores-grid" role="list">
@@ -376,42 +347,57 @@ export function ClientesPage() {
               required
             />
           </label>
-          <div className="field-row create-cliente-drawer-doc">
+          {editingId != null ? (
+            <>
+              <div className="field-row create-cliente-drawer-doc">
+                <label className="field">
+                  <span>Tipo documento</span>
+                  <select
+                    value={tipoDocumento}
+                    onChange={(e) => setTipoDocumento(e.target.value)}
+                  >
+                    {TIPO_DOCUMENTO_OPTS.map((o) => (
+                      <option key={o.value || "empty"} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field">
+                  <span>Número documento / cédula</span>
+                  <input
+                    value={numeroDocumento}
+                    onChange={(e) => setNumeroDocumento(e.target.value)}
+                    autoComplete="off"
+                  />
+                </label>
+              </div>
+              <label className="field">
+                <span>Teléfono</span>
+                <input
+                  type="tel"
+                  value={telefono}
+                  onChange={(e) => setTelefono(e.target.value)}
+                  autoComplete="tel"
+                />
+              </label>
+              <label className="field">
+                <span>Correo</span>
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
+              </label>
+            </>
+          ) : (
             <label className="field">
-              <span>Tipo documento</span>
-              <select
-                value={tipoDocumento}
-                onChange={(e) => setTipoDocumento(e.target.value)}
-              >
-                {TIPO_DOCUMENTO_OPTS.map((o) => (
-                  <option key={o.value || "empty"} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="field">
-              <span>Número documento / cédula</span>
+              <span>Celular *</span>
               <input
-                value={numeroDocumento}
-                onChange={(e) => setNumeroDocumento(e.target.value)}
-                autoComplete="off"
+                type="tel"
+                value={telefono}
+                onChange={(e) => setTelefono(e.target.value)}
+                autoComplete="tel"
+                required
               />
             </label>
-          </div>
-          <label className="field">
-            <span>Teléfono</span>
-            <input
-              type="tel"
-              value={telefono}
-              onChange={(e) => setTelefono(e.target.value)}
-              autoComplete="tel"
-            />
-          </label>
-          <label className="field">
-            <span>Correo</span>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
-          </label>
+          )}
           <div className="drawer-actions">
             {editingTemporal ? (
               <button type="button" className="btn primary btn-lg" onClick={onConvertirRegistrado}>

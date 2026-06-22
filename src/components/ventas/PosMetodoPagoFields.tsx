@@ -1,4 +1,5 @@
 import type { MedioPagoTransferencia } from "../../api";
+import { filterDecimalTyping } from "../../lib/decimalInput";
 import {
   etiquetaMedioTransferencia,
   mediosTransferenciaActivos,
@@ -118,13 +119,13 @@ function MixtoMedioRow({
         <label className="pos-saas-mixto-monto">
           <span className="pos-saas-field-label">Monto *</span>
           <input
-            type="number"
-            min={0}
-            step="100"
-            className="pos-saas-input mono"
+            type="text"
+            inputMode="decimal"
+            autoComplete="off"
+            className="pos-saas-input mono input-numeric"
             placeholder="0"
             value={monto === "" || monto == null ? "" : monto}
-            onChange={(e) => onMonto(e.target.value)}
+            onChange={(e) => onMonto(filterDecimalTyping(e.target.value))}
           />
         </label>
       ) : null}

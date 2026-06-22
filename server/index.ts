@@ -1,11 +1,12 @@
 import "express-async-errors";
 import express from "express";
 import cors from "cors";
+import { resolveApiPort } from "./config.js";
 import { initDatabase } from "./db.js";
 import { registerHttpRoutes } from "./registerHttpRoutes.js";
 import { errorHandler } from "./middleware/errors.js";
 
-const PORT = Number(process.env.INVENTARIO_API_PORT || 3010);
+const PORT = resolveApiPort();
 
 const app = express();
 app.use(cors({ origin: true }));

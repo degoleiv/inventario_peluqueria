@@ -1,3 +1,14 @@
+/**
+ * Puerto HTTP del API. Por defecto 3011: en Windows, WSL suele reenviar el 3010 (`wslrelay`)
+ * y las peticiones a `127.0.0.1:3010` no llegan a esta app (login falla en dev/Tauri).
+ */
+export const API_DEFAULT_PORT = 3011;
+
+export function resolveApiPort(raw = process.env.INVENTARIO_API_PORT): number {
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 && n < 65536 ? Math.floor(n) : API_DEFAULT_PORT;
+}
+
 /** Sesión JWT: mínimo obligatorio 8 horas. `JWT_EXPIRY_SEC` en env solo puede alargar, nunca acortar. */
 const JWT_MIN_SEC = 8 * 60 * 60;
 

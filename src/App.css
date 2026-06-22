@@ -3875,10 +3875,91 @@ select {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.2rem 0.15rem 0.55rem;
+}
+
+.page-pos--saas .pos-saas-panel-sticky {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding-bottom: 0.4rem;
 }
 
 .page-pos--saas .pos-saas-card--catalog {
   overflow: hidden;
+}
+
+/* Aire entre bloques internos del POS (carrito, catálogo, pago) */
+.page-pos--saas .pos-cart-subcard {
+  gap: 0.65rem;
+  padding: 0.85rem 0.95rem 0.8rem;
+}
+
+.page-pos--saas .pos-cart-subcard + .pos-cart-subcard {
+  margin-top: 0;
+}
+
+.page-pos--saas .pos-cart-subtotal {
+  margin-top: 0.45rem;
+  padding-top: 0.55rem;
+}
+
+.page-pos--saas .pos-cart-grandtotal {
+  margin-top: 0.35rem;
+}
+
+.page-pos--saas .pos-cart-cita-row {
+  margin-bottom: 0.65rem;
+  padding-bottom: 0.65rem;
+}
+
+.page-pos--saas .pos-pago-block {
+  gap: 0.55rem;
+}
+
+.page-pos--saas .pos-pago-resumen {
+  margin-top: 0.15rem;
+  margin-bottom: 0.15rem;
+  padding: 0.85rem 0.95rem;
+  gap: 0.5rem;
+}
+
+.page-pos--saas .pos-saas-field-label--spaced {
+  margin-top: 0.35rem;
+  margin-bottom: 0.35rem;
+}
+
+.page-pos--saas .pos-saas-pay-grid--aside {
+  margin-bottom: 0.35rem;
+}
+
+.page-pos--saas .pos-saas-mixto-row + .pos-saas-mixto-row {
+  margin-top: 0.15rem;
+}
+
+.page-pos--saas .pos-saas-search-row {
+  margin-bottom: 0.4rem;
+}
+
+.page-pos--saas .pos-saas-catalog-filters {
+  margin-top: 0.15rem;
+  margin-bottom: 0.45rem;
+  gap: 0.55rem 0.75rem;
+}
+
+.page-pos--saas .pos-saas-catalog-scroll {
+  padding-top: 0.25rem;
+}
+
+.page-pos--saas .pos-saas-cobrar {
+  margin-top: 0.35rem;
+}
+
+.page-pos--saas .pos-pago-secure {
+  margin-top: 0.5rem;
 }
 
 @media (max-width: 1380px) {
@@ -3978,7 +4059,7 @@ select {
   max-height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
+  gap: 0.65rem;
   overflow: hidden;
 }
 
@@ -4481,7 +4562,7 @@ select {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.85rem;
   overflow: hidden;
 }
 
@@ -4525,9 +4606,47 @@ select {
   margin: 0;
 }
 
-.page-pos--saas .pos-saas-catalog-toolbar__filter .searchable-select {
+.page-pos--saas .pos-saas-catalog-filters__combo .searchable-select {
   margin: 0;
-  gap: 0;
+  gap: 0.3rem;
+}
+
+.page-pos--saas .pos-saas-catalog-filters__combo .searchable-select__label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: color-mix(in srgb, var(--text-muted) 55%, var(--primary) 45%);
+  margin-bottom: 0.12rem;
+}
+
+.page-pos--saas .pos-saas-catalog-filters__combo .searchable-select__trigger,
+.page-pos--saas .pos-saas-catalog-filters__combo .searchable-select__combobox-input {
+  min-height: 2.35rem;
+  padding: 0.42rem 0.9rem;
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--border) 62%, var(--primary) 38%);
+  background: var(--surface);
+  font-size: 0.88rem;
+}
+
+.page-pos--saas .pos-saas-catalog-filters__combo .searchable-select__trigger:hover:not(:disabled),
+.page-pos--saas .pos-saas-catalog-filters__combo .searchable-select__combobox-input:hover:not(:disabled) {
+  border-color: var(--primary);
+}
+
+.page-pos--saas .pos-saas-catalog-filters__combo .searchable-select__combobox-input {
+  width: 100%;
+  padding-right: 1.5rem;
+}
+
+.page-pos--saas .pos-saas-catalog-filters__combo .searchable-select__panel {
+  z-index: 60;
+  min-width: 11rem;
+}
+
+.page-pos--saas .pos-saas-catalog-filters__field .pos-saas-select {
+  width: 100%;
 }
 
 .page-pos--saas .pos-saas-catalog-toolbar__filter .searchable-select__label {
@@ -5146,7 +5265,7 @@ select {
 .page-pos--saas .pos-saas-card--pago {
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
+  gap: 0.65rem;
   min-width: 0;
   max-width: 100%;
   overflow-x: hidden;
@@ -5719,6 +5838,11 @@ select {
   display: flex;
   justify-content: center;
   padding: 0.35rem 0 0.15rem;
+}
+
+/* Ventas POS en modo focus: sin subnav ni chrome del layout */
+.app-root--pos-focus .page-pos--saas {
+  padding: 0.35rem 0.65rem 0.5rem;
 }
 
 /* Ventas POS: llenar viewport bajo header + tabs + subnav; scroll solo en paneles */
@@ -8496,6 +8620,74 @@ select {
 .app-root--customer-display {
   padding: clamp(1rem, 3vw, 2.25rem);
   box-sizing: border-box;
+}
+
+/* POS maximizado: sin sidebar, topbar ni pestañas del workspace */
+html.pos-focus-active,
+html.pos-focus-active body {
+  overflow: hidden;
+  height: 100%;
+}
+
+.app-root--pos-focus {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+  background: var(--background);
+}
+
+.pos-focus-toolbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.4rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.pos-focus-toolbar-title {
+  flex: 1 1 auto;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.pos-focus-exit {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.pos-focus-kbd {
+  font-size: 0.72rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--input-bg);
+  color: var(--text-muted);
+}
+
+.pos-focus-body {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.app-root--pos-focus .pos-focus-body > .page-pos--saas,
+.app-root--pos-focus .page-pos.page-pos--saas {
+  flex: 1 1 0;
+  min-height: 0;
+  height: 100%;
+}
+
+.app-root--pos-focus .pos-saas-btn-focus {
+  font-weight: 600;
 }
 
 .pos-client-display {

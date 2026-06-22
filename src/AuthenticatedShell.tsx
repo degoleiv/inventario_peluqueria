@@ -22,6 +22,7 @@ import { ConfiguracionPage } from "./pages/ConfiguracionPage";
 import { EmpleadosPage } from "./pages/EmpleadosPage";
 import { AppLayout } from "./layout/AppLayout";
 import { WorkspaceTabsProvider, clearWorkspaceTabsStorage } from "./context/WorkspaceTabsContext";
+import { PosFocusProvider } from "./context/PosFocusContext";
 import {
   NAV_LABEL,
   puedeVerModulo,
@@ -284,6 +285,7 @@ export function AuthenticatedShell() {
   return (
     <>
       <WorkspaceTabsProvider permisos={permisos}>
+        <PosFocusProvider>
         <AppLayout
           nav={nav}
           setNav={setNav}
@@ -311,6 +313,7 @@ export function AuthenticatedShell() {
         >
           <Outlet />
         </AppLayout>
+        </PosFocusProvider>
       </WorkspaceTabsProvider>
       <CommandPalette
         open={paletteOpen}

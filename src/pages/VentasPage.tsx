@@ -6,6 +6,9 @@ import {
   MagnifyingGlass,
   Minus,
   Plus,
+  ArrowsIn,
+  ArrowsOut,
+  ClockCounterClockwise,
   ShoppingCart,
   Trash,
 } from "@phosphor-icons/react";
@@ -37,6 +40,7 @@ import { CreateClienteDrawer } from "../components/CreateClienteDrawer";
 import { SearchableSelect } from "../components/SearchableSelect";
 import { SkeletonCard } from "../components/Skeleton";
 import { useToast } from "../context/ToastContext";
+import { usePosFocus } from "../context/PosFocusContext";
 import {
   getPinnedClienteIds,
   getPinnedProductIds,
@@ -1049,9 +1053,25 @@ export function VentasPage() {
     return <Navigate to={`/ventas/${readVentasTab()}`} replace />;
   }
   const tab = tabParam as VentasTab;
+  const { posFocus, setPosFocus } = usePosFocus();
+
+  const onTogglePosFocus = async () => {
+    if (!posFocus) {
+      setPosFocus(true);
+      try {
+        await document.documentElement.requestFullscreen();
+      } catch {
+        /* sin permiso de pantalla completa del navegador */
+      }
+    } else {
+      setPosFocus(false);
+      if (document.fullscreenElement) void document.exitFullscreen();
+    }
+  };
 
   return (
     <>
+      {!posFocus ? (
       <SubNav
         moduleId="ventas"
         items={[
@@ -1074,12 +1094,37 @@ export function VentasPage() {
           ) : null
         }
       />
+      ) : null}
 
       {tab === "ventas" ? (
-        <div className="page-pos page-pos--saas">
+        <div className={`page-pos page-pos--saas page-pos--optimized${posFocus ? " page-pos--focus" : ""}`}>
+          <header className="pos-saas-head pos-saas-head--compact">
+            <div className="pos-saas-head-text">
+              <h1 className="pos-saas-head-title">
+                <ShoppingCart className="pos-saas-head-icon" size={28} weight="duotone" aria-hidden />
+                Nueva venta
+              </h1>
+            </div>
+            <div className="pos-saas-head-actions">
+              <button
+                type="button"
+                className="btn ghost small pos-saas-btn-focus"
+                onClick={() => void onTogglePosFocus()}
+                title={posFocus ? "Salir de pantalla completa" : "Maximizar POS (ocultar menú)"}
+              >
+                {posFocus ? <ArrowsIn size={18} aria-hidden /> : <ArrowsOut size={18} aria-hidden />}
+                {posFocus ? "Salir pantalla completa" : "Pantalla completa"}
+              </button>
+              <Link to="/ventas/historial" className="btn ghost small pos-saas-link-history">
+                <ClockCounterClockwise size={18} aria-hidden />
+                Historial de ventas
+              </Link>
+            </div>
+          </header>
+
           <form
             ref={saleFormRef}
-            className={`pos-saas-grid pos-saas-grid--triple pos-sale-form ${
+            className={`pos-saas-grid pos-saas-grid--triple pos-sale-form pos-sale-form--optimized ${
               ventaStep === "items" ? "pos-sale-form--items" : "pos-sale-form--pagos"
             }`}
             onSubmit={pagar}
@@ -1569,7 +1614,11 @@ export function VentasPage() {
                   >
                     <Barcode size={20} weight="duotone" aria-hidden />
                   </button>
-                  <div className="pos-saas-catalog-toolbar__filter">
+                  {lookupBusy ? <span className="muted pos-saas-busy">Buscando…</span> : null}
+                </div>
+
+                <div className="pos-saas-catalog-filters">
+                  <div className="pos-saas-catalog-filters__field pos-saas-catalog-filters__combo">
                     <SearchableSelect
                       variant="combobox"
                       label="Categoría"
@@ -1580,7 +1629,7 @@ export function VentasPage() {
                       idleTextWhenEmpty="Todas las categorías"
                     />
                   </div>
-                  <div className="pos-saas-catalog-toolbar__filter">
+                  <div className="pos-saas-catalog-filters__field pos-saas-catalog-filters__combo">
                     <SearchableSelect
                       variant="combobox"
                       label="Proveedor"
@@ -1594,16 +1643,15 @@ export function VentasPage() {
                   {(filtroCategoriaCatalogo !== "todos" || filtroProveedorCatalogo !== "todos") && (
                     <button
                       type="button"
-                      className="btn ghost small pos-saas-catalog-toolbar__clear"
+                      className="btn ghost small pos-saas-catalog-filters__clear"
                       onClick={() => {
                         setFiltroCategoriaCatalogo("todos");
                         setFiltroProveedorCatalogo("todos");
                       }}
                     >
-                      Limpiar
+                      Limpiar filtros
                     </button>
                   )}
-                  {lookupBusy ? <span className="muted pos-saas-catalog-toolbar__busy">…</span> : null}
                 </div>
 
                 </div>

@@ -573,6 +573,18 @@ export async function fetchProductos(): Promise<Producto[]> {
   return requestJson("/api/productos");
 }
 
+/** Catálogo asociado a un proveedor (productos propios + usados en pedidos previos). */
+export async function fetchProductosProveedor(
+  proveedorId: number,
+  opts?: { q?: string; limit?: number }
+): Promise<Producto[]> {
+  const params = new URLSearchParams();
+  if (opts?.q?.trim()) params.set("q", opts.q.trim());
+  if (opts?.limit != null) params.set("limit", String(opts.limit));
+  const qs = params.toString();
+  return requestJson(`/api/proveedores/${proveedorId}/productos${qs ? `?${qs}` : ""}`);
+}
+
 export async function createProducto(body: Partial<Producto>): Promise<Producto> {
   return requestJson("/api/productos", { method: "POST", body: JSON.stringify(body) });
 }

@@ -66,11 +66,13 @@ export function loadFiltrosGuardados(): FiltrosHistorialState | null {
     const p = JSON.parse(raw) as Partial<FiltrosHistorialState>;
     if (!p.desde || !p.hasta) return null;
     const d = defaultFiltros();
+    const preset = p.preset ?? d.preset;
+    const rango = preset !== "custom" ? rangoFromPreset(preset) : { desde: p.desde, hasta: p.hasta };
     return {
       ...d,
-      preset: p.preset ?? d.preset,
-      desde: p.desde,
-      hasta: p.hasta,
+      preset,
+      desde: rango.desde,
+      hasta: rango.hasta,
       texto: typeof p.texto === "string" ? p.texto : "",
       metodoPago: p.metodoPago ?? d.metodoPago,
       estado: p.estado ?? d.estado,

@@ -17,6 +17,8 @@ type Props = {
   idleTextWhenEmpty?: string;
   /** `combobox`: escribir en el campo filtra la lista sin abrir un panel aparte primero. */
   variant?: "button" | "combobox";
+  /** Solo combobox: permite texto libre además de elegir de la lista. */
+  allowCustom?: boolean;
 };
 
 export function SearchableSelect({
@@ -31,6 +33,7 @@ export function SearchableSelect({
   emptySlot,
   idleTextWhenEmpty = "Elegir…",
   variant = "button",
+  allowCustom = false,
 }: Props) {
   const baseId = useId();
   const listboxId = `${baseId}-listbox`;
@@ -43,6 +46,11 @@ export function SearchableSelect({
     () => options.find((o) => o.value === value)?.label ?? "",
     [options, value]
   );
+
+  const comboboxClosedDisplay = useMemo(() => {
+    if (!value) return "";
+    return selectedLabel || value;
+  }, [selectedLabel, value]);
 
   const filtered = useMemo(() => {
     const n = q.trim().toLowerCase();
@@ -126,14 +134,23 @@ export function SearchableSelect({
             autoComplete="off"
             disabled={disabled}
             placeholder={idleTextWhenEmpty}
-            value={open ? q : selectedLabel}
+            value={open ? q : allowCustom ? comboboxClosedDisplay : selectedLabel}
             onFocus={() => {
               openPanel();
-              setQ("");
+              setQ(allowCustom ? value : "");
             }}
             onChange={(e) => {
               setQ(e.target.value);
+              if (allowCustom) onChange(e.target.value);
               openPanel();
+            }}
+            onBlur={() => {
+              window.setTimeout(() => {
+                if (!wrapRef.current?.contains(document.activeElement)) {
+                  setOpen(false);
+                  setQ("");
+                }
+              }, 120);
             }}
             onKeyDown={(e) => {
               if (e.key === "Escape") {

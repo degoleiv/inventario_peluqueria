@@ -192,7 +192,18 @@ async function crearCita(body: Record<string, unknown>) {
     );
   }
 
-  if (estado !== "cancelado") await assertNoOverlap(inicio, duracion_min, null, usuario_id);
+  const desdePos = body.desde_pos === true;
+  if (estado !== "cancelado") {
+    if (desdePos) {
+      const rows = await loadCitasActivasLite();
+      const hit = findOverlapCitaId(rows, inicio, duracion_min, null, usuario_id);
+      if (hit != null) {
+        throw new AppError("Ya existe una cita solapada para ese profesional");
+      }
+    } else {
+      await assertNoOverlap(inicio, duracion_min, null, usuario_id);
+    }
+  }
 
   const now = new Date().toISOString();
   const info = await db

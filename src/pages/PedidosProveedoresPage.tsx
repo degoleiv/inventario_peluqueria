@@ -13,9 +13,11 @@ import {
   createProductoRapidoProveedor,
   fetchPedidosProveedores,
   fetchProductos,
+  fetchProductosProveedor,
   fetchProveedores,
   resolveImageSrc,
   updatePedidoProveedorMeta,
+  updateProducto,
   type PedidoProveedor,
   type Producto,
   type Proveedor,
@@ -31,8 +33,9 @@ import { ProveedoresPage } from "./ProveedoresPage";
 
 type Linea = {
   producto_id: number;
-  cantidad: number;
+  cantidad: number | "";
   costo_unitario: number | "";
+  precio_venta: number | "";
 };
 
 type VistaTab = "pedido" | "proveedores" | "historial";
@@ -157,6 +160,8 @@ export function PedidosProveedoresPage() {
   const [bloqueoRegistrarPedido, setBloqueoRegistrarPedido] = useState(false);
   const [pedidos, setPedidos] = useState<PedidoProveedor[]>([]);
   const [productos, setProductos] = useState<Producto[]>([]);
+  const [catalogoProveedor, setCatalogoProveedor] = useState<Producto[]>([]);
+  const [catalogoProveedorLoading, setCatalogoProveedorLoading] = useState(false);
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -248,6 +253,32 @@ export function PedidosProveedoresPage() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (proveedorId === "") {
+      setCatalogoProveedor([]);
+      setCatalogoProveedorLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setCatalogoProveedorLoading(true);
+    void fetchProductosProveedor(Number(proveedorId), { limit: 500 })
+      .then((rows) => {
+        if (!cancelled) setCatalogoProveedor(rows);
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          toast(e instanceof Error ? e.message : "No se pudo cargar el catálogo", "error");
+          setCatalogoProveedor([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setCatalogoProveedorLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [proveedorId, toast]);
+
   /** Tras Pagos → Resumen el botón primario pasa de «Siguiente» a «Registrar» en el mismo lugar: evitamos doble clic accidental. */
   useLayoutEffect(() => {
     if (wizardStep === 3 && prevWizardStepRef.current === 2) {
@@ -285,10 +316,9 @@ export function PedidosProveedoresPage() {
   );
 
   const productosCatalogoProveedor = useMemo(() => {
-    if (proveedorId === "") return productos;
-    const id = Number(proveedorId);
-    return productos.filter((p) => p.proveedor_id == null || p.proveedor_id === id);
-  }, [productos, proveedorId]);
+    if (proveedorId === "") return [];
+    return catalogoProveedor;
+  }, [catalogoProveedor, proveedorId]);
 
   const productosFiltrados = useMemo(
     () => productosCatalogoProveedor.filter((p) => matchesProductoSearch(p, productoSearch)),
@@ -356,6 +386,10 @@ export function PedidosProveedoresPage() {
         precio_venta: pv,
         stock: 0,
       });
+      setCatalogoProveedor((prev) => {
+        const sin = prev.filter((p) => p.id !== created.id);
+        return [{ ...created, proveedor_id: created.proveedor_id ?? Number(proveedorId) }, ...sin];
+      });
       await load();
       addProductoExistente({ ...created, proveedor_id: created.proveedor_id ?? Number(proveedorId) });
       toast("Producto creado en el catálogo del proveedor y sumado al pedido.", "success");
@@ -383,6 +417,7 @@ export function PedidosProveedoresPage() {
         producto_id: producto.id,
         cantidad: 1,
         costo_unitario: Number(producto.precio_compra ?? producto.precio ?? 0),
+        precio_venta: Number(producto.precio_venta ?? producto.precio ?? 0),
       };
       // Quitar filas placeholder (sin producto ni costo) para no dejar líneas inválidas junto a la nueva.
       const sinPlaceholders = prev.filter((ln) => !isLineaPlaceholderExistente(ln));
@@ -556,7 +591,34 @@ export function PedidosProveedoresPage() {
         referencia: referencia.trim() || null,
         lineas: built,
       });
-      toast("Pedido registrado; stock actualizado (ENTRADA).", "success");
+      const lineasConCambio = lineas.filter((ln) => {
+        if (!ln.producto_id) return false;
+        const prod = productos.find((p) => p.id === ln.producto_id);
+        if (!prod) return false;
+        const costoChanged = ln.costo_unitario !== "" && Number(ln.costo_unitario) !== Number(prod.precio_compra ?? 0);
+        const ventaChanged = ln.precio_venta !== "" && Number(ln.precio_venta) !== Number(prod.precio_venta ?? prod.precio ?? 0);
+        return costoChanged || ventaChanged;
+      });
+
+      if (lineasConCambio.length > 0) {
+        await Promise.all(
+          lineasConCambio.map((ln) => {
+            const prod = productos.find((p) => p.id === ln.producto_id);
+            const body: Record<string, unknown> = {};
+            if (ln.costo_unitario !== "" && Number(ln.costo_unitario) !== Number(prod?.precio_compra ?? 0)) {
+              body.precio_compra = Number(ln.costo_unitario);
+            }
+            if (ln.precio_venta !== "" && Number(ln.precio_venta) !== Number(prod?.precio_venta ?? prod?.precio ?? 0)) {
+              body.precio_venta = Number(ln.precio_venta);
+              body.precio = Number(ln.precio_venta);
+            }
+            return updateProducto(ln.producto_id, body);
+          })
+        );
+        toast("Pedido registrado; stock y precios actualizados.", "success");
+      } else {
+        toast("Pedido registrado; stock actualizado (ENTRADA).", "success");
+      }
       setProveedorId("");
       setWizardStep(0);
       setProveedorSearch("");
@@ -793,6 +855,9 @@ export function PedidosProveedoresPage() {
                                   Costo u.
                                 </th>
                                 <th scope="col" className="pedidos-lineas-table__col-num">
+                                  P. Venta
+                                </th>
+                                <th scope="col" className="pedidos-lineas-table__col-num">
                                   Subtotal
                                 </th>
                                 <th scope="col" className="pedidos-lineas-table__col-acc" />
@@ -830,11 +895,12 @@ export function PedidosProveedoresPage() {
                                         type="text"
                                         inputMode="numeric"
                                         autoComplete="off"
-                                        value={ln.cantidad}
+                                        value={ln.cantidad === "" ? "" : String(ln.cantidad)}
                                         onChange={(e) => {
                                           const raw = filterIntegerTyping(e.target.value);
-                                          const n = raw === "" ? 1 : Math.max(1, parseInt(raw, 10) || 1);
-                                          setLinea(idx, { cantidad: n });
+                                          setLinea(idx, {
+                                            cantidad: raw === "" ? "" : Math.max(1, parseInt(raw, 10) || 1),
+                                          });
                                         }}
                                         aria-label="Cantidad"
                                       />
@@ -852,6 +918,21 @@ export function PedidosProveedoresPage() {
                                           })
                                         }
                                         aria-label="Costo unitario"
+                                      />
+                                    </td>
+                                    <td className="pedidos-lineas-table__col-num">
+                                      <input
+                                        className="pedidos-input pedidos-lineas-table__control pedidos-lineas-table__control--money input-numeric"
+                                        type="text"
+                                        inputMode="decimal"
+                                        autoComplete="off"
+                                        value={ln.precio_venta === "" ? "" : String(ln.precio_venta)}
+                                        onChange={(e) =>
+                                          setLinea(idx, {
+                                            precio_venta: parseOptionalDecimal(e.target.value),
+                                          })
+                                        }
+                                        aria-label="Precio de venta"
                                       />
                                     </td>
                                     <td className="pedidos-lineas-table__col-num mono">{subStr}</td>
@@ -898,7 +979,12 @@ export function PedidosProveedoresPage() {
                           />
                         </span>
                       </label>
-                      {productosFiltrados.length === 0 ? (
+                      <div className="pedidos-sidebar-card__scroll">
+                      {catalogoProveedorLoading ? (
+                        <div className="pedidos-sidebar-empty">
+                          <p className="pedidos-sidebar-empty__title">Cargando catálogo…</p>
+                        </div>
+                      ) : productosFiltrados.length === 0 ? (
                         <div className="pedidos-sidebar-empty">
                           <p className="pedidos-sidebar-empty__title">Sin resultados</p>
                           <p className="pedidos-sidebar-empty__text">Probá otra búsqueda o creá un producto nuevo.</p>
@@ -924,6 +1010,7 @@ export function PedidosProveedoresPage() {
                       {productosFiltrados.length > 200 ? (
                         <p className="pedidos-sidebar-card__status">Mostrando los primeros 200 resultados.</p>
                       ) : null}
+                      </div>
                       <button type="button" className="pedidos-sidebar-cta" onClick={openDrawerNuevoProducto}>
                         <Plus size={18} weight="bold" aria-hidden />
                         Nuevo producto en catálogo
@@ -1493,6 +1580,7 @@ export function PedidosProveedoresPage() {
           </label>
         </form>
       </Drawer>
+
     </div>
   );
 }

@@ -464,19 +464,33 @@ export function ProductoCatalogoForm({
           />
         </label>
       ) : (
-        <label className="field">
-          <span>Precio venta *</span>
-          <input
-            type="text"
-            inputMode="decimal"
-            autoComplete="off"
-            className="input-numeric"
-            required
-            value={values.precioVenta === "" ? "" : String(values.precioVenta)}
-            onChange={(e) => onChange({ precioVenta: parseOptionalDecimal(e.target.value) })}
-            placeholder="Ej. 15000"
-          />
-        </label>
+        <div className="grid-2">
+          <label className="field">
+            <span>Precio compra</span>
+            <input
+              type="text"
+              inputMode="decimal"
+              autoComplete="off"
+              className="input-numeric"
+              value={values.precioCompra === "" ? "" : String(values.precioCompra)}
+              onChange={(e) => onChange({ precioCompra: parseOptionalDecimal(e.target.value) })}
+              placeholder="Ej. 6000"
+            />
+          </label>
+          <label className="field">
+            <span>Precio venta *</span>
+            <input
+              type="text"
+              inputMode="decimal"
+              autoComplete="off"
+              className="input-numeric"
+              required
+              value={values.precioVenta === "" ? "" : String(values.precioVenta)}
+              onChange={(e) => onChange({ precioVenta: parseOptionalDecimal(e.target.value) })}
+              placeholder="Ej. 15000"
+            />
+          </label>
+        </div>
       )}
 
       {!quickCreateFromPedido ? (

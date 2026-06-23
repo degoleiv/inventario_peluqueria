@@ -381,8 +381,9 @@ export function InventarioPage() {
     setDescripcion(p.descripcion ?? "");
     setImagenUrl(p.imagen_url ?? "");
     setStock(p.stock);
-    setPrecioCompra(p.precio_compra ?? "");
-    setPrecioVenta(p.precio_venta ?? p.precio ?? "");
+    const pvEditar = p.precio_venta ?? p.precio ?? null;
+    setPrecioCompra(p.precio_compra ?? (pvEditar != null ? Math.round(pvEditar * 0.4) : ""));
+    setPrecioVenta(pvEditar ?? "");
     setStockMinimo(p.stock_minimo ?? "");
     setFechaVencimiento(p.fecha_vencimiento?.slice(0, 10) ?? "");
     setLookupHint(
@@ -411,8 +412,9 @@ export function InventarioPage() {
     setDescripcion(p.descripcion ?? "");
     setImagenUrl(p.imagen_url ?? "");
     setStock(0);
-    setPrecioCompra(p.precio_compra ?? "");
-    setPrecioVenta(p.precio_venta ?? p.precio ?? "");
+    const pvDup = p.precio_venta ?? p.precio ?? null;
+    setPrecioCompra(p.precio_compra ?? (pvDup != null ? Math.round(pvDup * 0.4) : ""));
+    setPrecioVenta(pvDup ?? "");
     setStockMinimo(p.stock_minimo ?? "");
     setFechaVencimiento(p.fecha_vencimiento?.slice(0, 10) ?? "");
     setLookupHint(
@@ -1039,6 +1041,13 @@ export function InventarioPage() {
               <dt className="muted small">Stock mínimo</dt>
               <dd style={{ margin: 0 }}>
                 {viewingProduct.stock_minimo != null ? viewingProduct.stock_minimo : "—"}
+              </dd>
+
+              <dt className="muted small">Precio compra</dt>
+              <dd style={{ margin: 0 }}>
+                {viewingProduct.precio_compra != null
+                  ? viewingProduct.precio_compra.toFixed(2)
+                  : "—"}
               </dd>
 
               <dt className="muted small">Precio venta</dt>

@@ -3,6 +3,7 @@ import { Camera, Trash, Warning } from "@phosphor-icons/react";
 import {
   createProveedor,
   deleteProveedor,
+  fetchProductos,
   fetchProveedores,
   patchProveedorEstado,
   resolveImageSrc,
@@ -206,6 +207,7 @@ export function ProveedoresPage() {
 
   const [deleteTarget, setDeleteTarget] = useState<Proveedor | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteProductosAsociados, setDeleteProductosAsociados] = useState<string[]>([]);
   const [estadoSavingId, setEstadoSavingId] = useState<number | null>(null);
 
   const [detailProveedor, setDetailProveedor] = useState<Proveedor | null>(null);
@@ -474,9 +476,19 @@ export function ProveedoresPage() {
     }
   }
 
-  function openDelete(p: Proveedor) {
+  async function openDelete(p: Proveedor) {
     setDetailProveedor(null);
     setDeleteTarget(p);
+    setDeleteProductosAsociados([]);
+    try {
+      const prods = await fetchProductos();
+      const asociados = prods
+        .filter((prod) => prod.proveedor_id === p.id)
+        .map((prod) => prod.nombre);
+      setDeleteProductosAsociados(asociados);
+    } catch {
+      setDeleteProductosAsociados([]);
+    }
   }
 
   return (
@@ -970,25 +982,50 @@ export function ProveedoresPage() {
         >
           <div className="card drawer-overlay-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420 }}>
             <h3 id="prov-delete-title" className="card-title">
-              ¿Eliminar proveedor?
+              {deleteProductosAsociados.length > 0 ? "No se puede eliminar" : "¿Eliminar proveedor?"}
             </h3>
-            <p className="muted">
-              ¿Estás seguro de eliminar el proveedor <strong>«{deleteTarget.nombre}»</strong>? Esta acción no se
-              puede deshacer. No es posible si tiene productos o pedidos asociados. Si tiene pedidos asociados, el sistema no permitirá borrarlo.
-            </p>
-            <div className="actions" style={{ marginTop: "1rem" }}>
-              <button type="button" className="btn ghost" disabled={deleteBusy} onClick={() => setDeleteTarget(null)}>
-                Cancelar
-              </button>
-              <button
-                type="button"
-                className="btn secondary"
-                disabled={deleteBusy}
-                onClick={() => void confirmDelete()}
-              >
-                {deleteBusy ? "Eliminando…" : "Eliminar"}
-              </button>
-            </div>
+            {deleteProductosAsociados.length > 0 ? (
+              <>
+                <p className="muted">
+                  El proveedor <strong>«{deleteTarget.nombre}»</strong> tiene{" "}
+                  <strong>{deleteProductosAsociados.length}</strong> producto(s) asociados en inventario.
+                  Primero eliminá o reasigná estos productos:
+                </p>
+                <ul style={{ margin: "0.5rem 0", paddingLeft: "1.2rem", fontSize: "0.85rem" }}>
+                  {deleteProductosAsociados.slice(0, 10).map((nombre, i) => (
+                    <li key={i}>{nombre}</li>
+                  ))}
+                  {deleteProductosAsociados.length > 10 ? (
+                    <li className="muted">…y {deleteProductosAsociados.length - 10} más</li>
+                  ) : null}
+                </ul>
+                <div className="actions" style={{ marginTop: "1rem" }}>
+                  <button type="button" className="btn ghost" onClick={() => setDeleteTarget(null)}>
+                    Entendido
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="muted">
+                  ¿Estás seguro de eliminar el proveedor <strong>«{deleteTarget.nombre}»</strong>? Esta acción no se
+                  puede deshacer.
+                </p>
+                <div className="actions" style={{ marginTop: "1rem" }}>
+                  <button type="button" className="btn ghost" disabled={deleteBusy} onClick={() => setDeleteTarget(null)}>
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    className="btn secondary"
+                    disabled={deleteBusy}
+                    onClick={() => void confirmDelete()}
+                  >
+                    {deleteBusy ? "Eliminando…" : "Eliminar"}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       ) : null}

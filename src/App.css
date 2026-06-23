@@ -4060,11 +4060,41 @@ select {
   }
 
   .page-pos--saas .pos-sale-form--items {
-    grid-template-rows: auto minmax(0, 1fr) auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .page-pos--saas .pos-sale-form--pagos {
     grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  .page-pos--saas .pos-sale-form--items .pos-saas-col--catalog {
+    order: 1;
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .page-pos--saas .pos-sale-form--items .pos-saas-col--cart {
+    order: 2;
+    flex: 0 1 auto;
+    max-height: min(40vh, 320px);
+  }
+
+  .page-pos--saas .pos-sale-form--items .pos-sale-step-actions--items {
+    order: 3;
+    flex: 0 0 auto;
+  }
+
+  .page-pos--saas .pos-sale-form--items > .pos-saas-col {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    grid-column: auto;
+    height: auto;
   }
 
   .page-pos--saas .pos-saas-grid--triple > .pos-saas-col {
@@ -4080,11 +4110,10 @@ select {
 
   .page-pos--saas .pos-saas-col--cart {
     flex-shrink: 0;
-    max-height: min(36vh, 340px);
   }
 
   .page-pos--saas .pos-saas-col--catalog {
-    height: 100%;
+    order: 1;
     min-height: 0;
   }
 
@@ -4233,6 +4262,30 @@ select {
 .pos-cart-cita-cliente-tag {
   margin-left: 0.4rem;
   font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.pos-cart-cita-cliente-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.2rem;
+  height: 1.2rem;
+  border-radius: 999px;
+  border: 0;
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+  color: var(--text);
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  vertical-align: middle;
+}
+
+.pos-cart-cita-cliente-clear:hover {
+  background: color-mix(in srgb, var(--text) 20%, transparent);
 }
 
 .pos-cart-cita-select {
@@ -4336,6 +4389,51 @@ select {
   grid-column: 1 / -1;
 }
 
+.pos-nueva-cita-field--combo {
+  gap: 0;
+}
+
+.pos-nueva-cita-field--combo .searchable-select {
+  gap: 0.25rem;
+}
+
+.pos-nueva-cita-field--combo .searchable-select__label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 0;
+}
+
+.pos-nueva-cita-field--combo .searchable-select__trigger,
+.pos-nueva-cita-field--combo .searchable-select__combobox-input {
+  min-height: 2.65rem;
+  border-radius: 10px;
+  border: 1px solid var(--pos-saas-border, var(--border));
+  background: var(--surface);
+  font-size: 0.92rem;
+}
+
+.pos-nueva-cita-field--combo .searchable-select__trigger:hover:not(:disabled),
+.pos-nueva-cita-field--combo .searchable-select__combobox-input:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--pos-saas-border, var(--border)));
+}
+
+.pos-nueva-cita-field--combo .searchable-select__trigger[aria-expanded="true"],
+.pos-nueva-cita-field--combo .searchable-select__combobox-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.pos-nueva-cita-field--combo .searchable-select__panel {
+  z-index: 220;
+  border-radius: 10px;
+  border: 1px solid var(--pos-saas-border, var(--border));
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--text) 18%, transparent);
+}
+
 .pos-nueva-cita-actions {
   display: flex;
   justify-content: flex-end;
@@ -4399,6 +4497,10 @@ select {
   display: flex;
   flex-direction: column;
   gap: 0.55rem;
+}
+
+.pos-cart-mobile-tabs {
+  display: none;
 }
 
 @media (min-width: 1101px) {
@@ -4955,7 +5057,7 @@ select {
   }
 
   .main-pro-content:has(.page-pos--saas) {
-    padding: 0.2rem 0.45rem 0.35rem;
+    padding: 0.2rem 0.45rem 0;
   }
 
   .main-pro-content:has(.page-pos--saas) .subnav-wrap {
@@ -4977,6 +5079,10 @@ select {
     font-size: 0.78rem;
   }
 
+  .page-pos.page-pos--saas {
+    padding-bottom: 0;
+  }
+
   .page-pos--saas .pos-saas-head {
     display: none;
   }
@@ -4988,6 +5094,12 @@ select {
     flex-direction: column;
     padding: 0.4rem 0.5rem;
     gap: 0.45rem;
+    min-height: 0;
+  }
+
+  .page-pos--saas .pos-saas-col--catalog > .pos-saas-card--catalog {
+    flex: 1 1 0;
+    max-height: 100%;
   }
 
   .page-pos--saas .pos-saas-card--cart .pos-saas-card-head,
@@ -5054,15 +5166,99 @@ select {
   .page-pos--saas .pos-saas-catalog-scroll {
     flex: 1 1 0;
     min-height: 0;
+    overflow-x: hidden;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .page-pos--saas .pos-saas-catalog-scroll .pos-saas-pro-grid {
+    overflow: visible;
+    flex: none;
+    min-height: min-content;
+  }
+
+  .page-pos--saas .pos-saas-catalog-scroll .pos-saas-more-wrap {
+    flex-shrink: 0;
+    padding-bottom: 0.25rem;
   }
 
   .page-pos--saas .pos-saas-pro-grid {
-    grid-template-columns: repeat(
-      auto-fill,
-      minmax(max(5.5rem, calc((100% - 0.7rem) / 3)), 1fr)
-    );
-    gap: 0.3rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.45rem;
+  }
+
+  .page-pos--saas .pos-saas-pro-card-main {
+    padding: 0.55rem 0.5rem 0.65rem;
+  }
+
+  .page-pos--saas .pos-saas-pro-img-wrap {
+    width: 56px;
+    height: 56px;
+    margin-bottom: 0.3rem;
+  }
+
+  .page-pos--saas .pos-saas-pro-name {
+    font-size: 0.86rem;
+    -webkit-line-clamp: 3;
+  }
+
+  .page-pos--saas .pos-saas-pro-price {
+    font-size: 0.84rem;
+  }
+
+  .page-pos--saas .pos-saas-pro-stock {
+    font-size: 0.72rem;
+  }
+
+  .pos-cart-mobile-tabs {
+    display: flex;
+    gap: 0.35rem;
+    margin: 0 0 0.4rem;
+    padding: 0.22rem;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--border) 40%, var(--surface));
+    flex-shrink: 0;
+  }
+
+  .pos-cart-mobile-tab {
+    flex: 1 1 0;
+    min-width: 0;
+    border: 0;
+    border-radius: 8px;
+    padding: 0.48rem 0.55rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    line-height: 1.2;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition:
+      background 0.14s ease,
+      color 0.14s ease,
+      box-shadow 0.14s ease;
+  }
+
+  .pos-cart-mobile-tab.is-active {
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  }
+
+  .pos-cart-mobile-tabs-panel--prods .pos-cart-subcard--svcs,
+  .pos-cart-mobile-tabs-panel--svcs .pos-cart-subcard--prods {
+    display: none;
+  }
+
+  .pos-cart-mobile-tabs-panel .pos-cart-subcard .pos-cart-accordion-head {
+    display: none;
+  }
+
+  .pos-cart-mobile-tabs-panel .pos-cart-accordion-body {
+    display: flex !important;
+  }
+
+  .pos-cart-mobile-tabs-panel .pos-saas-panel-scroll--cart {
+    min-height: 0;
   }
 
   .page-pos--saas .pos-sale-form--items,
@@ -5076,9 +5272,15 @@ select {
     width: 100%;
     max-width: none;
     flex-shrink: 0;
-    padding: 0.45rem 0 0.55rem;
     margin-top: 0;
+    padding: 0.45rem 0 calc(0.55rem + env(safe-area-inset-bottom, 0px));
     border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--background) 88%, transparent) 0%,
+      var(--background) 35%
+    );
+    box-shadow: 0 -6px 16px color-mix(in srgb, var(--text) 6%, transparent);
   }
 
   .page-pos--saas .pos-sale-step-actions .btn {
@@ -6235,7 +6437,7 @@ select {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  padding: 0.35rem 0.85rem 0.5rem;
+  padding: 0.35rem 0.85rem 0;
 }
 
 /* Historial / cierre: scroll del área principal */
@@ -8284,16 +8486,32 @@ select {
 .page-pedidos .pedidos-sidebar-card {
   position: sticky;
   top: 12px;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   gap: 14px;
   padding: 20px;
   border-radius: var(--pp-radius-md);
   border: 1px solid var(--pp-line);
   background: var(--pp-card);
   box-shadow: var(--pp-shadow);
-  max-height: min(72vh, 640px);
-  overflow: auto;
+  /* Altura fija + fila 1fr: scroll interno estable (~10+ filas visibles). */
+  height: min(78vh, 680px);
+  max-height: min(78vh, 680px);
+  min-height: min(560px, 78vh);
+  overflow: hidden;
+}
+
+.page-pedidos .pedidos-sidebar-card__scroll {
+  min-height: 0;
+  max-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 2px;
 }
 
 .page-pedidos .pedidos-sidebar-card__head {
@@ -8358,7 +8576,6 @@ select {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  min-height: 120px;
 }
 
 .page-pedidos .pedidos-catalog-row {
@@ -8429,16 +8646,17 @@ select {
   gap: 8px;
   width: 100%;
   min-height: 44px;
-  margin-top: 4px;
+  margin-top: 0;
   padding: 0 16px;
   border-radius: var(--pp-radius-sm);
   border: 1px dashed color-mix(in srgb, var(--pp-primary) 38%, var(--pp-line));
-  background: transparent;
+  background: var(--pp-card);
   color: var(--pp-primary);
   font-family: inherit;
   font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
+  flex-shrink: 0;
   transition:
     background-color 0.16s ease,
     border-color 0.16s ease;
@@ -8894,6 +9112,48 @@ select {
   margin-top: 8px;
 }
 
+.page-pedidos .pedidos-conflicto-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.page-pedidos .pedidos-conflicto-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--pp-line);
+}
+
+.page-pedidos .pedidos-conflicto-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.page-pedidos .pedidos-conflicto-item__name {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--pp-text);
+}
+
+.page-pedidos .pedidos-conflicto-item__detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 0.8125rem;
+  color: var(--pp-muted);
+}
+
+.page-pedidos .pedidos-conflicto-item__detail strong {
+  color: var(--pp-text);
+}
+
+.page-pedidos .pedidos-conflicto-item__error {
+  color: var(--pp-danger-text) !important;
+}
+
 .page-pedidos .pedido-rapido-modal .field input:not([type="checkbox"]):not([type="radio"]),
 .page-pedidos .pedido-rapido-modal .field select,
 .page-pedidos .pedido-rapido-modal .field textarea {
@@ -8929,7 +9189,9 @@ select {
   .page-pedidos .pedidos-sidebar-card {
     position: relative;
     top: auto;
-    max-height: none;
+    height: min(68vh, 620px);
+    max-height: min(68vh, 620px);
+    min-height: min(520px, 68vh);
   }
 }
 
@@ -11449,14 +11711,14 @@ html.pos-focus-active body {
 }
 
 .inventario-filtros__buscar {
-  flex: 1 1 100%;
-  min-width: min(100%, 280px);
+  flex: 1 1 180px;
+  min-width: 160px;
 }
 
 .inventario-filtros__proveedor,
 .inventario-filtros__combo {
-  flex: 0 1 200px;
-  min-width: 180px;
+  flex: 0 1 170px;
+  min-width: 140px;
 }
 
 .inventario-filtros__combo .searchable-select {
@@ -11471,7 +11733,7 @@ html.pos-focus-active body {
 .inventario-filtros__estado,
 .inventario-filtros__stock {
   flex: 0 0 auto;
-  min-width: 140px;
+  min-width: 100px;
 }
 
 .inventario-filtros__stock {

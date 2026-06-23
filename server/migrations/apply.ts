@@ -794,6 +794,47 @@ const MIGRATIONS: Migration[] = [
       );
     },
   },
+
+  // ══════════════════════════════════════════
+  // 007 — Precio de compra = 51% del precio de venta (-49%)
+  // Actualiza precio_compra de todos los productos para que sea
+  // el 51% del precio_venta (descuento del 49%).
+  // No modifica precio_venta.
+  // ══════════════════════════════════════════
+  {
+    id: "007_precio_compra_49_porciento_menos",
+    up: async (db) => {
+      await db.exec(`
+        UPDATE productos
+           SET precio_compra = ROUND(precio_venta * 0.51, 2),
+               updated_at = datetime('now')
+         WHERE precio_venta IS NOT NULL
+      `);
+    },
+  },
+
+  // ══════════════════════════════════════════
+  // 008 — Corregir fechas de ventas de UTC a hora local
+  // Las ventas guardadas con toISOString() quedaron en UTC
+  // (sufijo 'Z'), causando que aparezcan en el día incorrecto
+  // al filtrar por fecha local. Esta migración convierte
+  // fecha y created_at a hora local sin 'Z'.
+  // ══════════════════════════════════════════
+  {
+    id: "008_ventas_fechas_utc_a_local",
+    up: async (db) => {
+      await db.exec(`
+        UPDATE ventas
+           SET fecha = strftime('%Y-%m-%dT%H:%M:%f', fecha, 'localtime')
+         WHERE fecha LIKE '%Z'
+      `);
+      await db.exec(`
+        UPDATE ventas
+           SET created_at = strftime('%Y-%m-%dT%H:%M:%f', created_at, 'localtime')
+         WHERE created_at LIKE '%Z'
+      `);
+    },
+  },
 ];
 
 // ─────────────────────────────────────────────

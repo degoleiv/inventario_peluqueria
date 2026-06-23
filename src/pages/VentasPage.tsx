@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useParams, useLocation, useNavigate } from "react-router-dom";
 import {
   CaretDown,
@@ -65,6 +65,7 @@ import {
 import { PosMetodoPagoFields } from "../components/ventas/PosMetodoPagoFields";
 import { useMediosPagoTransferencia } from "../hooks/useMediosPagoTransferencia";
 import { SubNav } from "../components/SubNav";
+import { SaleSuccessModal } from "../components/ventas/SaleSuccessModal";
 import { VentasHistorialSection } from "../components/ventas/VentasHistorialSection";
 import { VentasCierreSection } from "../components/ventas/VentasCierreSection";
 import { readVentasTab, VENTAS_TABS, type VentasTab } from "../lib/moduleRoutes";
@@ -143,22 +144,31 @@ export function VentasPage() {
   const [nuevaCitaServicio, setNuevaCitaServicio] = useState("");
   const [nuevaCitaProfesional, setNuevaCitaProfesional] = useState<number | "">("");
   const [nuevaCitaSubmitting, setNuevaCitaSubmitting] = useState(false);
-  const servicioNombreCatalogId = useId();
   const [clienteOpen, setClienteOpen] = useState(false);
   const [clienteHover, setClienteHover] = useState(0);
   const clienteComboRef = useRef<HTMLDivElement>(null);
   const [ventaStep, setVentaStep] = useState<VentaStep>("items");
-  /** En pantalla estrecha: acordeón de productos (servicios siempre visibles). */
+  /** En pantalla estrecha: pestaña activa del carrito (productos | servicios). */
+  const [cartMobileTab, setCartMobileTab] = useState<"prods" | "svcs">("prods");
+  /** En pantalla estrecha: acordeón de productos (escritorio). */
   const [cartProdsOpen, setCartProdsOpen] = useState(false);
   const [cartSvcsOpen, setCartSvcsOpen] = useState(true);
+  const [successModal, setSuccessModal] = useState<{
+    open: boolean;
+    total: number;
+    invoiceNumber: string | number | null;
+  }>({ open: false, total: 0, invoiceNumber: null });
 
   useEffect(() => {
     if (cart.length > 0) setCartProdsOpen(true);
   }, [cart.length]);
 
   useEffect(() => {
-    if (cartServicios.length > 0) setCartSvcsOpen(true);
-  }, [cartServicios.length]);
+    if (cartServicios.length > 0) {
+      setCartSvcsOpen(true);
+      if (cart.length === 0) setCartMobileTab("svcs");
+    }
+  }, [cartServicios.length, cart.length]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -350,7 +360,26 @@ export function VentasPage() {
     window.setTimeout(() => barcodeRef.current?.focus(), 0);
   }, [cart.length, cartServicios.length, search, toast]);
 
+  const onSuccessModalClose = useCallback(() => {
+    setSuccessModal({ open: false, total: 0, invoiceNumber: null });
+    setCart([]);
+    setCartServicios([]);
+    setCitaOrigenId(null);
+    setCitaOrigenInfo(null);
+    setCartSel(null);
+    setClienteId("");
+    setClienteBusqueda("");
+    setClienteOpen(false);
+    setNotasVenta("");
+    setPuntosCanjeados("");
+    setMetodoPagoVenta({ ...METODO_PAGO_VENTA_INICIAL });
+    setVentaStep("items");
+    void load();
+    window.setTimeout(() => barcodeRef.current?.focus(), 0);
+  }, [load]);
+
   const agregarLineaServicio = useCallback(() => {
+    setCartMobileTab("svcs");
     setCartServicios((prev) => [
       ...prev,
       {
@@ -366,6 +395,9 @@ export function VentasPage() {
     setCartServicios([]);
     setCitaOrigenId(null);
     setCitaOrigenInfo(null);
+    setClienteId("");
+    setClienteBusqueda("");
+    setClienteOpen(false);
     posBeepOk();
   }, []);
 
@@ -402,6 +434,24 @@ export function VentasPage() {
       ...provs.map((pr) => ({ value: String(pr.id), label: pr.nombre })),
     ];
   }, [inventarioCatalogo]);
+
+  const opcionesServicioNuevaCita = useMemo(
+    () =>
+      serviciosCatalogo.map((s) => ({
+        value: s.nombre_categoria,
+        label: s.emoji ? `${s.emoji} ${s.nombre_categoria}` : s.nombre_categoria,
+      })),
+    [serviciosCatalogo]
+  );
+
+  const opcionesProfesionalNuevaCita = useMemo(
+    () =>
+      equipo.map((p) => ({
+        value: String(p.id),
+        label: p.nombre || p.email,
+      })),
+    [equipo]
+  );
 
   const { filteredProducts, catalogMatchCount } = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -517,7 +567,7 @@ export function VentasPage() {
   const abrirNuevaCitaRapida = useCallback(() => {
     if (clienteId === "") {
       posBeepErr();
-      toast("Elegí primero un cliente en la sección de Pago.", "warning");
+      toast("Elegí primero un cliente en la sección de productos y servicios.", "warning");
       return;
     }
     const ahora = new Date();
@@ -570,7 +620,8 @@ export function VentasPage() {
         duracion_min: dur,
         servicio: nuevaCitaServicio.trim() || null,
         estado: "confirmado",
-      });
+        desde_pos: true,
+      } as Parameters<typeof createCita>[0]);
       const rows = await recargarCitasAsociar();
       const enLista = rows.find((r) => r.id === creada.id) ?? creada;
       setCitaOrigenId(creada.id);
@@ -639,6 +690,9 @@ export function VentasPage() {
     setClienteId("");
     setClienteBusqueda("");
     setClienteHover(0);
+    setCitaOrigenId(null);
+    setCitaOrigenInfo(null);
+    setCartServicios([]);
   }, []);
 
   useEffect(() => {
@@ -712,6 +766,7 @@ export function VentasPage() {
     recordRecentProduct(p.id);
     setFlashId(p.id);
     setCartSel(null);
+    setCartMobileTab("prods");
     window.setTimeout(() => {
       setFlashId((cur) => (cur === p.id ? null : cur));
     }, 380);
@@ -1002,11 +1057,6 @@ export function VentasPage() {
         return;
       }
     }
-    if (builtServicios.length > 0 && citaOrigenId == null) {
-      posBeepErr();
-      toast("Para cobrar servicios asociá la venta a una cita de la agenda (selector arriba en Servicios).", "warning");
-      return;
-    }
     if (vendedorId === "") {
       posBeepErr();
       toast("No se pudo cargar el vendedor de la sesión. Recargá la página.", "warning");
@@ -1036,25 +1086,19 @@ export function VentasPage() {
       posBeepOk();
       if (r.factura_error) {
         toast("Venta ok. Factura: " + r.factura_error, "warning");
-      } else {
-        toast("Venta " + (r.total as number).toFixed(2) + " — listo", "success");
       }
       if (r.puntos_otorgados && r.puntos_otorgados > 0) {
         toast("+" + r.puntos_otorgados + " puntos al cliente", "info");
       }
-      setCart([]);
-      setCartServicios([]);
-      setCitaOrigenId(null);
-      setCitaOrigenInfo(null);
-      setCartSel(null);
-      setClienteId("");
-      setClienteBusqueda("");
-      setClienteOpen(false);
-      setNotasVenta("");
-      setPuntosCanjeados("");
-      setMetodoPagoVenta({ ...METODO_PAGO_VENTA_INICIAL });
-      setVentaStep("items");
-      await load();
+      const invoiceNum =
+        (r as Record<string, unknown>).numero_factura ??
+        (r as Record<string, unknown>).consecutivo ??
+        r.id;
+      setSuccessModal({
+        open: true,
+        total: r.total as number,
+        invoiceNumber: invoiceNum as string | number | null,
+      });
     } catch (err) {
       posBeepErr();
       toast(err instanceof Error ? err.message : "Error al vender", "error");
@@ -1144,7 +1188,9 @@ export function VentasPage() {
             onSubmit={pagar}
           >
             <div className="pos-saas-col pos-saas-col--cart">
-              <section className="pos-saas-card pos-saas-card--cart pos-exempt-focus">
+              <section
+                className={`pos-saas-card pos-saas-card--cart pos-exempt-focus pos-cart-mobile-tabs-panel pos-cart-mobile-tabs-panel--${cartMobileTab}`}
+              >
                 <div className="pos-saas-card-head pos-saas-card-head--row">
                   <div className="pos-saas-card-head-textblock">
                     <div className="pos-saas-card-head-left">
@@ -1174,6 +1220,124 @@ export function VentasPage() {
                       Vaciar todo
                     </button>
                   ) : null}
+                </div>
+
+                <div className="pos-pago-block pos-cart-cliente-block">
+                  <span className="pos-saas-field-label">Cliente</span>
+                  <div className="pos-pago-combo" ref={clienteComboRef}>
+                    <div className="pos-pago-combo-row">
+                      <div className="pos-pago-combo-input-wrap">
+                        <input
+                          id="venta-cliente-input"
+                          type="text"
+                          className="pos-saas-input pos-pago-combo-input"
+                          placeholder="Buscar por nombre, teléfono o email…"
+                          value={clienteInputValue}
+                          onFocus={() => setClienteOpen(true)}
+                          onChange={(e) => {
+                            setClienteBusqueda(e.target.value);
+                            setClienteOpen(true);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "ArrowDown") {
+                              e.preventDefault();
+                              setClienteOpen(true);
+                              setClienteHover((h) =>
+                                Math.min(h + 1, Math.max(0, clientesFiltradosLista.length - 1))
+                              );
+                            } else if (e.key === "ArrowUp") {
+                              e.preventDefault();
+                              setClienteHover((h) => Math.max(h - 1, 0));
+                            } else if (e.key === "Enter") {
+                              if (clienteOpen && clientesFiltradosLista[clienteHover]) {
+                                e.preventDefault();
+                                seleccionarCliente(clientesFiltradosLista[clienteHover]!.id);
+                              }
+                            } else if (e.key === "Escape") {
+                              e.preventDefault();
+                              setClienteOpen(false);
+                            }
+                          }}
+                          autoComplete="off"
+                          spellCheck={false}
+                          aria-label="Buscar y elegir cliente"
+                          aria-expanded={clienteOpen}
+                          aria-autocomplete="list"
+                          role="combobox"
+                        />
+                        {clienteId !== "" && !clienteOpen ? (
+                          <button
+                            type="button"
+                            className="pos-pago-combo-clear"
+                            onClick={limpiarCliente}
+                            title="Quitar cliente"
+                            aria-label="Quitar cliente"
+                          >
+                            ×
+                          </button>
+                        ) : null}
+                      </div>
+                      <button
+                        type="button"
+                        className="btn ghost small pos-pago-cliente-add pos-pago-cliente-add--icon"
+                        onClick={() => setCreateClienteOpen(true)}
+                        title="Registrar nuevo cliente"
+                        aria-label="Registrar nuevo cliente"
+                      >
+                        <Plus size={16} weight="bold" aria-hidden />
+                      </button>
+                    </div>
+                    {clienteOpen ? (
+                      <ul className="pos-pago-combo-list" role="listbox">
+                        {clientesFiltradosLista.length === 0 ? (
+                          <li className="pos-pago-combo-empty muted small">
+                            Sin coincidencias. Tocá «Nuevo» para registrarlo.
+                          </li>
+                        ) : (
+                          clientesFiltradosLista.slice(0, 10).map((c, i) => (
+                            <li
+                              key={c.id}
+                              className={`pos-pago-combo-item ${i === clienteHover ? "pos-pago-combo-item--active" : ""} ${clienteId === c.id ? "pos-pago-combo-item--current" : ""}`}
+                              onMouseEnter={() => setClienteHover(i)}
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                seleccionarCliente(c.id);
+                              }}
+                              role="option"
+                              aria-selected={clienteId === c.id}
+                            >
+                              <span className="pos-pago-combo-item-name">{c.nombre}</span>
+                              <span className="pos-pago-combo-item-meta muted small">
+                                {c.telefono ? `· ${c.telefono}` : ""}
+                                {c.tipo_cliente === "temporal" ? " · ocasional" : ""}
+                              </span>
+                            </li>
+                          ))
+                        )}
+                      </ul>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="pos-cart-mobile-tabs" role="tablist" aria-label="Sección del carrito">
+                  <button
+                    type="button"
+                    role="tab"
+                    className={`pos-cart-mobile-tab${cartMobileTab === "prods" ? " is-active" : ""}`}
+                    aria-selected={cartMobileTab === "prods"}
+                    onClick={() => setCartMobileTab("prods")}
+                  >
+                    Productos ({cart.length})
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    className={`pos-cart-mobile-tab${cartMobileTab === "svcs" ? " is-active" : ""}`}
+                    aria-selected={cartMobileTab === "svcs"}
+                    onClick={() => setCartMobileTab("svcs")}
+                  >
+                    Servicios ({cartServicios.length})
+                  </button>
                 </div>
 
                 <div className="pos-saas-panel-scroll pos-saas-panel-scroll--cart">
@@ -1300,6 +1464,15 @@ export function VentasPage() {
                       {clienteId !== "" && clienteSeleccionado ? (
                         <span className="pos-cart-cita-cliente-tag muted small">
                           · {clienteSeleccionado.nombre}
+                          <button
+                            type="button"
+                            className="pos-cart-cita-cliente-clear"
+                            onClick={limpiarCliente}
+                            title="Quitar cliente"
+                            aria-label="Quitar cliente"
+                          >
+                            ×
+                          </button>
                         </span>
                       ) : null}
                     </span>
@@ -1364,9 +1537,9 @@ export function VentasPage() {
                         <option value="">
                           {clienteId !== ""
                             ? citasParaAsociarFiltradas.length === 0
-                              ? "— Este cliente no tiene citas pendientes —"
-                              : "— Elegí cita del cliente —"
-                            : "— Sin cita (elegí una si cobrás servicios) —"}
+                              ? "— Sin cita asociada —"
+                              : "— Sin cita (opcional) —"
+                            : "— Sin cita (opcional) —"}
                         </option>
                         {citaOrigenId != null &&
                         !citasParaAsociarFiltradas.some((x) => x.id === citaOrigenId) ? (
@@ -1413,9 +1586,8 @@ export function VentasPage() {
                       </button>
                     </div>
                     {cartServicios.length > 0 && citaOrigenId == null ? (
-                      <p className="pos-cart-cita-warn small">
-                        <strong>Obligatorio</strong>: elegí o creá la cita para cobrar estos servicios y
-                        actualizar la agenda.
+                      <p className="pos-cart-cita-warn small muted">
+                        Opcional: podés asociar una cita de la agenda si lo necesitás.
                       </p>
                     ) : null}
                   </div>
@@ -1429,20 +1601,11 @@ export function VentasPage() {
                         <Plus size={14} weight="bold" aria-hidden />
                         Agregar servicio
                       </button>
-                      {cartServicios.length > 0 && citaOrigenId != null ? (
+                      {cartServicios.length > 0 ? (
                         <button
                           type="button"
                           className="link danger small"
-                          onClick={quitarTodosServiciosYCita}
-                        >
-                          Quitar
-                        </button>
-                      ) : null}
-                      {cartServicios.length > 0 && citaOrigenId == null ? (
-                        <button
-                          type="button"
-                          className="link danger small"
-                          onClick={() => {
+                          onClick={citaOrigenId != null ? quitarTodosServiciosYCita : () => {
                             setCartServicios([]);
                             posBeepOk();
                           }}
@@ -1815,103 +1978,6 @@ export function VentasPage() {
                 </div>
 
                 <div className="pos-saas-panel-scroll">
-                <div className="pos-pago-block">
-                  <span className="pos-saas-field-label">Cliente</span>
-                  <div className="pos-pago-combo" ref={clienteComboRef}>
-                    <div className="pos-pago-combo-row">
-                      <div className="pos-pago-combo-input-wrap">
-                        <input
-                          id="venta-cliente-input"
-                          type="text"
-                          className="pos-saas-input pos-pago-combo-input"
-                          placeholder="Buscar por nombre, teléfono o email…"
-                          value={clienteInputValue}
-                          onFocus={() => setClienteOpen(true)}
-                          onChange={(e) => {
-                            setClienteBusqueda(e.target.value);
-                            setClienteOpen(true);
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === "ArrowDown") {
-                              e.preventDefault();
-                              setClienteOpen(true);
-                              setClienteHover((h) =>
-                                Math.min(h + 1, Math.max(0, clientesFiltradosLista.length - 1))
-                              );
-                            } else if (e.key === "ArrowUp") {
-                              e.preventDefault();
-                              setClienteHover((h) => Math.max(h - 1, 0));
-                            } else if (e.key === "Enter") {
-                              if (clienteOpen && clientesFiltradosLista[clienteHover]) {
-                                e.preventDefault();
-                                seleccionarCliente(clientesFiltradosLista[clienteHover]!.id);
-                              }
-                            } else if (e.key === "Escape") {
-                              e.preventDefault();
-                              setClienteOpen(false);
-                            }
-                          }}
-                          autoComplete="off"
-                          spellCheck={false}
-                          aria-label="Buscar y elegir cliente"
-                          aria-expanded={clienteOpen}
-                          aria-autocomplete="list"
-                          role="combobox"
-                        />
-                        {clienteId !== "" && !clienteOpen ? (
-                          <button
-                            type="button"
-                            className="pos-pago-combo-clear"
-                            onClick={limpiarCliente}
-                            title="Quitar cliente"
-                            aria-label="Quitar cliente"
-                          >
-                            ×
-                          </button>
-                        ) : null}
-                      </div>
-                      <button
-                        type="button"
-                        className="btn ghost small pos-pago-cliente-add pos-pago-cliente-add--icon"
-                        onClick={() => setCreateClienteOpen(true)}
-                        title="Registrar nuevo cliente"
-                        aria-label="Registrar nuevo cliente"
-                      >
-                        <Plus size={16} weight="bold" aria-hidden />
-                      </button>
-                    </div>
-                    {clienteOpen ? (
-                      <ul className="pos-pago-combo-list" role="listbox">
-                        {clientesFiltradosLista.length === 0 ? (
-                          <li className="pos-pago-combo-empty muted small">
-                            Sin coincidencias. Tocá «Nuevo» para registrarlo.
-                          </li>
-                        ) : (
-                          clientesFiltradosLista.slice(0, 10).map((c, i) => (
-                            <li
-                              key={c.id}
-                              className={`pos-pago-combo-item ${i === clienteHover ? "pos-pago-combo-item--active" : ""} ${clienteId === c.id ? "pos-pago-combo-item--current" : ""}`}
-                              onMouseEnter={() => setClienteHover(i)}
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                seleccionarCliente(c.id);
-                              }}
-                              role="option"
-                              aria-selected={clienteId === c.id}
-                            >
-                              <span className="pos-pago-combo-item-name">{c.nombre}</span>
-                              <span className="pos-pago-combo-item-meta muted small">
-                                {c.telefono ? `· ${c.telefono}` : ""}
-                                {c.tipo_cliente === "temporal" ? " · ocasional" : ""}
-                              </span>
-                            </li>
-                          ))
-                        )}
-                      </ul>
-                    ) : null}
-                  </div>
-                </div>
-
                 <div className="pos-pago-resumen">
                   <div className="pos-pago-resumen-row">
                     <span className="muted">Subtotal productos</span>
@@ -2070,40 +2136,30 @@ export function VentasPage() {
                       onChange={(e) => setNuevaCitaDuracion(filterIntegerTyping(e.target.value))}
                     />
                   </label>
-                  <label className="pos-nueva-cita-field">
-                    <span>Profesional</span>
-                    <select
-                      className="pos-saas-select"
+                  <div className="pos-nueva-cita-field pos-nueva-cita-field--combo">
+                    <SearchableSelect
+                      label="Profesional"
                       value={nuevaCitaProfesional === "" ? "" : String(nuevaCitaProfesional)}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setNuevaCitaProfesional(v === "" ? "" : Number(v));
-                      }}
-                    >
-                      <option value="">— Elegí profesional —</option>
-                      {equipo.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.nombre || p.email}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="pos-nueva-cita-field pos-nueva-cita-field--full">
-                    <span>Servicio (opcional)</span>
-                    <input
-                      type="text"
-                      list={servicioNombreCatalogId}
-                      className="pos-saas-input"
-                      placeholder="Ej. Corte dama, Tinte…"
-                      value={nuevaCitaServicio}
-                      onChange={(e) => setNuevaCitaServicio(e.target.value)}
+                      onChange={(v) => setNuevaCitaProfesional(v === "" ? "" : Number(v))}
+                      options={opcionesProfesionalNuevaCita}
+                      placeholder="Buscar profesional…"
+                      idleTextWhenEmpty="— Elegí profesional —"
+                      disabled={nuevaCitaSubmitting}
                     />
-                    <datalist id={servicioNombreCatalogId}>
-                      {serviciosCatalogo.map((s) => (
-                        <option key={s.id} value={s.nombre_categoria} />
-                      ))}
-                    </datalist>
-                  </label>
+                  </div>
+                  <div className="pos-nueva-cita-field pos-nueva-cita-field--full pos-nueva-cita-field--combo">
+                    <SearchableSelect
+                      variant="combobox"
+                      allowCustom
+                      label="Servicio (opcional)"
+                      value={nuevaCitaServicio}
+                      onChange={setNuevaCitaServicio}
+                      options={opcionesServicioNuevaCita}
+                      placeholder="Buscar servicio…"
+                      idleTextWhenEmpty="Ej. Corte dama, Tinte…"
+                      disabled={nuevaCitaSubmitting}
+                    />
+                  </div>
                 </div>
                 <div className="pos-nueva-cita-actions">
                   <button
@@ -2142,6 +2198,13 @@ export function VentasPage() {
           </p>
         </section>
       ) : null}
+
+      <SaleSuccessModal
+        open={successModal.open}
+        total={successModal.total}
+        invoiceNumber={successModal.invoiceNumber}
+        onClose={onSuccessModalClose}
+      />
     </>
   );
 }

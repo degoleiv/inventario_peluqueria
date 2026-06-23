@@ -1,11 +1,8 @@
 import { db, recordSyncEvent } from "../db.js";
 import { AppError } from "../lib/AppError.js";
+import { localNow, localToday } from "../lib/localDate.js";
 import { configuracionService } from "./configuracion.service.js";
 import { commissionService } from "./commission.service.js";
-
-function todayISODate() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 export const ventaService = {
   async list(desde?: string, hasta?: string) {
@@ -99,7 +96,7 @@ export const ventaService = {
         .get(citaIdPre)) as { id: number } | undefined;
       if (!existeCita) throw new AppError("La cita asociada no existe", 404);
     }
-    const now = new Date().toISOString();
+    const now = localNow();
     const fechaVenta =
       typeof body.fecha === "string" && body.fecha.trim() ? body.fecha.trim() : now;
 
@@ -145,7 +142,7 @@ export const ventaService = {
         subtotal: number;
       }[] = [];
 
-      const today = todayISODate();
+      const today = localToday();
 
       for (const sv of serviciosIn as Record<string, unknown>[]) {
         const nombre =
@@ -372,7 +369,7 @@ export const ventaService = {
       .prepare(`SELECT producto_id, cantidad FROM venta_lineas WHERE venta_id = ?`)
       .all(id)) as { producto_id: number; cantidad: number }[];
 
-    const now = new Date().toISOString();
+    const now = localNow();
 
     await db.transaction(async () => {
       await commissionService.deleteByVentaId(id);

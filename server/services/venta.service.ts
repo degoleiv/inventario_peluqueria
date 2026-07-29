@@ -3,6 +3,7 @@ import { AppError } from "../lib/AppError.js";
 import { localNow, localToday } from "../lib/localDate.js";
 import { configuracionService } from "./configuracion.service.js";
 import { commissionService } from "./commission.service.js";
+import { descuentoService, type DescuentoTipo } from "./descuento.service.js";
 
 export const ventaService = {
   async list(desde?: string, hasta?: string) {
@@ -64,7 +65,17 @@ export const ventaService = {
          WHERE vs.venta_id = ?`
       )
       .all(id);
-    return { ...venta, lineas, servicios };
+    const descuentos_aplicados = await db
+      .prepare(
+        `SELECT da.*, d.nombre AS descuento_nombre, p.nombre AS producto_nombre
+         FROM descuento_aplicaciones da
+         LEFT JOIN descuentos d  ON d.id = da.descuento_id
+         LEFT JOIN productos  p  ON p.id = da.producto_id
+         WHERE da.venta_id = ?
+         ORDER BY da.id ASC`
+      )
+      .all(id);
+    return { ...venta, lineas, servicios, descuentos_aplicados };
   },
 
   async create(body: Record<string, unknown>) {
@@ -114,8 +125,8 @@ export const ventaService = {
     if (!vu) throw new AppError("Vendedor no encontrado o inactivo");
 
     const insVenta = db.prepare(
-      `INSERT INTO ventas (cliente_id, fecha, total, metodo_pago, notas, created_at, descuento_puntos, puntos_canjeados, usuario_id, cita_id)
-       VALUES (?,?,?,?,?,?,?,?,?,?)`
+      `INSERT INTO ventas (cliente_id, fecha, total, metodo_pago, notas, created_at, descuento_puntos, puntos_canjeados, usuario_id, cita_id, descuento_total, descuento_manual, descuento_manual_motivo)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`
     );
     const insServicio = db.prepare(
       `INSERT INTO venta_servicios (venta_id, cita_id, servicio_nombre, usuario_id, cantidad, valor_unitario, subtotal, created_at)
@@ -222,6 +233,43 @@ export const ventaService = {
           ? Number(body.cliente_id)
           : null;
 
+      // ── Descuentos configurados + manual ─────────────────────────────
+      let manualIn: { tipo: DescuentoTipo; valor: number; motivo: string | null } | null = null;
+      const rawManual = body.descuento_manual as Record<string, unknown> | undefined | null;
+      if (rawManual && typeof rawManual === "object") {
+        const t = rawManual.tipo;
+        const v = Number(rawManual.valor);
+        if ((t === "porcentaje" || t === "monto") && Number.isFinite(v) && v > 0) {
+          if (t === "porcentaje" && v > 100) {
+            throw new AppError("El descuento manual en % no puede superar 100");
+          }
+          manualIn = {
+            tipo: t,
+            valor: v,
+            motivo: typeof rawManual.motivo === "string" ? rawManual.motivo.trim() || null : null,
+          };
+        }
+      }
+
+      const calc = await descuentoService.calcular({
+        cliente_id: clienteIdPre,
+        lineas: prepared.map((p) => ({
+          producto_id: p.producto_id,
+          cantidad: p.cantidad,
+          precio_unitario: p.precio_unitario,
+        })),
+        servicios: preparedServicios.map((s) => ({
+          cantidad: s.cantidad,
+          valor_unitario: s.valor_unitario,
+        })),
+        manual: manualIn,
+      });
+      const descuentoTotalCfg = calc.total_descuento;
+      const totalBrutoTrasDescuentos = Math.max(0, totalBruto - descuentoTotalCfg);
+      const descuentoManualMonto = calc.aplicados
+        .filter((a) => a.origen === "manual")
+        .reduce((acc, a) => acc + a.monto, 0);
+
       const valorRedencion = await configuracionService.getPuntosValorRedencion();
       const reqCanje = Math.floor(
         Number(
@@ -234,16 +282,16 @@ export const ventaService = {
         clienteIdPre != null &&
         valorRedencion > 0 &&
         reqCanje > 0 &&
-        totalBruto > 0
+        totalBrutoTrasDescuentos > 0
       ) {
         const cli = (await db.prepare(`SELECT puntos FROM clientes WHERE id = ?`).get(clienteIdPre)) as
           | { puntos: number }
           | undefined;
         if (!cli) throw new AppError("Cliente no existe");
-        const maxPtsPorMonto = Math.floor(totalBruto / valorRedencion + 1e-12);
+        const maxPtsPorMonto = Math.floor(totalBrutoTrasDescuentos / valorRedencion + 1e-12);
         const usar = Math.min(reqCanje, Math.max(0, cli.puntos), maxPtsPorMonto);
         if (usar > 0) {
-          descuentoPuntos = Math.min(usar * valorRedencion, totalBruto);
+          descuentoPuntos = Math.min(usar * valorRedencion, totalBrutoTrasDescuentos);
           puntosCanjeadosEfectivos = usar;
           const quitarPts = db.prepare(
             `UPDATE clientes SET puntos = puntos - ?, updated_at = ? WHERE id = ? AND puntos >= ?`
@@ -255,7 +303,7 @@ export const ventaService = {
         }
       }
 
-      const totalFinal = Math.max(0, totalBruto - descuentoPuntos);
+      const totalFinal = Math.max(0, totalBrutoTrasDescuentos - descuentoPuntos);
 
       const info = await insVenta.run(
         clienteIdPre,
@@ -267,9 +315,13 @@ export const ventaService = {
         descuentoPuntos,
         puntosCanjeadosEfectivos,
         usuario_id,
-        citaIdPre
+        citaIdPre,
+        descuentoTotalCfg,
+        descuentoManualMonto,
+        manualIn?.motivo ?? null
       );
       const vid = Number(info.lastInsertRowid);
+      await descuentoService.registrarAplicaciones(vid, clienteIdPre, calc.aplicados);
 
       const insLine = db.prepare(
         `INSERT INTO venta_lineas (venta_id, producto_id, cantidad, precio_unitario, subtotal)
@@ -327,6 +379,8 @@ export const ventaService = {
         cita_id: citaIdPre,
         total: totalFinal,
         total_bruto: totalBruto,
+        descuento_total: descuentoTotalCfg,
+        descuento_manual: descuentoManualMonto,
         descuento_puntos: descuentoPuntos,
         lineas: prepared.length,
         servicios: preparedServicios.length,

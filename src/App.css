@@ -8722,6 +8722,10 @@ select {
   border-top: 1px solid var(--pp-line);
 }
 
+.page-pedidos .pedidos-wizard-footer--end {
+  justify-content: flex-end;
+}
+
 .page-pedidos .pedidos-drawer-footer {
   margin-top: 8px;
   padding-top: 20px;
@@ -8807,6 +8811,30 @@ select {
 
 .page-pedidos .pedidos-btn--secondary:active:not(:disabled) {
   transform: translateY(0);
+}
+
+.page-pedidos .pedidos-btn--danger-ghost {
+  color: var(--pp-danger, #dc2626);
+  background: var(--pp-card);
+  border-color: color-mix(in srgb, var(--pp-danger, #dc2626) 35%, var(--pp-line));
+  font-weight: 600;
+}
+
+.page-pedidos .pedidos-btn--danger-ghost:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--pp-danger, #dc2626) 10%, var(--pp-card));
+  border-color: var(--pp-danger, #dc2626);
+}
+
+.page-pedidos .pedidos-btn--compact {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.82rem;
+}
+
+.page-pedidos .pedidos-historial-row__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
 }
 
 .page-pedidos .pedido-toggle input:checked + .pedido-toggle__track {
@@ -9035,6 +9063,13 @@ select {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 6px;
+}
+
+.page-pedidos .pedidos-drawer-card__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .page-pedidos .pedidos-drawer-card__title {

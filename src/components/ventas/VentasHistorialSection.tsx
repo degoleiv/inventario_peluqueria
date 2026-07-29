@@ -14,7 +14,12 @@ import { useVentasHistorial } from "./historial/useVentasHistorial";
 import { useToast } from "../../context/ToastContext";
 import { useMediosPagoTransferencia } from "../../hooks/useMediosPagoTransferencia";
 
-export function VentasHistorialSection() {
+type Props = {
+  puedeCrear: boolean;
+  puedeEliminar: boolean;
+};
+
+export function VentasHistorialSection({ puedeCrear, puedeEliminar }: Props) {
   useMediosPagoTransferencia();
   const toast = useToast();
   const h = useVentasHistorial();
@@ -43,14 +48,18 @@ export function VentasHistorialSection() {
           </p>
         </div>
         <div className="sales-history-header-actions">
-          <Link to="/ventas/cierre" className="btn secondary">
-            <LockSimple size={18} aria-hidden />
-            Cerrar día
-          </Link>
-          <Link to="/ventas/ventas" className="btn primary">
-            <Plus size={18} weight="bold" aria-hidden />
-            Nueva venta
-          </Link>
+          {puedeCrear ? (
+            <Link to="/ventas/cierre" className="btn secondary">
+              <LockSimple size={18} aria-hidden />
+              Cerrar día
+            </Link>
+          ) : null}
+          {puedeCrear ? (
+            <Link to="/ventas/ventas" className="btn primary">
+              <Plus size={18} weight="bold" aria-hidden />
+              Nueva venta
+            </Link>
+          ) : null}
           <button type="button" className="btn ghost" onClick={() => void h.loadVentas()} disabled={h.loading}>
             <ArrowClockwise size={18} aria-hidden />
             Actualizar
@@ -100,7 +109,7 @@ export function VentasHistorialSection() {
                   selected={h.selectedId === v.id}
                   onOpen={() => void h.openDetalle(v.id)}
                   onReprint={handleReprint}
-                  onCancel={() => h.setCancelTarget(v)}
+                  onCancel={puedeEliminar ? () => h.setCancelTarget(v) : undefined}
                 />
               ))
             )}
@@ -129,9 +138,13 @@ export function VentasHistorialSection() {
         detalle={h.detalle}
         onClose={h.closeDetalle}
         onReprint={handleReprint}
-        onCancel={() => {
-          if (h.detalle) h.setCancelTarget(h.detalle);
-        }}
+        onCancel={
+          puedeEliminar
+            ? () => {
+                if (h.detalle) h.setCancelTarget(h.detalle);
+              }
+            : undefined
+        }
       />
 
       <ConfirmDialog

@@ -9,7 +9,6 @@ import {
   deleteTurnoEmpleado,
   deleteUsuario,
   downloadCertificadoLaboral,
-  fetchAuthMe,
   fetchEmpleadoLiquidacionComisiones,
   fetchEmpleadoResumen,
   fetchEmpleadosMovimientos,
@@ -33,8 +32,15 @@ import { Drawer } from "../components/Drawer";
 import { SubNav } from "../components/SubNav";
 import { esEmpleadoSalarioFijo } from "../lib/nominaEmpleado";
 import { EMPLEADOS_TABS, readEmpleadosTab, type EmpleadosTab } from "../lib/moduleRoutes";
-import { NAV_LABEL, PERMISO_MODULOS, type PermisoModulo } from "../nav";
+import {
+  NAV_LABEL,
+  PERMISO_ACCIONES,
+  PERMISO_MODULOS,
+  type PermisoAccion,
+  type PermisoModulo,
+} from "../nav";
 import { useToast } from "../context/ToastContext";
+import { usePermisos } from "../context/PermisosContext";
 import { formatMoney, filterMoneyTyping, parseMoneyLoose } from "../lib/money";
 import { CircleNotch, Download, PencilSimple, Plus, Trash } from "@phosphor-icons/react";
 
@@ -74,20 +80,100 @@ function isoDesdeHaceDiasInclusive(dias: number) {
   return d.toISOString().slice(0, 10);
 }
 
-function emptyPermMods(): Record<PermisoModulo, boolean> {
-  return PERMISO_MODULOS.reduce(
-    (acc, m) => ({ ...acc, [m]: false }),
-    {} as Record<PermisoModulo, boolean>
+type RolMods = Record<PermisoModulo, Record<PermisoAccion, boolean>>;
+
+const MODULO_ALIAS_ROL: Record<string, PermisoModulo> = {
+  compras: "pedidos",
+  proveedores: "pedidos",
+  pedidos_proveedores: "pedidos",
+};
+
+function normalizarModulo(m: string): PermisoModulo | null {
+  if (PERMISO_MODULOS.includes(m as PermisoModulo)) return m as PermisoModulo;
+  return MODULO_ALIAS_ROL[m] ?? null;
+}
+
+function accionesVacias(): Record<PermisoAccion, boolean> {
+  return PERMISO_ACCIONES.reduce(
+    (a, k) => ({ ...a, [k]: false }),
+    {} as Record<PermisoAccion, boolean>
   );
 }
 
-function permisosToMods(permisos: string[]): Record<PermisoModulo, boolean> {
+function accionesTodas(): Record<PermisoAccion, boolean> {
+  return PERMISO_ACCIONES.reduce(
+    (a, k) => ({ ...a, [k]: true }),
+    {} as Record<PermisoAccion, boolean>
+  );
+}
+
+function emptyPermMods(): RolMods {
+  return PERMISO_MODULOS.reduce(
+    (acc, m) => ({ ...acc, [m]: accionesVacias() }),
+    {} as RolMods
+  );
+}
+
+function permisosToMods(permisos: string[]): RolMods {
   const mods = emptyPermMods();
   if (permisos.includes("*")) return mods;
   for (const p of permisos) {
-    if (PERMISO_MODULOS.includes(p as PermisoModulo)) mods[p as PermisoModulo] = true;
+    if (p.includes(":")) {
+      const [rawMod, rawAcc] = p.split(":");
+      if (!rawMod || !rawAcc) continue;
+      const m = normalizarModulo(rawMod);
+      if (!m) continue;
+      if (PERMISO_ACCIONES.includes(rawAcc as PermisoAccion)) {
+        mods[m][rawAcc as PermisoAccion] = true;
+      }
+    } else {
+      const m = normalizarModulo(p);
+      if (!m) continue;
+      mods[m] = accionesTodas();
+    }
   }
   return mods;
+}
+
+/** Colapsa a `modulo` si están las 4 acciones (formato compat); de lo contrario, emite `modulo:accion`. */
+function modsToPermisos(mods: RolMods): string[] {
+  const out: string[] = [];
+  for (const m of PERMISO_MODULOS) {
+    const perAcc = mods[m];
+    const seleccionadas = PERMISO_ACCIONES.filter((a) => perAcc[a]);
+    if (seleccionadas.length === 0) continue;
+    if (seleccionadas.length === PERMISO_ACCIONES.length) {
+      out.push(m);
+    } else {
+      for (const a of seleccionadas) out.push(`${m}:${a}`);
+    }
+  }
+  return out;
+}
+
+const ACCION_ABBR: Record<PermisoAccion, string> = {
+  ver: "V",
+  crear: "C",
+  editar: "E",
+  eliminar: "X",
+};
+
+function resumenPermisos(permisos: string[]): string {
+  if (permisos.includes("*")) return "Acceso total";
+  if (permisos.length === 0) return "—";
+  const mods = permisosToMods(permisos);
+  const partes: string[] = [];
+  for (const m of PERMISO_MODULOS) {
+    const seleccionadas = PERMISO_ACCIONES.filter((a) => mods[m][a]);
+    if (seleccionadas.length === 0) continue;
+    const label = NAV_LABEL[m];
+    if (seleccionadas.length === PERMISO_ACCIONES.length) {
+      partes.push(`${label} (todo)`);
+    } else {
+      partes.push(`${label} (${seleccionadas.map((a) => ACCION_ABBR[a]).join("·")})`);
+    }
+  }
+  return partes.length > 0 ? partes.join(" · ") : "—";
 }
 
 type EmpleadoEstadoFiltro = "todos" | "activo" | "inactivo";
@@ -111,6 +197,7 @@ export function EmpleadosPage({ onChanged }: Props) {
   const { tab: tabParam } = useParams<{ tab: string }>();
   const navigate = useNavigate();
   const toast = useToast();
+  const { esAdmin, permisos } = usePermisos();
   const nuevoHandled = useRef(false);
 
   const [roles, setRoles] = useState<RolDefinicion[]>([]);
@@ -167,7 +254,7 @@ export function EmpleadosPage({ onChanged }: Props) {
     notas: "",
   });
 
-  const [puedeCertificado, setPuedeCertificado] = useState(false);
+  const puedeCertificado = esAdmin;
   /** Feedback UI mientras el API genera el PDF del certificado. */
   const [certBusy, setCertBusy] = useState<{ id: number } | null>(null);
   const certLockRef = useRef(false);
@@ -203,32 +290,33 @@ export function EmpleadosPage({ onChanged }: Props) {
   );
 
   const load = useCallback(async () => {
+    if (!esAdmin) {
+      setRoles([]);
+      setUsuarios([]);
+      return;
+    }
     setLoading(true);
     try {
-      const me = await fetchAuthMe();
-      setPuedeCertificado(!!me.user.permisos?.includes("*"));
-      if (!me.user.permisos?.includes("*")) {
-        setRoles([]);
-        setUsuarios([]);
-        navigate("/inicio", { replace: true });
-        return;
-      }
       const [r, u] = await Promise.all([fetchRoles(), fetchUsuarios()]);
       setRoles(r);
       setUsuarios(u);
     } catch (e) {
       toast(e instanceof Error ? e.message : "Error", "error");
-      setPuedeCertificado(false);
       setRoles([]);
       setUsuarios([]);
     } finally {
       setLoading(false);
     }
-  }, [toast, navigate]);
+  }, [toast, esAdmin]);
 
   useEffect(() => {
+    if (permisos.length === 0) return;
+    if (!esAdmin) {
+      navigate("/inicio", { replace: true });
+      return;
+    }
     void load();
-  }, [load]);
+  }, [load, permisos.length, esAdmin, navigate]);
 
   /* Al actualizar usuario/rol desde este módulo, volver a cargar lista y roles */
   useEffect(() => {
@@ -456,9 +544,9 @@ export function EmpleadosPage({ onChanged }: Props) {
     if (rolForm.editingSlug === "admin" || rolForm.todo) {
       permisos = ["*"];
     } else {
-      permisos = PERMISO_MODULOS.filter((m) => rolForm.mods[m]);
+      permisos = modsToPermisos(rolForm.mods);
       if (permisos.length === 0) {
-        toast("Marcá al menos un módulo o activá acceso total.", "warning");
+        toast("Marcá al menos una acción o activá acceso total.", "warning");
         return;
       }
     }
@@ -1424,7 +1512,11 @@ export function EmpleadosPage({ onChanged }: Props) {
                     <div className="muted small">{r.nombre}</div>
                   </td>
                   <td className="small">
-                    {r.permisos.includes("*") ? <strong>*</strong> : r.permisos.join(", ")}
+                    {r.permisos.includes("*") ? (
+                      <strong>Acceso total (*)</strong>
+                    ) : (
+                      resumenPermisos(r.permisos)
+                    )}
                   </td>
                   <td className="row-actions">
                     <button type="button" className="link" onClick={() => openRolDrawerEditar(r)}>
@@ -1494,28 +1586,82 @@ export function EmpleadosPage({ onChanged }: Props) {
               {!rolForm.todo ? (
                 <fieldset className="rol-perm-fieldset" style={{ border: "none", padding: 0, margin: 0 }}>
                   <legend className="field-label-strong" style={{ marginBottom: "0.35rem" }}>
-                    Módulos permitidos
+                    Permisos por módulo
                   </legend>
-                  <div
-                    className="perm-grid rol-perm-grid"
-                    style={{ display: "grid", gap: "0.35rem", marginBottom: "0.75rem" }}
-                  >
-                    {PERMISO_MODULOS.map((m) => (
-                      <label key={m} className="field inline-check">
-                        <input
-                          type="checkbox"
-                          checked={!!rolForm.mods[m]}
-                          onChange={(e) =>
-                            setRolForm((x) => ({
-                              ...x,
-                              mods: { ...x.mods, [m]: e.target.checked },
-                            }))
-                          }
-                        />
-                        <span>{NAV_LABEL[m]}</span>
-                      </label>
-                    ))}
+                  <div className="table-wrap">
+                    <table className="table rol-matriz-table">
+                      <thead>
+                        <tr>
+                          <th style={{ textAlign: "left" }}>Módulo</th>
+                          <th style={{ textAlign: "center" }}>Ver</th>
+                          <th style={{ textAlign: "center" }}>Crear</th>
+                          <th style={{ textAlign: "center" }}>Editar</th>
+                          <th style={{ textAlign: "center" }}>Eliminar</th>
+                          <th style={{ textAlign: "center" }}>Todos</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {PERMISO_MODULOS.map((m) => {
+                          const perAcc = rolForm.mods[m];
+                          const todosMod = PERMISO_ACCIONES.every((a) => perAcc[a]);
+                          return (
+                            <tr key={m}>
+                              <td>{NAV_LABEL[m]}</td>
+                              {PERMISO_ACCIONES.map((a) => (
+                                <td key={a} style={{ textAlign: "center" }}>
+                                  <input
+                                    type="checkbox"
+                                    aria-label={`${NAV_LABEL[m]}: ${a}`}
+                                    checked={perAcc[a]}
+                                    onChange={(e) => {
+                                      const v = e.target.checked;
+                                      setRolForm((x) => {
+                                        const cur = x.mods[m];
+                                        const next = { ...cur, [a]: v };
+                                        // "ver" es requisito: activar cualquier otra acción
+                                        // implica ver; quitar ver limpia el resto.
+                                        if (a !== "ver" && v) next.ver = true;
+                                        if (a === "ver" && !v) {
+                                          next.crear = false;
+                                          next.editar = false;
+                                          next.eliminar = false;
+                                        }
+                                        return {
+                                          ...x,
+                                          mods: { ...x.mods, [m]: next },
+                                        };
+                                      });
+                                    }}
+                                  />
+                                </td>
+                              ))}
+                              <td style={{ textAlign: "center" }}>
+                                <input
+                                  type="checkbox"
+                                  aria-label={`${NAV_LABEL[m]}: todas las acciones`}
+                                  checked={todosMod}
+                                  onChange={(e) => {
+                                    const v = e.target.checked;
+                                    setRolForm((x) => ({
+                                      ...x,
+                                      mods: {
+                                        ...x.mods,
+                                        [m]: v ? accionesTodas() : accionesVacias(),
+                                      },
+                                    }));
+                                  }}
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
+                  <p className="muted small" style={{ marginTop: "0.5rem" }}>
+                    <strong>Ver</strong> hace que el módulo aparezca en la barra lateral. Al activar
+                    <em> Crear / Editar / Eliminar</em> se marca automáticamente <strong>Ver</strong>.
+                  </p>
                 </fieldset>
               ) : null}
             </>

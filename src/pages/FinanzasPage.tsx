@@ -17,7 +17,6 @@ import {
   createCobranza,
   createGasto,
   deleteGasto,
-  fetchAuthMe,
   fetchCategoriasFinanzaConcepto,
   fetchClientes,
   fetchCobranzas,
@@ -31,6 +30,7 @@ import {
   type GastoOperativo,
 } from "../api";
 import { useToast } from "../context/ToastContext";
+import { usePermisos, usePuede } from "../context/PermisosContext";
 import { formatMoney, formatMoneyForInput, parseMoneyInput } from "../lib/money";
 import { SearchableSelect } from "../components/SearchableSelect";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -141,7 +141,9 @@ function buildFinanzasCalendarCells(viewDate: Date): FinCalCell[] {
 export function FinanzasPage() {
   const toast = useToast();
   const [tab, setTab] = useState<FinanzasTab>("flujo");
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { esAdmin: isAdmin } = usePermisos();
+  const puedeCrearFin = usePuede("finanzas", "crear");
+  const puedeEditarFin = usePuede("finanzas", "editar");
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
   const [flujo, setFlujo] = useState<FlujoCaja | null>(null);
@@ -288,22 +290,6 @@ export function FinanzasPage() {
     void load();
   }, [load]);
 
-  useEffect(() => {
-    let cancel = false;
-    void (async () => {
-      try {
-        const me = await fetchAuthMe();
-        if (cancel) return;
-        setIsAdmin(!!me.user.permisos?.includes("*"));
-      } catch (e) {
-        console.warn("[finanzas] No se pudo verificar permisos de admin:", e);
-        if (!cancel) setIsAdmin(false);
-      }
-    })();
-    return () => {
-      cancel = true;
-    };
-  }, []);
 
   useEffect(() => {
     if (!diaDetalleIso) return;
@@ -668,6 +654,7 @@ export function FinanzasPage() {
 
       {tab === "gastos" ? (
         <>
+          {isAdmin ? (
           <section
             id="finanzas-gastos-form-anchor"
             className="pedidos-wizard-card finanzas-tab-panel"
@@ -738,6 +725,7 @@ export function FinanzasPage() {
               </div>
             </form>
           </section>
+          ) : null}
 
           <section
             className="pedidos-wizard-card finanzas-tab-panel"
@@ -1137,13 +1125,15 @@ export function FinanzasPage() {
               >
                 Cerrar
               </button>
-              <button
-                type="button"
-                className="pedidos-btn pedidos-btn--primary"
-                onClick={() => abrirRapidoEnDia(diaDetalleIso)}
-              >
-                <Plus size={16} weight="bold" aria-hidden /> Registrar gasto en este día
-              </button>
+              {isAdmin ? (
+                <button
+                  type="button"
+                  className="pedidos-btn pedidos-btn--primary"
+                  onClick={() => abrirRapidoEnDia(diaDetalleIso)}
+                >
+                  <Plus size={16} weight="bold" aria-hidden /> Registrar gasto en este día
+                </button>
+              ) : null}
             </div>
           </div>
         </div>
@@ -1213,11 +1203,13 @@ export function FinanzasPage() {
                   />
                 </div>
               </div>
-              <div className="pedidos-actions-row pedidos-actions-row--start" style={{ marginTop: "18px" }}>
-                <button type="submit" className="pedidos-btn pedidos-btn--primary">
-                  Registrar deuda
-                </button>
-              </div>
+              {puedeCrearFin ? (
+                <div className="pedidos-actions-row pedidos-actions-row--start" style={{ marginTop: "18px" }}>
+                  <button type="submit" className="pedidos-btn pedidos-btn--primary">
+                    Registrar deuda
+                  </button>
+                </div>
+              ) : null}
             </form>
           </section>
 
@@ -1266,14 +1258,16 @@ export function FinanzasPage() {
                             <td className="finanzas-table__mono">{formatMoney(Number(c.saldo_pendiente))}</td>
                             <td className="finanzas-table__mono">{c.vencimiento ?? "—"}</td>
                             <td>
-                              <button
-                                type="button"
-                                className="finanzas-pill-pago"
-                                onClick={() => openPagoDeudaModal(c.id, c.saldo_pendiente)}
-                              >
-                                <Check size={16} weight="bold" aria-hidden />
-                                Registrar pago
-                              </button>
+                              {puedeEditarFin ? (
+                                <button
+                                  type="button"
+                                  className="finanzas-pill-pago"
+                                  onClick={() => openPagoDeudaModal(c.id, c.saldo_pendiente)}
+                                >
+                                  <Check size={16} weight="bold" aria-hidden />
+                                  Registrar pago
+                                </button>
+                              ) : null}
                             </td>
                           </tr>
                         );

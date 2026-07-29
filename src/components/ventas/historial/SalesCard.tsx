@@ -24,7 +24,8 @@ type Props = {
   selected?: boolean;
   onOpen: () => void;
   onReprint: () => void;
-  onCancel: () => void;
+  /** Ausente = sin permiso para anular; se oculta el botón. */
+  onCancel?: () => void;
 };
 
 const STATUS_LABEL: Record<ReturnType<typeof ventaEstadoUi>, string> = {
@@ -98,7 +99,7 @@ export function SalesCard({ venta, selected, onOpen, onReprint, onCancel }: Prop
           <button type="button" className="btn ghost small icon-only" title="Reimprimir" onClick={onReprint}>
             <Printer size={18} />
           </button>
-          {activa ? (
+          {activa && onCancel ? (
             <button
               type="button"
               className="btn ghost small icon-only danger"

@@ -8,7 +8,13 @@ import { ReturnsSkeleton } from "./devoluciones/ReturnsSkeleton";
 import { ReturnsDetailDrawer } from "./devoluciones/ReturnsDetailDrawer";
 import { ReturnsCreateModal } from "./devoluciones/ReturnsCreateModal";
 
-export function DevolucionesSection() {
+type Props = {
+  puedeCrear: boolean;
+  puedeEditar: boolean;
+  puedeEliminar: boolean;
+};
+
+export function DevolucionesSection({ puedeCrear, puedeEditar, puedeEliminar }: Props) {
   const h = useDevolucionesHistorial();
 
   return (
@@ -21,14 +27,16 @@ export function DevolucionesSection() {
           </p>
         </div>
         <div className="returns-header-actions">
-          <button
-            type="button"
-            className="btn primary"
-            onClick={() => h.setCreateOpen(true)}
-          >
-            <Plus size={18} weight="bold" aria-hidden />
-            Nueva devolución
-          </button>
+          {puedeCrear ? (
+            <button
+              type="button"
+              className="btn primary"
+              onClick={() => h.setCreateOpen(true)}
+            >
+              <Plus size={18} weight="bold" aria-hidden />
+              Nueva devolución
+            </button>
+          ) : null}
           <button
             type="button"
             className="btn ghost"
@@ -112,10 +120,10 @@ export function DevolucionesSection() {
         loading={h.detalleLoading}
         detalle={h.detalle}
         onClose={h.closeDetalle}
-        onAprobar={() => void h.handleAprobar()}
-        onProcesar={() => void h.handleProcesar()}
-        onRechazar={() => void h.handleRechazar()}
-        onAnular={() => void h.handleAnular()}
+        onAprobar={puedeEditar ? () => void h.handleAprobar() : undefined}
+        onProcesar={puedeEditar ? () => void h.handleProcesar() : undefined}
+        onRechazar={puedeEditar ? () => void h.handleRechazar() : undefined}
+        onAnular={puedeEliminar ? () => void h.handleAnular() : undefined}
       />
 
       <ReturnsCreateModal

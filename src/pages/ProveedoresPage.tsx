@@ -14,6 +14,7 @@ import { ChoiceDialog } from "../components/ChoiceDialog";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { SearchableSelect } from "../components/SearchableSelect";
 import { useToast } from "../context/ToastContext";
+import { usePuede } from "../context/PermisosContext";
 
 function fmtFecha(iso: string) {
   try {
@@ -195,6 +196,9 @@ function ProveedorCardMedia({ proveedor }: { proveedor: Proveedor }) {
 
 export function ProveedoresPage() {
   const toast = useToast();
+  const puedeCrearProv = usePuede("pedidos", "crear");
+  const puedeEditarProv = usePuede("pedidos", "editar");
+  const puedeEliminarProv = usePuede("pedidos", "eliminar");
   const [rows, setRows] = useState<Proveedor[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -496,9 +500,11 @@ export function ProveedoresPage() {
       <section className="card">
         <div className="card-head" style={{ flexWrap: "wrap" }}>
           <h2 className="card-title">Proveedores</h2>
-          <button type="button" className="btn primary" onClick={openCreate}>
-            Nuevo proveedor
-          </button>
+          {puedeCrearProv ? (
+            <button type="button" className="btn primary" onClick={openCreate}>
+              Nuevo proveedor
+            </button>
+          ) : null}
         </div>
         {!loading && rows.length > 0 ? (
           <div className="module-filters-bar">
@@ -596,21 +602,23 @@ export function ProveedoresPage() {
                 <ProveedorCardMedia proveedor={p} />
                 <h3 className="prov-card__nombre-text">{p.nombre}</h3>
                 <div className="prov-card__toolbar" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    type="button"
-                    className="btn ghost small danger-ghost prov-card__icon-btn"
-                    onClick={() => openDelete(p)}
-                    aria-label={`Eliminar ${p.nombre}`}
-                    title="Eliminar"
-                  >
-                    <Trash size={22} weight="regular" aria-hidden />
-                  </button>
+                  {puedeEliminarProv ? (
+                    <button
+                      type="button"
+                      className="btn ghost small danger-ghost prov-card__icon-btn"
+                      onClick={() => openDelete(p)}
+                      aria-label={`Eliminar ${p.nombre}`}
+                      title="Eliminar"
+                    >
+                      <Trash size={22} weight="regular" aria-hidden />
+                    </button>
+                  ) : null}
                   <label className="ui-switch prov-card__switch" title={p.estado === "activo" ? "Activo" : "Inactivo"}>
                     <input
                       type="checkbox"
                       className="ui-switch__input"
                       checked={p.estado === "activo"}
-                      disabled={estadoSavingId === p.id}
+                      disabled={estadoSavingId === p.id || !puedeEditarProv}
                       aria-label={`${p.nombre}: proveedor activo`}
                       onChange={(e) => void onToggleActivo(p, e.target.checked)}
                     />
@@ -778,15 +786,17 @@ export function ProveedoresPage() {
               </dl>
             </fieldset>
             <div className="actions prov-detail-footer prov-detail-footer--actions">
-              <button
-                type="button"
-                className="btn primary"
-                disabled={detailSaveBusy || !detailDirty}
-                title={!detailDirty ? "No hay cambios para guardar" : undefined}
-                onClick={() => void saveDetailProveedorAndClose()}
-              >
-                {detailSaveBusy ? "Guardando…" : "Guardar"}
-              </button>
+              {puedeEditarProv ? (
+                <button
+                  type="button"
+                  className="btn primary"
+                  disabled={detailSaveBusy || !detailDirty}
+                  title={!detailDirty ? "No hay cambios para guardar" : undefined}
+                  onClick={() => void saveDetailProveedorAndClose()}
+                >
+                  {detailSaveBusy ? "Guardando…" : "Guardar"}
+                </button>
+              ) : null}
               <button
                 type="button"
                 className="btn ghost"

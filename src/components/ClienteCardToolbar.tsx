@@ -3,8 +3,9 @@ import { PencilSimple, Star, Trash } from "@phosphor-icons/react";
 type Props = {
   nombreCliente: string;
   pinned: boolean;
-  onEdit: () => void;
-  onDelete: () => void;
+  /** Ausentes = sin permiso; se oculta el botón correspondiente. */
+  onEdit?: () => void;
+  onDelete?: () => void;
   onTogglePin: () => void;
 };
 
@@ -20,30 +21,34 @@ export function ClienteCardToolbar({
 }: Props) {
   return (
     <div className="prov-card__toolbar" onClick={(e) => e.stopPropagation()}>
-      <button
-        type="button"
-        className="btn ghost small prov-card__icon-btn prov-card__icon-btn--edit"
-        title={`Editar ${nombreCliente}`}
-        aria-label={`Editar cliente ${nombreCliente}`}
-        onClick={(e) => {
-          e.stopPropagation();
-          onEdit();
-        }}
-      >
-        <PencilSimple size={22} weight="regular" aria-hidden />
-      </button>
-      <button
-        type="button"
-        className="btn ghost small danger-ghost prov-card__icon-btn"
-        title={`Eliminar ${nombreCliente}`}
-        aria-label={`Eliminar cliente ${nombreCliente}`}
-        onClick={(e) => {
-          e.stopPropagation();
-          onDelete();
-        }}
-      >
-        <Trash size={22} weight="regular" aria-hidden />
-      </button>
+      {onEdit ? (
+        <button
+          type="button"
+          className="btn ghost small prov-card__icon-btn prov-card__icon-btn--edit"
+          title={`Editar ${nombreCliente}`}
+          aria-label={`Editar cliente ${nombreCliente}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit();
+          }}
+        >
+          <PencilSimple size={22} weight="regular" aria-hidden />
+        </button>
+      ) : null}
+      {onDelete ? (
+        <button
+          type="button"
+          className="btn ghost small danger-ghost prov-card__icon-btn"
+          title={`Eliminar ${nombreCliente}`}
+          aria-label={`Eliminar cliente ${nombreCliente}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+        >
+          <Trash size={22} weight="regular" aria-hidden />
+        </button>
+      ) : null}
       <button
         type="button"
         className={`btn ghost small prov-card__icon-btn cliente-card-pin${pinned ? " cliente-card-pin--on" : ""}`}

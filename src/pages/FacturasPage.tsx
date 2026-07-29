@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import {
   downloadFacturaDocumento,
   enviarFacturaPorEmail,
-  fetchAuthMe,
   fetchFacturasElectronicas,
   fetchSmtpConfig,
   probarSmtpEmail,
@@ -11,14 +10,15 @@ import {
   type SmtpPublicConfig,
 } from "../api";
 import { useToast } from "../context/ToastContext";
+import { usePermisos } from "../context/PermisosContext";
 import { formatMoney } from "../lib/money";
 import { PromptDialog } from "../components/PromptDialog";
 
 export function FacturasPage() {
   const toast = useToast();
+  const { esAdmin: isAdmin } = usePermisos();
   const [rows, setRows] = useState<FacturaElectronica[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [smtpCfg, setSmtpCfg] = useState<SmtpPublicConfig | null>(null);
   const [smtpDraft, setSmtpDraft] = useState({
     host: "",
@@ -48,36 +48,31 @@ export function FacturasPage() {
   }, [load]);
 
   useEffect(() => {
+    if (!isAdmin) {
+      setSmtpCfg(null);
+      return;
+    }
     let cancel = false;
     void (async () => {
       try {
-        const me = await fetchAuthMe();
+        const cfg = await fetchSmtpConfig();
         if (cancel) return;
-        const admin = !!me.user.permisos?.includes("*");
-        setIsAdmin(admin);
-        if (!admin) return;
-        try {
-          const cfg = await fetchSmtpConfig();
-          if (cancel) return;
-          setSmtpCfg(cfg);
-          setSmtpDraft({
-            host: cfg.host,
-            portStr: String(cfg.port || 587),
-            secure: cfg.secure,
-            user: cfg.user,
-            from: cfg.from,
-          });
-        } catch {
-          if (!cancel) setSmtpCfg(null);
-        }
+        setSmtpCfg(cfg);
+        setSmtpDraft({
+          host: cfg.host,
+          portStr: String(cfg.port || 587),
+          secure: cfg.secure,
+          user: cfg.user,
+          from: cfg.from,
+        });
       } catch {
-        if (!cancel) setIsAdmin(false);
+        if (!cancel) setSmtpCfg(null);
       }
     })();
     return () => {
       cancel = true;
     };
-  }, []);
+  }, [isAdmin]);
 
   async function guardarSmtp(e: React.FormEvent) {
     e.preventDefault();

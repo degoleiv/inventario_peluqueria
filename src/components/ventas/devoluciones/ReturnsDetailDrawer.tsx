@@ -7,10 +7,11 @@ type Props = {
   loading: boolean;
   open: boolean;
   onClose: () => void;
-  onAprobar: () => void;
-  onProcesar: () => void;
-  onRechazar: () => void;
-  onAnular: () => void;
+  /** Los handlers ausentes ocultan su botón (sin permiso). */
+  onAprobar?: () => void;
+  onProcesar?: () => void;
+  onRechazar?: () => void;
+  onAnular?: () => void;
 };
 
 function actionButtons(
@@ -21,23 +22,31 @@ function actionButtons(
     case "pendiente":
       return (
         <>
-          <button type="button" className="btn primary" onClick={handlers.onAprobar}>
-            Aprobar
-          </button>
-          <button type="button" className="btn ghost danger-text" onClick={handlers.onRechazar}>
-            Rechazar
-          </button>
+          {handlers.onAprobar ? (
+            <button type="button" className="btn primary" onClick={handlers.onAprobar}>
+              Aprobar
+            </button>
+          ) : null}
+          {handlers.onRechazar ? (
+            <button type="button" className="btn ghost danger-text" onClick={handlers.onRechazar}>
+              Rechazar
+            </button>
+          ) : null}
         </>
       );
     case "aprobada":
       return (
         <>
-          <button type="button" className="btn primary" onClick={handlers.onProcesar}>
-            Procesar reembolso
-          </button>
-          <button type="button" className="btn ghost danger-text" onClick={handlers.onAnular}>
-            Anular
-          </button>
+          {handlers.onProcesar ? (
+            <button type="button" className="btn primary" onClick={handlers.onProcesar}>
+              Procesar reembolso
+            </button>
+          ) : null}
+          {handlers.onAnular ? (
+            <button type="button" className="btn ghost danger-text" onClick={handlers.onAnular}>
+              Anular
+            </button>
+          ) : null}
         </>
       );
     default:

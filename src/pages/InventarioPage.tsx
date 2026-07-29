@@ -26,6 +26,7 @@ import { Drawer } from "../components/Drawer";
 import { SearchableSelect } from "../components/SearchableSelect";
 import { SkeletonCard } from "../components/Skeleton";
 import { useToast } from "../context/ToastContext";
+import { usePuede } from "../context/PermisosContext";
 import { SubNav } from "../components/SubNav";
 import { filterIntegerTyping, parseOptionalNonNegativeInt } from "../lib/decimalInput";
 import { formatMoney } from "../lib/money";
@@ -52,6 +53,9 @@ type InventarioTipoFiltro = "todos" | "activo" | "inactivo";
 export function InventarioPage() {
   const { tab: tabParam } = useParams<{ tab: string }>();
   const toast = useToast();
+  const puedeCrearProducto = usePuede("inventario", "crear");
+  const puedeEditarProducto = usePuede("inventario", "editar");
+  const puedeEliminarProducto = usePuede("inventario", "eliminar");
   const [productos, setProductos] = useState<Producto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -509,16 +513,17 @@ export function InventarioPage() {
   }
 
   function buildCtxItems(p: Producto): ContextMenuItem[] {
-    return [
-      { label: "Visualizar", onSelect: () => onVisualizar(p) },
-      { label: "Editar", onSelect: () => onEditar(p) },
-      { label: "Duplicar…", onSelect: () => abrirDuplicarProducto(p) },
-      {
+    const items: ContextMenuItem[] = [{ label: "Visualizar", onSelect: () => onVisualizar(p) }];
+    if (puedeEditarProducto) items.push({ label: "Editar", onSelect: () => onEditar(p) });
+    if (puedeCrearProducto) items.push({ label: "Duplicar…", onSelect: () => abrirDuplicarProducto(p) });
+    if (puedeEliminarProducto) {
+      items.push({
         label: "Eliminar",
         danger: true,
         onSelect: () => requestEliminarProducto(p),
-      },
-    ];
+      });
+    }
+    return items;
   }
 
   function onEliminarDesdeVisualizar() {
@@ -728,7 +733,7 @@ export function InventarioPage() {
                     type="checkbox"
                     className="ui-switch__input"
                     checked={activo}
-                    disabled={estadoSavingId === editado.id}
+                    disabled={estadoSavingId === editado.id || !puedeEditarProducto}
                     onChange={(e) =>
                       void setProductoEstado(editado, e.target.checked ? "activo" : "inactivo")
                     }
@@ -758,9 +763,11 @@ export function InventarioPage() {
         <div className="card-head">
           <h2 className="card-title">Inventario</h2>
           <div className="toolbar-inline">
-            <button type="button" className="btn primary" onClick={openNuevoProducto}>
-              Nuevo producto
-            </button>
+            {puedeCrearProducto ? (
+              <button type="button" className="btn primary" onClick={openNuevoProducto}>
+                Nuevo producto
+              </button>
+            ) : null}
           </div>
         </div>
         <div className="inventario-filtros">
@@ -841,9 +848,11 @@ export function InventarioPage() {
           <div className="empty-state empty-state--compact card-pro">
             <p>No hay productos todavía.</p>
             <p className="muted">Cargá el catálogo o creá el primero en segundos.</p>
-            <button type="button" className="btn primary" onClick={openNuevoProducto}>
-              Crear producto
-            </button>
+            {puedeCrearProducto ? (
+              <button type="button" className="btn primary" onClick={openNuevoProducto}>
+                Crear producto
+              </button>
+            ) : null}
           </div>
         ) : productosOrdenados.length === 0 ? (
           <div className="empty-state empty-state--compact card-pro">
@@ -949,9 +958,11 @@ export function InventarioPage() {
                       </td>
                       <td data-label="Mínimo">{p.stock_minimo ?? "—"}</td>
                       <td className="row-actions" data-label="Acciones">
-                        <button type="button" className="link" onClick={() => onEditar(p)}>
-                          Editar
-                        </button>
+                        {puedeEditarProducto ? (
+                          <button type="button" className="link" onClick={() => onEditar(p)}>
+                            Editar
+                          </button>
+                        ) : null}
                       </td>
                     </tr>
                   ))}
@@ -1064,27 +1075,33 @@ export function InventarioPage() {
             </dl>
 
               <div className="drawer-actions">
-              <button
-                type="button"
-                className="btn secondary"
-                onClick={() => abrirDuplicarProducto(viewingProduct)}
-              >
-                Duplicar…
-              </button>
-              <button
-                type="button"
-                className="btn primary"
-                onClick={() => onEditar(viewingProduct)}
-              >
-                Editar
-              </button>
-              <button
-                type="button"
-                className="btn ghost danger-ghost"
-                onClick={() => void onEliminarDesdeVisualizar()}
-              >
-                Eliminar
-              </button>
+              {puedeCrearProducto ? (
+                <button
+                  type="button"
+                  className="btn secondary"
+                  onClick={() => abrirDuplicarProducto(viewingProduct)}
+                >
+                  Duplicar…
+                </button>
+              ) : null}
+              {puedeEditarProducto ? (
+                <button
+                  type="button"
+                  className="btn primary"
+                  onClick={() => onEditar(viewingProduct)}
+                >
+                  Editar
+                </button>
+              ) : null}
+              {puedeEliminarProducto ? (
+                <button
+                  type="button"
+                  className="btn ghost danger-ghost"
+                  onClick={() => void onEliminarDesdeVisualizar()}
+                >
+                  Eliminar
+                </button>
+              ) : null}
               <button type="button" className="btn ghost" onClick={cerrarVisualizar}>
                 Cerrar
               </button>

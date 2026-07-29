@@ -16,7 +16,16 @@ export const MODULO_KEYS = [
 
 export type ModuloKey = (typeof MODULO_KEYS)[number];
 
+/** Acciones granulares admitidas junto a un módulo (formato "modulo:accion"). */
+export const ACCION_KEYS = ["ver", "crear", "editar", "eliminar"] as const;
+export type AccionKey = (typeof ACCION_KEYS)[number];
+
 const RESERVED_ADMIN_SLUG = "admin";
+
+function normalizarModuloBase(mod: string): string {
+  if (mod === "compras" || mod === "pedidos_proveedores" || mod === "proveedores") return "pedidos";
+  return mod;
+}
 
 function validatePermisos(arr: string[]): string[] {
   const out = [
@@ -24,13 +33,31 @@ function validatePermisos(arr: string[]): string[] {
       arr
         .map((s) => s.trim())
         .filter(Boolean)
-        .map((p) =>
-          p === "compras" || p === "pedidos_proveedores" || p === "proveedores" ? "pedidos" : p
-        )
+        .map((p) => {
+          if (p === "*") return p;
+          if (p.includes(":")) {
+            const [mod, acc, ...rest] = p.split(":");
+            if (rest.length > 0 || !mod || !acc) {
+              throw new AppError(`Permiso inválido: ${p}`);
+            }
+            return `${normalizarModuloBase(mod)}:${acc}`;
+          }
+          return normalizarModuloBase(p);
+        })
     ),
   ];
   for (const p of out) {
     if (p === "*") continue;
+    if (p.includes(":")) {
+      const [mod, acc] = p.split(":");
+      if (!(MODULO_KEYS as readonly string[]).includes(mod!)) {
+        throw new AppError(`Permiso desconocido: ${p}`);
+      }
+      if (!(ACCION_KEYS as readonly string[]).includes(acc!)) {
+        throw new AppError(`Acción desconocida en permiso: ${p}`);
+      }
+      continue;
+    }
     if (!(MODULO_KEYS as readonly string[]).includes(p)) {
       throw new AppError(`Permiso desconocido: ${p}`);
     }

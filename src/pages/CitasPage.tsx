@@ -22,6 +22,7 @@ import {
   type EquipoMiembro,
 } from "../api";
 import { useToast } from "../context/ToastContext";
+import { usePuede } from "../context/PermisosContext";
 import { SubNav } from "../components/SubNav";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Drawer } from "../components/Drawer";
@@ -152,10 +153,11 @@ type CitasBusquedaAccionesMenuProps = {
   left: number;
   top: number;
   onClose: () => void;
-  onEdit: (c: Cita) => void;
-  onConfirm: (c: Cita) => void | Promise<void>;
+  /** Ausentes = sin permiso; se oculta el ítem correspondiente. */
+  onEdit?: (c: Cita) => void;
+  onConfirm?: (c: Cita) => void | Promise<void>;
   onPos: (c: Cita) => void;
-  onCancel: (c: Cita) => void | Promise<void>;
+  onCancel?: (c: Cita) => void | Promise<void>;
 };
 
 function CitasBusquedaAccionesMenu({
@@ -177,18 +179,20 @@ function CitasBusquedaAccionesMenu({
       aria-label={`Acciones cita ${c.id}`}
       style={{ left, top }}
     >
-      <button
-        type="button"
-        className="citas-busqueda-menu-item"
-        role="menuitem"
-        onClick={() => {
-          onClose();
-          onEdit(c);
-        }}
-      >
-        Editar
-      </button>
-      {pend ? (
+      {onEdit ? (
+        <button
+          type="button"
+          className="citas-busqueda-menu-item"
+          role="menuitem"
+          onClick={() => {
+            onClose();
+            onEdit(c);
+          }}
+        >
+          Editar
+        </button>
+      ) : null}
+      {pend && onConfirm ? (
         <button
           type="button"
           className="citas-busqueda-menu-item citas-busqueda-menu-item--confirmar"
@@ -214,17 +218,19 @@ function CitasBusquedaAccionesMenu({
           >
             Cobrar en POS
           </button>
-          <button
-            type="button"
-            className="citas-busqueda-menu-item citas-busqueda-menu-item--cancelar"
-            role="menuitem"
-            onClick={() => {
-              onClose();
-              void onCancel(c);
-            }}
-          >
-            Cancelar
-          </button>
+          {onCancel ? (
+            <button
+              type="button"
+              className="citas-busqueda-menu-item citas-busqueda-menu-item--cancelar"
+              role="menuitem"
+              onClick={() => {
+                onClose();
+                void onCancel(c);
+              }}
+            >
+              Cancelar
+            </button>
+          ) : null}
         </>
       ) : null}
     </div>
@@ -243,6 +249,9 @@ export function CitasPage() {
   const { tab: tabParam } = useParams<{ tab: string }>();
   const navigate = useNavigate();
   const toast = useToast();
+  const puedeCrearCita = usePuede("citas", "crear");
+  const puedeEditarCita = usePuede("citas", "editar");
+  const puedeEliminarCita = usePuede("citas", "eliminar");
   /** En pestaña Calendario: la cuadrícula de horas se abre en modal al elegir un día. */
   const [cuadriculaHorasAbierta, setCuadriculaHorasAbierta] = useState(false);
   /** Día sin turno (gris): modal para confirmar creación del horario del negocio. */
@@ -939,12 +948,14 @@ export function CitasPage() {
   }
 
   function openNewDrawerFromSlot(isoLocal: string) {
+    if (!puedeCrearCita) return;
     reset();
     setInicio(isoLocal);
     setDrawerOpen(true);
   }
 
   function openEditDrawer(x: Cita) {
+    if (!puedeEditarCita) return;
     setEditingId(x.id);
     setProfesionalId(x.usuario_id != null ? x.usuario_id : miUsuarioId ?? "");
     setInicio(toLocalInput(x.inicio));
@@ -959,6 +970,7 @@ export function CitasPage() {
   }
 
   function openNewDrawer() {
+    if (!puedeCrearCita) return;
     reset();
     setDrawerOpen(true);
   }
@@ -1500,15 +1512,17 @@ export function CitasPage() {
         )}
       </div>
       <div className="drawer-actions">
-        <button
-          type="submit"
-          className="btn primary btn-lg"
-          disabled={Boolean(citaSolapeTurno)}
-          title={citaSolapeTurno ? "Resolvé el solapamiento cambiando hora, duración o empleado" : undefined}
-        >
-          {editingId ? "Guardar" : "Agendar"}
-        </button>
-        {editingId != null ? (
+        {(editingId ? puedeEditarCita : puedeCrearCita) ? (
+          <button
+            type="submit"
+            className="btn primary btn-lg"
+            disabled={Boolean(citaSolapeTurno)}
+            title={citaSolapeTurno ? "Resolvé el solapamiento cambiando hora, duración o empleado" : undefined}
+          >
+            {editingId ? "Guardar" : "Agendar"}
+          </button>
+        ) : null}
+        {editingId != null && puedeEliminarCita ? (
           <button type="button" className="btn ghost danger-text" onClick={() => requestDeleteCita(editingId)}>
             Eliminar
           </button>
@@ -1920,10 +1934,10 @@ export function CitasPage() {
               left={busquedaMenu.left}
               top={busquedaMenu.top}
               onClose={() => setBusquedaMenu(null)}
-              onEdit={openEditDrawer}
-              onConfirm={confirmarCitaBusqueda}
+              onEdit={puedeEditarCita ? openEditDrawer : undefined}
+              onConfirm={puedeEditarCita ? confirmarCitaBusqueda : undefined}
               onPos={irAVentaDesdeCita}
-              onCancel={requestCancelarCita}
+              onCancel={puedeEditarCita ? requestCancelarCita : undefined}
             />,
             document.body
           )

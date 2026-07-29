@@ -23,6 +23,7 @@ import {
   fetchCitaCobro,
   fetchCitasAsociarVentas,
   fetchClientes,
+  fetchDescuentosVigentes,
   fetchEquipo,
   fetchInventarioCatalogo,
   fetchProductos,
@@ -33,6 +34,8 @@ import {
   type CategoriaServicio,
   type Cita,
   type Cliente,
+  type Descuento,
+  type DescuentoTipo,
   type EquipoMiembro,
   type InventarioCatalogo,
   type Producto,
@@ -42,6 +45,7 @@ import { CreateClienteDrawer } from "../components/CreateClienteDrawer";
 import { SearchableSelect } from "../components/SearchableSelect";
 import { SkeletonCard } from "../components/Skeleton";
 import { useToast } from "../context/ToastContext";
+import { usePuede } from "../context/PermisosContext";
 import { filterIntegerTyping } from "../lib/decimalInput";
 import { formatMoney, formatMoneyForInput, parseMoneyInput } from "../lib/money";
 import { usePosFocus } from "../context/PosFocusContext";
@@ -70,6 +74,7 @@ import { SaleSuccessModal } from "../components/ventas/SaleSuccessModal";
 import { VentasHistorialSection } from "../components/ventas/VentasHistorialSection";
 import { DevolucionesSection } from "../components/ventas/DevolucionesSection";
 import { VentasCierreSection } from "../components/ventas/VentasCierreSection";
+import { DescuentosSection } from "../components/ventas/DescuentosSection";
 import { readVentasTab, VENTAS_TABS, type VentasTab } from "../lib/moduleRoutes";
 import { publishPosClienteDisplay } from "../lib/posClientDisplay";
 import { lineasServicioDesdeTextoAgenda, parsePosPreloadCita } from "../lib/posPrecargaDesdeCita";
@@ -111,6 +116,9 @@ type PosDraft = {
   puntosCanjeados?: number | "";
   vendedorId?: number | "";
   ventaStep?: VentaStep;
+  descuentoManualTipo?: DescuentoTipo;
+  descuentoManualValor?: number | "";
+  descuentoManualMotivo?: string;
 };
 
 function readPosDraft(): PosDraft | null {
@@ -131,6 +139,10 @@ export function VentasPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const toast = useToast();
+  const puedeCrearVenta = usePuede("ventas", "crear");
+  const puedeEditarVenta = usePuede("ventas", "editar");
+  const puedeEliminarVenta = usePuede("ventas", "eliminar");
+  const puedeCrearCliente = usePuede("clientes", "crear");
   const { medios: mediosTransferencia } = useMediosPagoTransferencia();
   const barcodeRef = useRef<HTMLInputElement>(null);
   const saleFormRef = useRef<HTMLFormElement>(null);
@@ -175,6 +187,20 @@ export function VentasPage() {
       ? posDraft0.puntosCanjeados
       : ""
   );
+  const [descuentoManualTipo, setDescuentoManualTipo] = useState<DescuentoTipo>(
+    posDraft0?.descuentoManualTipo === "monto" || posDraft0?.descuentoManualTipo === "porcentaje"
+      ? posDraft0.descuentoManualTipo
+      : "porcentaje"
+  );
+  const [descuentoManualValor, setDescuentoManualValor] = useState<number | "">(
+    posDraft0?.descuentoManualValor === "" || typeof posDraft0?.descuentoManualValor === "number"
+      ? posDraft0.descuentoManualValor
+      : ""
+  );
+  const [descuentoManualMotivo, setDescuentoManualMotivo] = useState<string>(
+    typeof posDraft0?.descuentoManualMotivo === "string" ? posDraft0.descuentoManualMotivo : ""
+  );
+  const [descuentosVigentes, setDescuentosVigentes] = useState<Descuento[]>([]);
   const [vendedorId, setVendedorId] = useState<number | "">(() =>
     posDraft0?.vendedorId === "" || typeof posDraft0?.vendedorId === "number" ? posDraft0.vendedorId : ""
   );
@@ -411,6 +437,9 @@ export function VentasPage() {
         puntosCanjeados,
         vendedorId,
         ventaStep,
+        descuentoManualTipo,
+        descuentoManualValor,
+        descuentoManualMotivo,
       });
     }, 250);
     return () => clearTimeout(t);
@@ -427,6 +456,9 @@ export function VentasPage() {
     puntosCanjeados,
     vendedorId,
     ventaStep,
+    descuentoManualTipo,
+    descuentoManualValor,
+    descuentoManualMotivo,
   ]);
 
   const nuevaVenta = useCallback(() => {
@@ -442,6 +474,9 @@ export function VentasPage() {
     setNotasVenta("");
     setPuntosCanjeados("");
     setMetodoPagoVenta({ ...METODO_PAGO_VENTA_INICIAL });
+    setDescuentoManualTipo("porcentaje");
+    setDescuentoManualValor("");
+    setDescuentoManualMotivo("");
     setVentaStep("items");
     clearSessionDraft(POS_DRAFT_KEY);
     toast("Nueva venta lista", "info");
@@ -984,7 +1019,132 @@ export function VentasPage() {
     () => cartServicios.reduce((s, sv) => s + Math.max(0, sv.valor_unitario), 0),
     [cartServicios]
   );
-  const total = totalProductos + totalServicios;
+  const subtotalBruto = totalProductos + totalServicios;
+
+  const productoIdsCarrito = useMemo(
+    () => Array.from(new Set(cart.map((l) => l.producto_id))),
+    [cart]
+  );
+  const productoIdsKey = productoIdsCarrito.join(",");
+
+  useEffect(() => {
+    let cancelado = false;
+    if (clienteId === "" && productoIdsCarrito.length === 0) {
+      setDescuentosVigentes([]);
+      return;
+    }
+    fetchDescuentosVigentes({
+      cliente_id: clienteId === "" ? null : Number(clienteId),
+      producto_ids: productoIdsCarrito,
+    })
+      .then((rows) => {
+        if (!cancelado) setDescuentosVigentes(rows);
+      })
+      .catch(() => {
+        if (!cancelado) setDescuentosVigentes([]);
+      });
+    return () => {
+      cancelado = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clienteId, productoIdsKey]);
+
+  /** Preview local del cálculo de descuentos — el servidor recalcula igual al cobrar. */
+  const descuentosCalc = useMemo(() => {
+    const porProducto = new Map<number, Descuento>();
+    let descCliente: Descuento | null = null;
+    for (const d of descuentosVigentes) {
+      if (d.activo !== 1) continue;
+      if (d.alcance === "producto" && d.producto_id != null && !porProducto.has(d.producto_id)) {
+        porProducto.set(d.producto_id, d);
+      } else if (d.alcance === "cliente" && d.cliente_id != null && !descCliente) {
+        descCliente = d;
+      }
+    }
+    type Aplicado = {
+      origen: "producto" | "cliente" | "manual";
+      descripcion: string;
+      monto: number;
+      tipo: DescuentoTipo;
+      valor: number;
+    };
+    const aplicados: Aplicado[] = [];
+    let acumulado = 0;
+
+    for (const l of cart) {
+      const d = porProducto.get(l.producto_id);
+      if (!d) continue;
+      const subtotalLinea = l.precio_unitario * l.cantidad;
+      const monto =
+        d.tipo === "porcentaje"
+          ? subtotalLinea * (d.valor / 100)
+          : Math.min(d.valor, subtotalLinea);
+      const montoR = Math.max(0, Math.round(monto));
+      if (montoR <= 0) continue;
+      aplicados.push({
+        origen: "producto",
+        descripcion: `${d.nombre} · ${l.nombre}`,
+        monto: montoR,
+        tipo: d.tipo,
+        valor: d.valor,
+      });
+      acumulado += montoR;
+    }
+
+    if (descCliente) {
+      const base = Math.max(0, subtotalBruto - acumulado);
+      const monto =
+        descCliente.tipo === "porcentaje"
+          ? base * (descCliente.valor / 100)
+          : Math.min(descCliente.valor, base);
+      const montoR = Math.max(0, Math.round(monto));
+      if (montoR > 0) {
+        aplicados.push({
+          origen: "cliente",
+          descripcion: descCliente.nombre,
+          monto: montoR,
+          tipo: descCliente.tipo,
+          valor: descCliente.valor,
+        });
+        acumulado += montoR;
+      }
+    }
+
+    let manualMonto = 0;
+    if (descuentoManualValor !== "" && Number(descuentoManualValor) > 0) {
+      const base = Math.max(0, subtotalBruto - acumulado);
+      const valor = Number(descuentoManualValor);
+      const valorSaneado = descuentoManualTipo === "porcentaje" ? Math.min(100, valor) : valor;
+      const monto =
+        descuentoManualTipo === "porcentaje"
+          ? base * (valorSaneado / 100)
+          : Math.min(valorSaneado, base);
+      manualMonto = Math.max(0, Math.round(monto));
+      if (manualMonto > 0) {
+        aplicados.push({
+          origen: "manual",
+          descripcion: descuentoManualMotivo.trim() || "Descuento manual",
+          monto: manualMonto,
+          tipo: descuentoManualTipo,
+          valor: valorSaneado,
+        });
+        acumulado += manualMonto;
+      }
+    }
+
+    const totalDescuento = Math.min(subtotalBruto, acumulado);
+    const totalFinal = Math.max(0, subtotalBruto - totalDescuento);
+    return { aplicados, totalDescuento, totalFinal, manualMonto };
+  }, [
+    descuentosVigentes,
+    cart,
+    subtotalBruto,
+    descuentoManualTipo,
+    descuentoManualValor,
+    descuentoManualMotivo,
+  ]);
+
+  const total = descuentosCalc.totalFinal;
   const tieneItemsVenta = cart.length > 0 || cartServicios.length > 0;
 
   function irPasoPagos() {
@@ -1164,6 +1324,17 @@ export function VentasPage() {
       return;
     }
     try {
+      const descManualPayload =
+        descuentoManualValor !== "" && Number(descuentoManualValor) > 0
+          ? {
+              tipo: descuentoManualTipo,
+              valor:
+                descuentoManualTipo === "porcentaje"
+                  ? Math.min(100, Number(descuentoManualValor))
+                  : Number(descuentoManualValor),
+              motivo: descuentoManualMotivo.trim() || null,
+            }
+          : null;
       const r = await createVenta({
         cliente_id: clienteId === "" ? null : clienteId,
         usuario_id: Number(vendedorId),
@@ -1177,6 +1348,7 @@ export function VentasPage() {
           clienteId !== "" && puntosCanjeados !== ""
             ? Math.floor(Number(puntosCanjeados))
             : undefined,
+        descuento_manual: descManualPayload,
       });
       posBeepOk();
       if (r.factura_error) {
@@ -1206,6 +1378,11 @@ export function VentasPage() {
     return <Navigate to={`/ventas/${readVentasTab()}`} replace />;
   }
   const tab = tabParam as VentasTab;
+  // Tabs que exigen `ventas:crear` en el servidor; sin permiso, redirigir a historial (solo lectura).
+  const tabRequiereCrear = tab === "ventas" || tab === "cierre";
+  if (tabRequiereCrear && !puedeCrearVenta) {
+    return <Navigate to="/ventas/historial" replace />;
+  }
   const { posFocus, setPosFocus } = usePosFocus();
 
   const onTogglePosFocus = async () => {
@@ -1228,10 +1405,13 @@ export function VentasPage() {
       <SubNav
         moduleId="ventas"
         items={[
-          { id: "ventas", label: "Ventas", to: "/ventas/ventas" },
+          ...(puedeCrearVenta ? [{ id: "ventas", label: "Ventas", to: "/ventas/ventas" }] : []),
           { id: "historial", label: "Historial", to: "/ventas/historial" },
-          { id: "cierre", label: "Cierre de día", to: "/ventas/cierre" },
+          ...(puedeCrearVenta ? [{ id: "cierre", label: "Cierre de día", to: "/ventas/cierre" }] : []),
           { id: "devoluciones", label: "Devoluciones", to: "/ventas/devoluciones" },
+          ...(puedeEditarVenta || puedeCrearVenta || puedeEliminarVenta
+            ? [{ id: "descuentos", label: "Descuentos", to: "/ventas/descuentos" }]
+            : []),
         ]}
         quickActions={
           tab === "ventas" ? (
@@ -1372,21 +1552,25 @@ export function VentasPage() {
                           </button>
                         ) : null}
                       </div>
-                      <button
-                        type="button"
-                        className="btn ghost small pos-pago-cliente-add pos-pago-cliente-add--icon"
-                        onClick={() => setCreateClienteOpen(true)}
-                        title="Registrar nuevo cliente"
-                        aria-label="Registrar nuevo cliente"
-                      >
-                        <Plus size={16} weight="bold" aria-hidden />
-                      </button>
+                      {puedeCrearCliente ? (
+                        <button
+                          type="button"
+                          className="btn ghost small pos-pago-cliente-add pos-pago-cliente-add--icon"
+                          onClick={() => setCreateClienteOpen(true)}
+                          title="Registrar nuevo cliente"
+                          aria-label="Registrar nuevo cliente"
+                        >
+                          <Plus size={16} weight="bold" aria-hidden />
+                        </button>
+                      ) : null}
                     </div>
                     {clienteOpen ? (
                       <ul className="pos-pago-combo-list" role="listbox">
                         {clientesFiltradosLista.length === 0 ? (
                           <li className="pos-pago-combo-empty muted small">
-                            Sin coincidencias. Tocá «Nuevo» para registrarlo.
+                            {puedeCrearCliente
+                              ? "Sin coincidencias. Tocá «Nuevo» para registrarlo."
+                              : "Sin coincidencias."}
                           </li>
                         ) : (
                           clientesFiltradosLista.slice(0, 10).map((c, i) => (
@@ -2086,6 +2270,79 @@ export function VentasPage() {
                     <span className="muted">Subtotal servicios</span>
                     <span className="mono">{formatMoney(totalServicios)}</span>
                   </div>
+                  {descuentosCalc.aplicados.map((a, i) => (
+                    <div key={i} className="pos-pago-resumen-row">
+                      <span className="muted">
+                        {a.origen === "producto"
+                          ? "Desc. producto"
+                          : a.origen === "cliente"
+                            ? "Desc. cliente"
+                            : "Desc. manual"}
+                        {": "}
+                        {a.descripcion}
+                        {a.tipo === "porcentaje" ? ` (${a.valor}%)` : ""}
+                      </span>
+                      <span className="mono" style={{ color: "var(--color-danger, #c0392b)" }}>
+                        −{formatMoney(a.monto)}
+                      </span>
+                    </div>
+                  ))}
+                  <div className="pos-pago-block" style={{ marginTop: 8 }}>
+                    <span className="pos-saas-field-label">Descuento manual</span>
+                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      <select
+                        aria-label="Tipo de descuento manual"
+                        className="pos-saas-input"
+                        style={{ flex: "0 0 auto", width: 110 }}
+                        value={descuentoManualTipo}
+                        onChange={(e) =>
+                          setDescuentoManualTipo(e.target.value as DescuentoTipo)
+                        }
+                      >
+                        <option value="porcentaje">%</option>
+                        <option value="monto">Gs.</option>
+                      </select>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        className="pos-saas-input"
+                        style={{ flex: 1 }}
+                        placeholder={descuentoManualTipo === "porcentaje" ? "0-100" : "Monto"}
+                        value={descuentoManualValor === "" ? "" : String(descuentoManualValor)}
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(/[^\d]/g, "");
+                          if (raw === "") {
+                            setDescuentoManualValor("");
+                            return;
+                          }
+                          const n = Number(raw);
+                          if (!Number.isFinite(n)) return;
+                          if (descuentoManualTipo === "porcentaje") {
+                            setDescuentoManualValor(Math.min(100, n));
+                          } else {
+                            setDescuentoManualValor(n);
+                          }
+                        }}
+                      />
+                    </div>
+                    <input
+                      type="text"
+                      className="pos-saas-input"
+                      style={{ marginTop: 6 }}
+                      placeholder="Motivo (opcional)"
+                      value={descuentoManualMotivo}
+                      maxLength={80}
+                      onChange={(e) => setDescuentoManualMotivo(e.target.value)}
+                    />
+                  </div>
+                  {descuentosCalc.totalDescuento > 0 ? (
+                    <div className="pos-pago-resumen-row">
+                      <span className="muted">Total descuentos</span>
+                      <span className="mono" style={{ color: "var(--color-danger, #c0392b)" }}>
+                        −{formatMoney(descuentosCalc.totalDescuento)}
+                      </span>
+                    </div>
+                  ) : null}
                   <div className="pos-pago-resumen-divider" aria-hidden />
                   <div className="pos-pago-resumen-total">
                     <span className="pos-pago-resumen-total-label">Total a pagar</span>
@@ -2284,11 +2541,30 @@ export function VentasPage() {
         </div>
       ) : null}
 
-      {tab === "historial" ? <VentasHistorialSection /> : null}
+      {tab === "historial" ? (
+        <VentasHistorialSection
+          puedeCrear={puedeCrearVenta}
+          puedeEliminar={puedeEliminarVenta}
+        />
+      ) : null}
 
       {tab === "cierre" ? <VentasCierreSection /> : null}
 
-      {tab === "devoluciones" ? <DevolucionesSection /> : null}
+      {tab === "devoluciones" ? (
+        <DevolucionesSection
+          puedeCrear={puedeCrearVenta}
+          puedeEditar={puedeEditarVenta}
+          puedeEliminar={puedeEliminarVenta}
+        />
+      ) : null}
+
+      {tab === "descuentos" ? (
+        <DescuentosSection
+          puedeCrear={puedeCrearVenta}
+          puedeEditar={puedeEditarVenta}
+          puedeEliminar={puedeEliminarVenta}
+        />
+      ) : null}
 
       <SaleSuccessModal
         open={successModal.open}

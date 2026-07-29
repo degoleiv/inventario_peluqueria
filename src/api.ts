@@ -156,6 +156,9 @@ export type Venta = {
   notas: string | null;
   estado?: string;
   descuento_puntos?: number;
+  descuento_total?: number;
+  descuento_manual?: number;
+  descuento_manual_motivo?: string | null;
   puntos_canjeados?: number;
   created_at: string;
   cliente_nombre: string | null;
@@ -192,6 +195,7 @@ export type VentaServicioLinea = {
 export type VentaDetalle = Venta & {
   lineas: VentaLinea[];
   servicios?: VentaServicioLinea[];
+  descuentos_aplicados?: DescuentoAplicacion[];
 };
 
 export type ProximaCitaDia = {
@@ -1389,6 +1393,158 @@ export type VentaServicioInput = {
   valor_unitario: number;
 };
 
+/* ══════════════ Descuentos ══════════════ */
+
+export type DescuentoAlcance = "cliente" | "producto";
+export type DescuentoTipo = "porcentaje" | "monto";
+export type DescuentoOrigen = "cliente" | "producto" | "manual";
+
+export type Descuento = {
+  id: number;
+  alcance: DescuentoAlcance;
+  cliente_id: number | null;
+  producto_id: number | null;
+  tipo: DescuentoTipo;
+  valor: number;
+  nombre: string;
+  descripcion: string | null;
+  vigente_desde: string | null;
+  vigente_hasta: string | null;
+  activo: number;
+  creado_por: number | null;
+  created_at: string;
+  updated_at: string;
+  cliente_nombre?: string | null;
+  producto_nombre?: string | null;
+  creado_por_nombre?: string | null;
+};
+
+export type DescuentoInput = {
+  alcance: DescuentoAlcance;
+  cliente_id?: number | null;
+  producto_id?: number | null;
+  tipo: DescuentoTipo;
+  valor: number;
+  nombre: string;
+  descripcion?: string | null;
+  vigente_desde?: string | null;
+  vigente_hasta?: string | null;
+  activo?: boolean;
+};
+
+export type DescuentoAplicacion = {
+  id: number;
+  venta_id: number;
+  descuento_id: number | null;
+  origen: DescuentoOrigen;
+  tipo: DescuentoTipo;
+  valor: number;
+  monto_aplicado: number;
+  descripcion: string | null;
+  producto_id: number | null;
+  cliente_id: number | null;
+  created_at: string;
+  venta_fecha?: string;
+  venta_total?: number;
+  cliente_nombre?: string | null;
+  producto_nombre?: string | null;
+  descuento_nombre?: string | null;
+};
+
+export type DescuentoAuditoriaEntrada = {
+  id: number;
+  descuento_id: number | null;
+  usuario_id: number | null;
+  accion: string;
+  detalle_json: string | null;
+  created_at: string;
+  usuario_nombre?: string | null;
+  descuento_nombre?: string | null;
+};
+
+export async function fetchDescuentos(params?: {
+  alcance?: DescuentoAlcance | "todos";
+  cliente_id?: number;
+  producto_id?: number;
+  incluir_inactivos?: boolean;
+  search?: string;
+}): Promise<Descuento[]> {
+  const q = new URLSearchParams();
+  if (params?.alcance && params.alcance !== "todos") q.set("alcance", params.alcance);
+  if (params?.cliente_id != null) q.set("cliente_id", String(params.cliente_id));
+  if (params?.producto_id != null) q.set("producto_id", String(params.producto_id));
+  if (params?.incluir_inactivos) q.set("incluir_inactivos", "1");
+  if (params?.search?.trim()) q.set("search", params.search.trim());
+  const suffix = q.toString() ? `?${q}` : "";
+  return requestJson(`/api/descuentos${suffix}`);
+}
+
+export async function fetchDescuento(id: number): Promise<Descuento> {
+  return requestJson(`/api/descuentos/${id}`);
+}
+
+export async function createDescuento(body: DescuentoInput): Promise<Descuento> {
+  return requestJson(`/api/descuentos`, { method: "POST", body: JSON.stringify(body) });
+}
+
+export async function updateDescuento(id: number, body: Partial<DescuentoInput>): Promise<Descuento> {
+  return requestJson(`/api/descuentos/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+}
+
+export async function patchDescuentoEstado(id: number, activo: boolean): Promise<Descuento> {
+  return requestJson(`/api/descuentos/${id}/estado`, {
+    method: "PATCH",
+    body: JSON.stringify({ activo }),
+  });
+}
+
+export async function deleteDescuento(id: number): Promise<void> {
+  return requestJson(`/api/descuentos/${id}`, { method: "DELETE" });
+}
+
+export async function fetchDescuentosVigentes(params: {
+  cliente_id?: number | null;
+  producto_ids?: number[];
+}): Promise<Descuento[]> {
+  const q = new URLSearchParams();
+  if (params.cliente_id != null) q.set("cliente_id", String(params.cliente_id));
+  if (params.producto_ids && params.producto_ids.length > 0) {
+    q.set("producto_ids", params.producto_ids.join(","));
+  }
+  const suffix = q.toString() ? `?${q}` : "";
+  return requestJson(`/api/descuentos/vigentes${suffix}`);
+}
+
+export async function fetchDescuentoAplicaciones(params?: {
+  desde?: string;
+  hasta?: string;
+  cliente_id?: number;
+  descuento_id?: number;
+  origen?: DescuentoOrigen;
+  limit?: number;
+}): Promise<DescuentoAplicacion[]> {
+  const q = new URLSearchParams();
+  if (params?.desde) q.set("desde", params.desde);
+  if (params?.hasta) q.set("hasta", params.hasta);
+  if (params?.cliente_id != null) q.set("cliente_id", String(params.cliente_id));
+  if (params?.descuento_id != null) q.set("descuento_id", String(params.descuento_id));
+  if (params?.origen) q.set("origen", params.origen);
+  if (params?.limit != null) q.set("limit", String(params.limit));
+  const suffix = q.toString() ? `?${q}` : "";
+  return requestJson(`/api/descuentos/aplicaciones${suffix}`);
+}
+
+export async function fetchDescuentoAuditoria(params?: {
+  descuento_id?: number;
+  limit?: number;
+}): Promise<DescuentoAuditoriaEntrada[]> {
+  const q = new URLSearchParams();
+  if (params?.descuento_id != null) q.set("descuento_id", String(params.descuento_id));
+  if (params?.limit != null) q.set("limit", String(params.limit));
+  const suffix = q.toString() ? `?${q}` : "";
+  return requestJson(`/api/descuentos/auditoria${suffix}`);
+}
+
 export async function createVenta(body: {
   cliente_id?: number | null;
   usuario_id?: number;
@@ -1405,6 +1561,12 @@ export async function createVenta(body: {
   factura_tipo?: string;
   /** Puntos del cliente a descontar (requiere valor de redención configurado en Inicio). */
   puntos_canjeados?: number;
+  /** Descuento manual ingresado por el cajero en la venta. */
+  descuento_manual?: {
+    tipo: DescuentoTipo;
+    valor: number;
+    motivo?: string | null;
+  } | null;
 }): Promise<
   VentaDetalle & {
     factura_electronica?: unknown;
@@ -1613,6 +1775,11 @@ export async function updatePedidoProveedorFull(
     method: "PUT",
     body: JSON.stringify(body),
   });
+}
+
+/** Eliminación permanente (solo admin *). Revierte stock de las entradas del pedido. */
+export async function deletePedidoProveedor(id: number): Promise<void> {
+  await requestJson(`/api/pedidos-proveedores/${id}`, { method: "DELETE" });
 }
 
 export type FacturaElectronica = {

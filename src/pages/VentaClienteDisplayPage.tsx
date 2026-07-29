@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { fetchAuthMe, fetchBranding } from "../api";
+import { fetchBranding } from "../api";
 import { applyBrandingToDocument } from "../lib/brandingDocument";
-import { puedeVerModulo } from "../nav";
+import { usePermisos, usePuedeVer } from "../context/PermisosContext";
 import {
   readPosClienteDisplaySnapshot,
   subscribePosClienteDisplay,
@@ -14,19 +14,14 @@ import { formatMoney } from "../lib/money";
 const empty: PosClienteSnapshot = { lines: [], subtotal: 0 };
 
 export function VentaClienteDisplayPage() {
-  const [allowed, setAllowed] = useState<boolean | null>(null);
+  const { permisos } = usePermisos();
+  const puedeVerVentas = usePuedeVer("ventas");
+  const allowed = permisos.length === 0 ? null : puedeVerVentas;
   const [snapshot, setSnapshot] = useState<PosClienteSnapshot>(() => readPosClienteDisplaySnapshot() ?? empty);
   const [brand, setBrand] = useState<string | null>(null);
 
   useEffect(() => {
     let cancel = false;
-    void fetchAuthMe()
-      .then((m) => {
-        if (!cancel) setAllowed(puedeVerModulo(m.user.permisos ?? [], "ventas"));
-      })
-      .catch(() => {
-        if (!cancel) setAllowed(false);
-      });
     void fetchBranding()
       .then((b) => {
         if (cancel) return;

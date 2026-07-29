@@ -654,4 +654,47 @@ export const pedidoProveedorService = {
     });
     return await pedidoProveedorService.getById(id);
   },
+
+  /**
+   * Eliminación permanente (solo admin). Revierte el stock de las ENTRADAS del pedido
+   * y borra líneas, movimientos asociados y el encabezado.
+   */
+  async delete(id: number) {
+    const cur = (await db.prepare(`SELECT id FROM pedidos_proveedor WHERE id = ?`).get(id)) as
+      | { id: number }
+      | undefined;
+    if (!cur) throw new AppError("no encontrado", 404);
+
+    const lineas = (await db
+      .prepare(
+        `SELECT producto_id, cantidad FROM pedido_proveedor_lineas WHERE pedido_proveedor_id = ?`
+      )
+      .all(id)) as { producto_id: number; cantidad: number }[];
+
+    const now = new Date().toISOString();
+    const updStock = db.prepare(
+      `UPDATE productos SET stock = stock + ?, updated_at = ? WHERE id = ?`
+    );
+    const delMovs = db.prepare(
+      `DELETE FROM movimientos_inventario WHERE pedido_proveedor_id = ?`
+    );
+    const delLineas = db.prepare(
+      `DELETE FROM pedido_proveedor_lineas WHERE pedido_proveedor_id = ?`
+    );
+    const delPedido = db.prepare(`DELETE FROM pedidos_proveedor WHERE id = ?`);
+
+    await db.transaction(async () => {
+      for (const ln of lineas) {
+        await updStock.run(-Number(ln.cantidad), now, ln.producto_id);
+      }
+      await delMovs.run(id);
+      await delLineas.run(id);
+      await delPedido.run(id);
+    });
+
+    await recordSyncEvent("pedido_proveedor", "eliminado", {
+      pedido_proveedor_id: id,
+      lineas: lineas.length,
+    });
+  },
 };

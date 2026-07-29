@@ -4,23 +4,50 @@ import { usuariosRepo } from "../repositories/usuarios.js";
 import { verifyAccessToken } from "../services/auth.service.js";
 import { rolesService } from "../services/roles.service.js";
 
+/** Acciones granulares definidas por módulo. */
+export type AccionPermiso = "ver" | "crear" | "editar" | "eliminar";
+
+/** Normaliza permisos legacy (alias de módulo). */
+function normalizarModulo(modulo: string): string {
+  if (modulo === "compras" || modulo === "pedidos_proveedores" || modulo === "proveedores") {
+    return "pedidos";
+  }
+  return modulo;
+}
+
+/**
+ * ¿El conjunto de permisos habilita `modulo` (ver, sin acción específica)?
+ * Compat: si el permiso está como "modulo" simple sin `:accion`, se considera acceso total al módulo.
+ */
 export function hasPermiso(permisos: string[] | undefined, modulo: string): boolean {
+  return hasAccion(permisos, modulo, "ver");
+}
+
+/**
+ * ¿Puede ejecutar `accion` sobre `modulo`?
+ * Reglas:
+ *  - "*" → todo.
+ *  - "modulo" (sin `:accion`) → todas las acciones del módulo (compat con roles viejos).
+ *  - "modulo:accion" → solo esa acción.
+ *  - Alias legacy (compras, proveedores, pedidos_proveedores) → mapean a "pedidos".
+ */
+export function hasAccion(
+  permisos: string[] | undefined,
+  modulo: string,
+  accion: AccionPermiso
+): boolean {
   if (!permisos?.length) return false;
   if (permisos.includes("*")) return true;
-  if (permisos.includes(modulo)) return true;
-  if (modulo === "pedidos") {
-    if (
-      permisos.includes("proveedores") ||
-      permisos.includes("pedidos_proveedores") ||
-      permisos.includes("compras")
-    ) {
-      return true;
-    }
+  const target = normalizarModulo(modulo);
+  for (const p of permisos) {
+    if (p === "*") return true;
+    const norm = normalizarModulo(p);
+    if (norm === target) return true; // compat: módulo simple otorga todas las acciones
+    if (norm === `${target}:${accion}`) return true;
+    // Permisos ya guardados como "modulo:accion" pero con alias legacy
+    const [modPart, accPart] = norm.split(":");
+    if (modPart && accPart && normalizarModulo(modPart) === target && accPart === accion) return true;
   }
-  /* Compat API / tokens antiguos */
-  if (modulo === "pedidos_proveedores" && permisos.includes("compras")) return true;
-  if (modulo === "pedidos_proveedores" && permisos.includes("pedidos")) return true;
-  if (modulo === "proveedores" && permisos.includes("pedidos")) return true;
   return false;
 }
 
@@ -55,16 +82,17 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction) {
 
 /** Acceso total (configuración, usuarios, roles, auditoría sensible). */
 export function requireAdmin(req: Request, _res: Response, next: NextFunction) {
-  if (!hasPermiso(req.user?.permisos, "*")) {
+  if (!hasAccion(req.user?.permisos, "*", "ver")) {
     next(new AppError("Requiere permisos de administrador", 403));
     return;
   }
   next();
 }
 
+/** Requiere ver el módulo (compat con firma histórica). */
 export function requirePermiso(modulo: string) {
   return (req: Request, _res: Response, next: NextFunction) => {
-    if (hasPermiso(req.user?.permisos, modulo)) {
+    if (hasAccion(req.user?.permisos, modulo, "ver")) {
       next();
       return;
     }
@@ -72,14 +100,25 @@ export function requirePermiso(modulo: string) {
   };
 }
 
-export function requireAlguno(...modulos: string[]) {
+/** Requiere una acción granular específica sobre un módulo. */
+export function requirePermisoAccion(modulo: string, accion: AccionPermiso) {
   return (req: Request, _res: Response, next: NextFunction) => {
-    const p = req.user?.permisos;
-    if (hasPermiso(p, "*")) {
+    if (hasAccion(req.user?.permisos, modulo, accion)) {
       next();
       return;
     }
-    if (modulos.some((m) => hasPermiso(p, m))) {
+    next(new AppError(`Sin permiso para ${accion} en ${modulo}`, 403));
+  };
+}
+
+export function requireAlguno(...modulos: string[]) {
+  return (req: Request, _res: Response, next: NextFunction) => {
+    const p = req.user?.permisos;
+    if (hasAccion(p, "*", "ver")) {
+      next();
+      return;
+    }
+    if (modulos.some((m) => hasAccion(p, m, "ver"))) {
       next();
       return;
     }

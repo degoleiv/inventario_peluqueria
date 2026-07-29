@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { resolveImageSrc } from "../api";
 import { WorkspaceTabsBar } from "../components/WorkspaceTabsBar";
 import { usePosFocus } from "../context/PosFocusContext";
+import { usePuede } from "../context/PermisosContext";
 import { ArrowsIn } from "@phosphor-icons/react";
 import {
   NAV_GROUPS,
@@ -219,8 +220,8 @@ export function AppLayout({
     ),
   })).filter((g) => g.items.length > 0);
 
-  const canVentas = puedeVerModulo(permisos, "ventas");
-  const canCitas = puedeVerModulo(permisos, "citas");
+  const canVentas = usePuede("ventas", "crear");
+  const canCitas = usePuede("citas", "crear");
 
   return (
     <div className={`app-root ${collapsed ? "app-root--collapsed" : ""}`}>

@@ -15,7 +15,8 @@ type Props = {
   detalle: VentaDetalle | null;
   onClose: () => void;
   onReprint: () => void;
-  onCancel: () => void;
+  /** Ausente = sin permiso para anular; se oculta el botón. */
+  onCancel?: () => void;
 };
 
 export function SalesDetailDrawer({
@@ -47,7 +48,7 @@ export function SalesDetailDrawer({
               <Printer size={18} aria-hidden />
               Reimprimir
             </button>
-            {activa ? (
+            {activa && onCancel ? (
               <button type="button" className="btn danger small" onClick={onCancel}>
                 <Prohibit size={18} aria-hidden />
                 Anular

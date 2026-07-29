@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { fetchDashboard, type DashboardStats, type ProximaCitaDia } from "../api";
 import { formatMoney } from "../lib/money";
 import { useToast } from "../context/ToastContext";
+import { usePuede } from "../context/PermisosContext";
 
 const DEMO_TRENDS = {
   ventas_hoy_pct: 12,
@@ -156,6 +157,8 @@ function IconServicios() {
 
 export function DashboardPage() {
   const toast = useToast();
+  const puedeCrearCita = usePuede("citas", "crear");
+  const puedeCrearVenta = usePuede("ventas", "crear");
   const [raw, setRaw] = useState<DashboardStats | null>(null);
   const [dashLoadFailed, setDashLoadFailed] = useState(false);
 
@@ -300,9 +303,11 @@ export function DashboardPage() {
         {raw && raw.proximas_citas_hoy.length === 0 ? (
           <div className="dash-empty-cta">
             <p className="muted">No hay citas agendadas para hoy.</p>
-            <Link to="/citas" className="btn primary">
-              Agendar cita →
-            </Link>
+            {puedeCrearCita ? (
+              <Link to="/citas" className="btn primary">
+                Agendar cita →
+              </Link>
+            ) : null}
           </div>
         ) : (
           <ul className="dash-timeline" aria-label="Citas de hoy">
@@ -331,9 +336,11 @@ export function DashboardPage() {
           {raw && raw.ingresos_7d.length === 0 ? (
             <div className="dash-empty-cta">
               <p className="muted">Todavía no registramos ventas en este período.</p>
-              <Link to="/ventas" className="btn secondary">
-                Registrar primera venta →
-              </Link>
+              {puedeCrearVenta ? (
+                <Link to="/ventas" className="btn secondary">
+                  Registrar primera venta →
+                </Link>
+              ) : null}
             </div>
           ) : (
             <div className="bar-chart" role="img" aria-label="Ingresos últimos 7 días">

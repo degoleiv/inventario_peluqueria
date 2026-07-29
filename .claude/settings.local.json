@@ -15,7 +15,9 @@
       "Bash(cd C:\\\\Users\\\\Dego\\\\Documents\\\\ggj_mask\\\\hoobie\\\\inventario_peluqueria *)",
       "Bash(git grep *)",
       "Bash(node -e \"const p=require\\('./package.json'\\);console.log\\(JSON.stringify\\(p.scripts,null,2\\)\\)\")",
-      "Bash(node -e \"const p=require\\('./server/package.json'\\);console.log\\(JSON.stringify\\(p.scripts,null,2\\)\\)\")"
+      "Bash(node -e \"const p=require\\('./server/package.json'\\);console.log\\(JSON.stringify\\(p.scripts,null,2\\)\\)\")",
+      "Bash(awk 'BEGIN{prev=\"\"} {print} ')",
+      "Bash(echo \"exit=$?\")"
     ]
   }
 }

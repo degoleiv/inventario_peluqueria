@@ -12,6 +12,7 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Drawer } from "../components/Drawer";
 import { SkeletonCard } from "../components/Skeleton";
 import { useToast } from "../context/ToastContext";
+import { usePuede } from "../context/PermisosContext";
 import {
   getPinnedClienteIds,
   getRecentClienteIds,
@@ -54,6 +55,9 @@ function ClienteCardAvatar({ nombre }: { nombre: string }) {
 
 export function ClientesPage() {
   const toast = useToast();
+  const puedeCrearCliente = usePuede("clientes", "crear");
+  const puedeEditarCliente = usePuede("clientes", "editar");
+  const puedeEliminarCliente = usePuede("clientes", "eliminar");
   const [rows, setRows] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState("");
@@ -234,9 +238,11 @@ export function ClientesPage() {
         <section className="card">
           <div className="card-head" style={{ flexWrap: "wrap" }}>
             <h2 className="card-title">Clientes</h2>
-            <button type="button" className="btn primary" onClick={openNew}>
-              Nuevo cliente
-            </button>
+            {puedeCrearCliente ? (
+              <button type="button" className="btn primary" onClick={openNew}>
+                Nuevo cliente
+              </button>
+            ) : null}
           </div>
           {!loading && rows.length > 0 ? (
             <div className="module-filters-bar">
@@ -277,12 +283,15 @@ export function ClientesPage() {
               {filteredListaRows.map((c) => (
                 <article
                   key={c.id}
-                  className="prov-card prov-card--stacked prov-card--clickable"
+                  className={`prov-card prov-card--stacked${
+                    puedeEditarCliente ? " prov-card--clickable" : ""
+                  }`}
                   role="listitem"
-                  tabIndex={0}
-                  aria-label={`Ver o editar ${c.nombre}`}
-                  onClick={() => openEdit(c)}
+                  tabIndex={puedeEditarCliente ? 0 : -1}
+                  aria-label={puedeEditarCliente ? `Ver o editar ${c.nombre}` : c.nombre}
+                  onClick={puedeEditarCliente ? () => openEdit(c) : undefined}
                   onKeyDown={(e) => {
+                    if (!puedeEditarCliente) return;
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
                       openEdit(c);
@@ -312,8 +321,8 @@ export function ClientesPage() {
                   <ClienteCardToolbar
                     nombreCliente={c.nombre}
                     pinned={isClientePinned(c.id)}
-                    onEdit={() => openEdit(c)}
-                    onDelete={() => requestDeleteCliente(c)}
+                    onEdit={puedeEditarCliente ? () => openEdit(c) : undefined}
+                    onDelete={puedeEliminarCliente ? () => requestDeleteCliente(c) : undefined}
                     onTogglePin={() => {
                       togglePinCliente(c.id);
                       setPinTick((t) => t + 1);
@@ -407,7 +416,7 @@ export function ClientesPage() {
             <button type="submit" className="btn primary btn-lg">
               {editingTemporal ? "Guardar cambios (sigue ocasional)" : "Guardar"}
             </button>
-            {editingId != null ? (
+            {editingId != null && puedeEliminarCliente ? (
               <button
                 type="button"
                 className="btn ghost danger-text"

@@ -12,6 +12,7 @@ import { TabbedOutlet } from "./components/TabbedOutlet";
 import { AppLayout } from "./layout/AppLayout";
 import { WorkspaceTabsProvider, clearWorkspaceTabsStorage } from "./context/WorkspaceTabsContext";
 import { PosFocusProvider } from "./context/PosFocusContext";
+import { PermisosProvider } from "./context/PermisosContext";
 import {
   NAV_LABEL,
   puedeVerModulo,
@@ -266,6 +267,7 @@ export function AuthenticatedShell() {
 
   return (
     <>
+      <PermisosProvider permisos={permisos}>
       <WorkspaceTabsProvider permisos={permisos}>
         <PosFocusProvider>
         <AppLayout
@@ -298,6 +300,7 @@ export function AuthenticatedShell() {
         </AppLayout>
         </PosFocusProvider>
       </WorkspaceTabsProvider>
+      </PermisosProvider>
       <CommandPalette
         open={paletteOpen}
         onClose={() => setPaletteOpen(false)}

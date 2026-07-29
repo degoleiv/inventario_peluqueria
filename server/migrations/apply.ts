@@ -938,6 +938,83 @@ const MIGRATIONS: Migration[] = [
       await db.exec(`CREATE INDEX IF NOT EXISTS idx_devaudit_devolucion ON devolucion_auditoria(devolucion_id)`);
     },
   },
+
+  // ══════════════════════════════════════════
+  // 010 — Descuentos (fijos por cliente/producto, aplicaciones y auditoría)
+  // ══════════════════════════════════════════
+  {
+    id: "010_descuentos",
+    up: async (db) => {
+      // Descuentos configurables (por cliente o por producto).
+      await db.exec(`
+        CREATE TABLE IF NOT EXISTS descuentos (
+          id           INTEGER PRIMARY KEY AUTOINCREMENT,
+          alcance      TEXT NOT NULL CHECK(alcance IN ('cliente','producto')),
+          cliente_id   INTEGER REFERENCES clientes(id)  ON DELETE CASCADE,
+          producto_id  INTEGER REFERENCES productos(id) ON DELETE CASCADE,
+          tipo         TEXT NOT NULL CHECK(tipo IN ('porcentaje','monto')),
+          valor        REAL NOT NULL,
+          nombre       TEXT NOT NULL,
+          descripcion  TEXT,
+          vigente_desde TEXT,
+          vigente_hasta TEXT,
+          activo       INTEGER NOT NULL DEFAULT 1,
+          creado_por   INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+          created_at   TEXT NOT NULL,
+          updated_at   TEXT NOT NULL
+        )
+      `);
+      await db.exec(`CREATE INDEX IF NOT EXISTS idx_descuentos_cliente  ON descuentos(cliente_id)`);
+      await db.exec(`CREATE INDEX IF NOT EXISTS idx_descuentos_producto ON descuentos(producto_id)`);
+      await db.exec(`CREATE INDEX IF NOT EXISTS idx_descuentos_activo   ON descuentos(activo)`);
+
+      // Registro de cada aplicación de descuento en una venta.
+      await db.exec(`
+        CREATE TABLE IF NOT EXISTS descuento_aplicaciones (
+          id            INTEGER PRIMARY KEY AUTOINCREMENT,
+          venta_id      INTEGER NOT NULL REFERENCES ventas(id) ON DELETE CASCADE,
+          descuento_id  INTEGER REFERENCES descuentos(id) ON DELETE SET NULL,
+          origen        TEXT NOT NULL CHECK(origen IN ('cliente','producto','manual')),
+          tipo          TEXT NOT NULL CHECK(tipo IN ('porcentaje','monto')),
+          valor         REAL NOT NULL,
+          monto_aplicado REAL NOT NULL,
+          descripcion   TEXT,
+          producto_id   INTEGER REFERENCES productos(id) ON DELETE SET NULL,
+          cliente_id    INTEGER REFERENCES clientes(id)  ON DELETE SET NULL,
+          created_at    TEXT NOT NULL
+        )
+      `);
+      await db.exec(`CREATE INDEX IF NOT EXISTS idx_descap_venta     ON descuento_aplicaciones(venta_id)`);
+      await db.exec(`CREATE INDEX IF NOT EXISTS idx_descap_descuento ON descuento_aplicaciones(descuento_id)`);
+      await db.exec(`CREATE INDEX IF NOT EXISTS idx_descap_cliente   ON descuento_aplicaciones(cliente_id)`);
+      await db.exec(`CREATE INDEX IF NOT EXISTS idx_descap_created   ON descuento_aplicaciones(created_at)`);
+
+      // Auditoría de altas / cambios / desactivaciones sobre la config de descuentos.
+      await db.exec(`
+        CREATE TABLE IF NOT EXISTS descuento_auditoria (
+          id            INTEGER PRIMARY KEY AUTOINCREMENT,
+          descuento_id  INTEGER REFERENCES descuentos(id) ON DELETE CASCADE,
+          usuario_id    INTEGER REFERENCES usuarios(id)   ON DELETE SET NULL,
+          accion        TEXT NOT NULL,
+          detalle_json  TEXT,
+          created_at    TEXT NOT NULL
+        )
+      `);
+      await db.exec(`CREATE INDEX IF NOT EXISTS idx_descaudit_descuento ON descuento_auditoria(descuento_id)`);
+      await db.exec(`CREATE INDEX IF NOT EXISTS idx_descaudit_created   ON descuento_auditoria(created_at)`);
+
+      // Totales de descuento en la propia venta.
+      if (!(await columnExists(db, "ventas", "descuento_total"))) {
+        await db.exec(`ALTER TABLE ventas ADD COLUMN descuento_total REAL NOT NULL DEFAULT 0`);
+      }
+      if (!(await columnExists(db, "ventas", "descuento_manual"))) {
+        await db.exec(`ALTER TABLE ventas ADD COLUMN descuento_manual REAL NOT NULL DEFAULT 0`);
+      }
+      if (!(await columnExists(db, "ventas", "descuento_manual_motivo"))) {
+        await db.exec(`ALTER TABLE ventas ADD COLUMN descuento_manual_motivo TEXT`);
+      }
+    },
+  },
 ];
 
 // ─────────────────────────────────────────────

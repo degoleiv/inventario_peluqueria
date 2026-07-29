@@ -12,7 +12,7 @@ import {
   createInventarioCategoriaProducto,
   createPedidoProveedor,
   createProductoRapidoProveedor,
-  fetchAuthMe,
+  deletePedidoProveedor,
   fetchInventarioCatalogo,
   fetchPedidoProveedor,
   fetchPedidosProveedores,
@@ -38,7 +38,9 @@ import {
   type ProductoCatalogoFields,
 } from "../components/ProductoCatalogoForm";
 import { Drawer } from "../components/Drawer";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { useToast } from "../context/ToastContext";
+import { usePermisos, usePuede } from "../context/PermisosContext";
 import {
   clearSessionDraft,
   loadSessionDraft,
@@ -287,7 +289,10 @@ export function PedidosProveedoresPage() {
   inventarioCatalogoRef.current = inventarioCatalogo;
   nuevoCodigoRef.current = nuevoCatalogo.codigo;
 
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { esAdmin: isAdmin } = usePermisos();
+  const puedeCrear = usePuede("pedidos", "crear");
+  const puedeEditarPedido = usePuede("pedidos", "editar");
+  const puedeEliminarPedido = usePuede("pedidos", "eliminar");
 
   const [edit, setEdit] = useState<PedidoProveedor | null>(null);
   const [editFecha, setEditFecha] = useState("");
@@ -306,6 +311,8 @@ export function PedidosProveedoresPage() {
   const [editCatalogoBusca, setEditCatalogoBusca] = useState("");
   const [editProveedorBusca, setEditProveedorBusca] = useState("");
   const [editWizardStep, setEditWizardStep] = useState(0);
+  const [confirmDeletePedido, setConfirmDeletePedido] = useState<PedidoProveedor | null>(null);
+  const [deletePedidoBusy, setDeletePedidoBusy] = useState(false);
 
   const historialFiltrosRef = useRef<HistorialFiltrosForm>({ ...HIST_FILTROS_VACIOS });
   const [historialForm, setHistorialForm] = useState<HistorialFiltrosForm>({ ...HIST_FILTROS_VACIOS });
@@ -360,10 +367,8 @@ export function PedidosProveedoresPage() {
   }, [load]);
 
   useEffect(() => {
-    void fetchAuthMe()
-      .then((m) => setIsAdmin((m.user.permisos ?? []).includes("*")))
-      .catch(() => setIsAdmin(false));
-  }, []);
+    if (vistaTab === "pedido" && !puedeCrear) setVistaTab("historial");
+  }, [vistaTab, puedeCrear]);
 
   useEffect(() => {
     if (!edit || !isAdmin) {
@@ -1148,6 +1153,28 @@ export function PedidosProveedoresPage() {
     }
   }
 
+  function requestEliminarPedido(p: PedidoProveedor) {
+    if (!isAdmin) return;
+    setConfirmDeletePedido(p);
+  }
+
+  async function confirmEliminarPedidoAction() {
+    const p = confirmDeletePedido;
+    if (!p) return;
+    setDeletePedidoBusy(true);
+    try {
+      await deletePedidoProveedor(p.id);
+      setConfirmDeletePedido(null);
+      if (edit?.id === p.id) setEdit(null);
+      toast("Pedido eliminado. Se revirtió el stock de las líneas.", "success");
+      await load();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "No se pudo eliminar el pedido", "error");
+    } finally {
+      setDeletePedidoBusy(false);
+    }
+  }
+
   const resumenWarnings = [validateLineas(), validatePagos()].filter((x): x is string => Boolean(x));
 
   return (
@@ -1155,7 +1182,7 @@ export function PedidosProveedoresPage() {
       <nav className="pedidos-segmented" aria-label="Navegación de pedidos" role="tablist">
         {(
           [
-            { id: "pedido" as const, label: "Pedido" },
+            ...(puedeCrear ? [{ id: "pedido" as const, label: "Pedido" }] : []),
             { id: "proveedores" as const, label: "Proveedores" },
             { id: "historial" as const, label: "Historial" },
           ] as const
@@ -1745,14 +1772,12 @@ export function PedidosProveedoresPage() {
               </div>
             ) : null}
 
-            <div className="pedidos-wizard-footer">
+            <div className="pedidos-wizard-footer pedidos-wizard-footer--end">
               {wizardStep > 0 ? (
                 <button type="button" className="pedidos-btn pedidos-btn--ghost" onClick={onPrevStep}>
                   Anterior
                 </button>
-              ) : (
-                <span />
-              )}
+              ) : null}
               {wizardStep < 3 ? (
                 <button type="button" className="pedidos-btn pedidos-btn--primary" onClick={onNextStep}>
                   Siguiente
@@ -1877,9 +1902,22 @@ export function PedidosProveedoresPage() {
                   </div>
                   <div className="pedidos-historial-row__aside">
                     <span className="pedidos-historial-row__amount">{formatMoney(Number(c.total))}</span>
-                    <button type="button" className="pedidos-btn pedidos-btn--ghost" onClick={() => openEdit(c)}>
-                      Editar
-                    </button>
+                    <div className="pedidos-historial-row__actions">
+                      {puedeEditarPedido ? (
+                        <button type="button" className="pedidos-btn pedidos-btn--ghost" onClick={() => openEdit(c)}>
+                          Editar
+                        </button>
+                      ) : null}
+                      {puedeEliminarPedido ? (
+                        <button
+                          type="button"
+                          className="pedidos-btn pedidos-btn--danger-ghost"
+                          onClick={() => requestEliminarPedido(c)}
+                        >
+                          Eliminar
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                 </article>
               ))}
@@ -1904,21 +1942,36 @@ export function PedidosProveedoresPage() {
           role="dialog"
           aria-modal
           aria-labelledby="edit-pedido-title"
+          onClick={() => {
+            if (!editBusy) setEdit(null);
+          }}
         >
           <div className="card drawer-overlay-card pedidos-drawer-card" onClick={(e) => e.stopPropagation()}>
             <div className="pedidos-drawer-card__header">
               <h3 id="edit-pedido-title" className="pedidos-drawer-card__title">
                 Editar pedido #{edit.id}
               </h3>
-              <button
-                type="button"
-                className="pedidos-drawer-card__close"
-                onClick={() => setEdit(null)}
-                aria-label="Cerrar"
-                disabled={editBusy}
-              >
-                ×
-              </button>
+              <div className="pedidos-drawer-card__header-actions">
+                {puedeEliminarPedido ? (
+                  <button
+                    type="button"
+                    className="pedidos-btn pedidos-btn--danger-ghost pedidos-btn--compact"
+                    onClick={() => requestEliminarPedido(edit)}
+                    disabled={editBusy || deletePedidoBusy}
+                  >
+                    Eliminar
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="pedidos-drawer-card__close"
+                  onClick={() => setEdit(null)}
+                  aria-label="Cerrar"
+                  disabled={editBusy}
+                >
+                  ×
+                </button>
+              </div>
             </div>
             <p className="pedidos-drawer-card__lede">
               {isAdmin
@@ -2342,7 +2395,7 @@ export function PedidosProveedoresPage() {
                 </div>
               ) : null}
 
-              <div className="pedidos-wizard-footer pedidos-drawer-footer">
+              <div className="pedidos-wizard-footer pedidos-drawer-footer pedidos-wizard-footer--end">
                 {editWizardStep > 0 ? (
                   <button
                     type="button"
@@ -2351,9 +2404,7 @@ export function PedidosProveedoresPage() {
                   >
                     Anterior
                   </button>
-                ) : (
-                  <span />
-                )}
+                ) : null}
                 {!isLastStep ? (
                   <button type="button" className="pedidos-btn pedidos-btn--primary" onClick={onEditNextStep}>
                     Siguiente
@@ -2423,6 +2474,28 @@ export function PedidosProveedoresPage() {
           />
         </form>
       </Drawer>
+
+      <ConfirmDialog
+        open={confirmDeletePedido != null}
+        title="Eliminar pedido"
+        description={
+          confirmDeletePedido ? (
+            <>
+              ¿Eliminar el pedido <strong>#{confirmDeletePedido.id}</strong>
+              {confirmDeletePedido.proveedor_nombre_ref || confirmDeletePedido.proveedor_nombre
+                ? <> de <strong>{confirmDeletePedido.proveedor_nombre_ref ?? confirmDeletePedido.proveedor_nombre}</strong></>
+                : null}
+              ? Se revertirá el stock de las líneas y no se puede deshacer.
+            </>
+          ) : null
+        }
+        confirmLabel="Eliminar"
+        cancelLabel="Volver"
+        variant="danger"
+        busy={deletePedidoBusy}
+        onCancel={() => !deletePedidoBusy && setConfirmDeletePedido(null)}
+        onConfirm={() => void confirmEliminarPedidoAction()}
+      />
 
     </div>
   );

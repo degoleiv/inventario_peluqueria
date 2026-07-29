@@ -1,6 +1,11 @@
 import { useId, useMemo, useRef, useState, useEffect, type ReactNode } from "react";
 
-export type SearchableSelectOption = { value: string; label: string };
+export type SearchableSelectOption = {
+  value: string;
+  label: string;
+  /** Si se define, se usa en la lista / trigger; `label` sigue sirviendo para filtrar. */
+  labelNode?: ReactNode;
+};
 
 type Props = {
   label: ReactNode;
@@ -46,6 +51,11 @@ export function SearchableSelect({
     () => options.find((o) => o.value === value)?.label ?? "",
     [options, value]
   );
+
+  const selectedLabelNode = useMemo(() => {
+    const hit = options.find((o) => o.value === value);
+    return hit?.labelNode ?? hit?.label ?? "";
+  }, [options, value]);
 
   const comboboxClosedDisplay = useMemo(() => {
     if (!value) return "";
@@ -106,7 +116,7 @@ export function SearchableSelect({
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => selectOption(o.value)}
             >
-              {o.label}
+              {o.labelNode ?? o.label}
             </button>
           </li>
         ))}

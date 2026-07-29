@@ -4,7 +4,13 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { db } from "./db.js";
 import { lookupBarcode } from "./barcode.js";
-import { requireAdmin, requireAlguno, requireAuth, requirePermiso } from "./middleware/auth.js";
+import {
+  requireAdmin,
+  requireAlguno,
+  requireAuth,
+  requirePermiso,
+  requirePermisoAccion,
+} from "./middleware/auth.js";
 import { asyncHandler } from "./utils/asyncHandler.js";
 import { bootstrapFirstAdmin, login, refreshAccessTokenSession } from "./services/auth.service.js";
 import { usuariosRepo } from "./repositories/usuarios.js";
@@ -33,6 +39,7 @@ import { inventarioCatalogoService } from "./services/inventarioCatalogo.service
 import { promocionesService } from "./services/promociones.service.js";
 import { commissionService } from "./services/commission.service.js";
 import { devolucionService } from "./services/devolucion.service.js";
+import { descuentoService } from "./services/descuento.service.js";
 import { turnoService } from "./services/turno.service.js";
 import { empleadoMovimientoService } from "./services/empleadoMovimiento.service.js";
 import { certificadoController } from "./controllers/certificado.controller.js";
@@ -510,7 +517,7 @@ export function registerHttpRoutes(app: Express) {
 
   api.post(
     "/productos",
-    requirePermiso("inventario"),
+    requirePermisoAccion("inventario", "crear"),
     asyncHandler(async (req, res) => {
       const row = await productoService.create(req.body as Record<string, unknown>);
       res.status(201).json(row);
@@ -519,7 +526,7 @@ export function registerHttpRoutes(app: Express) {
 
   api.put(
     "/productos/:id",
-    requirePermiso("inventario"),
+    requirePermisoAccion("inventario", "editar"),
     asyncHandler(async (req, res) => {
       const id = parseId(req, res);
       if (id == null) return;
@@ -533,7 +540,7 @@ export function registerHttpRoutes(app: Express) {
 
   api.patch(
     "/productos/:id/estado",
-    requirePermiso("inventario"),
+    requirePermisoAccion("inventario", "editar"),
     asyncHandler(async (req, res) => {
       const id = parseId(req, res);
       if (id == null) return;
@@ -546,7 +553,7 @@ export function registerHttpRoutes(app: Express) {
 
   api.delete(
     "/productos/:id",
-    requirePermiso("inventario"),
+    requirePermisoAccion("inventario", "eliminar"),
     asyncHandler(async (req, res) => {
       const id = parseId(req, res);
       if (id == null) return;
@@ -583,7 +590,7 @@ export function registerHttpRoutes(app: Express) {
 
   api.post(
     "/clientes/:id/convertir-registrado",
-    requirePermiso("clientes"),
+    requirePermisoAccion("clientes", "editar"),
     asyncHandler(async (req, res) => {
       const id = parseId(req, res);
       if (id == null) return;
@@ -597,7 +604,7 @@ export function registerHttpRoutes(app: Express) {
 
   api.put(
     "/clientes/:id",
-    requirePermiso("clientes"),
+    requirePermisoAccion("clientes", "editar"),
     asyncHandler(async (req, res) => {
       const id = parseId(req, res);
       if (id == null) return;
@@ -607,7 +614,7 @@ export function registerHttpRoutes(app: Express) {
 
   api.delete(
     "/clientes/:id",
-    requirePermiso("clientes"),
+    requirePermisoAccion("clientes", "eliminar"),
     asyncHandler(async (req, res) => {
       const id = parseId(req, res);
       if (id == null) return;
@@ -706,7 +713,7 @@ export function registerHttpRoutes(app: Express) {
   /** Crea un turno de trabajo para un día (franja del negocio por defecto); permiso citas. */
   api.post(
     "/citas/empleado-turno-dia",
-    requirePermiso("citas"),
+    requirePermisoAccion("citas", "crear"),
     asyncHandler(async (req, res) => {
       const b = req.body as Record<string, unknown>;
       const uid = Number(b.usuario_id);
@@ -741,7 +748,7 @@ export function registerHttpRoutes(app: Express) {
 
   api.post(
     "/citas",
-    requirePermiso("citas"),
+    requirePermisoAccion("citas", "crear"),
     asyncHandler(async (req, res) => {
       const row = (await citaService.create(req.body as Record<string, unknown>)) as { id: number };
       await auditService.log(req.user?.sub, "crear", "cita", row.id, {
@@ -753,7 +760,7 @@ export function registerHttpRoutes(app: Express) {
 
   api.put(
     "/citas/:id",
-    requirePermiso("citas"),
+    requirePermisoAccion("citas", "editar"),
     asyncHandler(async (req, res) => {
       const id = parseId(req, res);
       if (id == null) return;
@@ -763,7 +770,7 @@ export function registerHttpRoutes(app: Express) {
 
   api.patch(
     "/citas/:id/cancelar",
-    requirePermiso("citas"),
+    requirePermisoAccion("citas", "editar"),
     asyncHandler(async (req, res) => {
       const id = parseId(req, res);
       if (id == null) return;
@@ -787,7 +794,7 @@ export function registerHttpRoutes(app: Express) {
 
   api.delete(
     "/citas/:id",
-    requirePermiso("citas"),
+    requirePermisoAccion("citas", "eliminar"),
     asyncHandler(async (req, res) => {
       const id = parseId(req, res);
       if (id == null) return;
@@ -815,7 +822,7 @@ export function registerHttpRoutes(app: Express) {
 
   api.post(
     "/citas/serie-recurrente",
-    requirePermiso("citas"),
+    requirePermisoAccion("citas", "crear"),
     asyncHandler(async (req, res) => {
       res.status(201).json(await citaService.crearSerieRecurrente(req.body as Record<string, unknown>));
     })
@@ -860,7 +867,7 @@ export function registerHttpRoutes(app: Express) {
 
   api.patch(
     "/ventas/citas/:id/servicios-desde-pos",
-    requirePermiso("ventas"),
+    requirePermisoAccion("ventas", "editar"),
     asyncHandler(async (req, res) => {
       const id = parseId(req, res);
       if (id == null) return;
@@ -882,7 +889,7 @@ export function registerHttpRoutes(app: Express) {
 
   api.patch(
     "/ventas/:id/cancelar",
-    requirePermiso("ventas"),
+    requirePermisoAccion("ventas", "eliminar"),
     asyncHandler(async (req, res) => {
       const id = parseId(req, res);
       if (id == null) return;
@@ -906,7 +913,7 @@ export function registerHttpRoutes(app: Express) {
 
   api.post(
     "/ventas",
-    requirePermiso("ventas"),
+    requirePermisoAccion("ventas", "crear"),
     asyncHandler(async (req, res) => {
       const raw = { ...(req.body as Record<string, unknown>) };
       if (raw.usuario_id == null && req.user?.sub != null) {
@@ -943,7 +950,7 @@ export function registerHttpRoutes(app: Express) {
 
   api.post(
     "/ventas/:id/factura-electronica",
-    requirePermiso("ventas"),
+    requirePermisoAccion("ventas", "editar"),
     asyncHandler(async (req, res) => {
       const id = parseId(req, res);
       if (id == null) return;
@@ -1018,7 +1025,7 @@ export function registerHttpRoutes(app: Express) {
 
   api.post(
     "/devoluciones",
-    requirePermiso("ventas"),
+    requirePermisoAccion("ventas", "crear"),
     asyncHandler(async (req, res) => {
       const userId = req.user?.sub;
       if (userId == null) { res.status(401).json({ error: "No autenticado" }); return; }
@@ -1033,7 +1040,7 @@ export function registerHttpRoutes(app: Express) {
 
   api.patch(
     "/devoluciones/:id/aprobar",
-    requirePermiso("ventas"),
+    requirePermisoAccion("ventas", "editar"),
     asyncHandler(async (req, res) => {
       const id = parseId(req, res);
       if (id == null) return;
@@ -1047,7 +1054,7 @@ export function registerHttpRoutes(app: Express) {
 
   api.patch(
     "/devoluciones/:id/procesar",
-    requirePermiso("ventas"),
+    requirePermisoAccion("ventas", "editar"),
     asyncHandler(async (req, res) => {
       const id = parseId(req, res);
       if (id == null) return;
@@ -1064,7 +1071,7 @@ export function registerHttpRoutes(app: Express) {
 
   api.patch(
     "/devoluciones/:id/rechazar",
-    requirePermiso("ventas"),
+    requirePermisoAccion("ventas", "editar"),
     asyncHandler(async (req, res) => {
       const id = parseId(req, res);
       if (id == null) return;
@@ -1080,7 +1087,7 @@ export function registerHttpRoutes(app: Express) {
 
   api.patch(
     "/devoluciones/:id/anular",
-    requirePermiso("ventas"),
+    requirePermisoAccion("ventas", "eliminar"),
     asyncHandler(async (req, res) => {
       const id = parseId(req, res);
       if (id == null) return;
@@ -1126,7 +1133,7 @@ export function registerHttpRoutes(app: Express) {
 
   api.post(
     "/cierres-dia",
-    requirePermiso("ventas"),
+    requirePermisoAccion("ventas", "crear"),
     asyncHandler(async (req, res) => {
       const uid = req.user?.sub;
       if (uid == null) {
@@ -1152,11 +1159,11 @@ export function registerHttpRoutes(app: Express) {
     asyncHandler((req, res) => proveedoresController.getById(req, res))
   );
 
-  api.post("/proveedores", requirePermiso("pedidos"), asyncHandler((req, res) => proveedoresController.create(req, res)));
+  api.post("/proveedores", requirePermisoAccion("pedidos", "crear"), asyncHandler((req, res) => proveedoresController.create(req, res)));
 
   api.post(
     "/proveedores/:id/productos-rapido",
-    requirePermiso("pedidos"),
+    requirePermisoAccion("pedidos", "crear"),
     asyncHandler(async (req, res) => {
       const proveedorId = parseId(req, res);
       if (proveedorId == null) return;
@@ -1167,15 +1174,15 @@ export function registerHttpRoutes(app: Express) {
     })
   );
 
-  api.put("/proveedores/:id", requirePermiso("pedidos"), asyncHandler((req, res) => proveedoresController.update(req, res)));
+  api.put("/proveedores/:id", requirePermisoAccion("pedidos", "editar"), asyncHandler((req, res) => proveedoresController.update(req, res)));
 
   api.patch(
     "/proveedores/:id/estado",
-    requirePermiso("pedidos"),
+    requirePermisoAccion("pedidos", "editar"),
     asyncHandler((req, res) => proveedoresController.patchEstado(req, res))
   );
 
-  api.delete("/proveedores/:id", requirePermiso("pedidos"), asyncHandler((req, res) => proveedoresController.remove(req, res)));
+  api.delete("/proveedores/:id", requirePermisoAccion("pedidos", "eliminar"), asyncHandler((req, res) => proveedoresController.remove(req, res)));
 
   api.get(
     "/proveedores/:id/productos",
@@ -1228,7 +1235,7 @@ export function registerHttpRoutes(app: Express) {
 
   api.post(
     "/pedidos-proveedores",
-    requirePermiso("pedidos"),
+    requirePermisoAccion("pedidos", "crear"),
     asyncHandler(async (req, res) => {
       res.status(201).json(await pedidoProveedorService.create(req.body as Record<string, unknown>));
     })
@@ -1236,7 +1243,7 @@ export function registerHttpRoutes(app: Express) {
 
   api.patch(
     "/pedidos-proveedores/:id",
-    requirePermiso("pedidos"),
+    requirePermisoAccion("pedidos", "editar"),
     asyncHandler(async (req, res) => {
       const id = parseId(req, res);
       if (id == null) return;
@@ -1251,6 +1258,17 @@ export function registerHttpRoutes(app: Express) {
       const id = parseId(req, res);
       if (id == null) return;
       res.json(await pedidoProveedorService.updateFull(id, req.body as Record<string, unknown>));
+    })
+  );
+
+  api.delete(
+    "/pedidos-proveedores/:id",
+    requirePermisoAccion("pedidos", "eliminar"),
+    asyncHandler(async (req, res) => {
+      const id = parseId(req, res);
+      if (id == null) return;
+      await pedidoProveedorService.delete(id);
+      res.status(204).send();
     })
   );
 
@@ -1293,7 +1311,7 @@ export function registerHttpRoutes(app: Express) {
 
   api.post(
     "/facturas-electronicas/:id/enviar-email",
-    requirePermiso("facturas"),
+    requirePermisoAccion("facturas", "editar"),
     asyncHandler(async (req, res) => {
       const id = parseId(req, res);
       if (id == null) return;
@@ -1504,7 +1522,7 @@ export function registerHttpRoutes(app: Express) {
 
   api.post(
     "/cobranzas",
-    requirePermiso("finanzas"),
+    requirePermisoAccion("finanzas", "crear"),
     asyncHandler(async (req, res) => {
       const row = (await cobranzaService.create(req.body as Record<string, unknown>)) as {
         id: number;
@@ -1519,7 +1537,7 @@ export function registerHttpRoutes(app: Express) {
 
   api.patch(
     "/cobranzas/:id/pago",
-    requirePermiso("finanzas"),
+    requirePermisoAccion("finanzas", "editar"),
     asyncHandler(async (req, res) => {
       const id = parseId(req, res);
       if (id == null) return;
@@ -1673,7 +1691,7 @@ export function registerHttpRoutes(app: Express) {
 
   api.post(
     "/inventario/categorias-producto",
-    requirePermiso("inventario"),
+    requirePermisoAccion("inventario", "crear"),
     asyncHandler(async (req, res) => {
       const row = await categoriaProductoService.create(req.body as Record<string, unknown>);
       await auditService.log(req.user?.sub, "crear", "categoria_producto", row.id, {
@@ -1686,7 +1704,7 @@ export function registerHttpRoutes(app: Express) {
 
   api.post(
     "/inventario/ajuste-stock",
-    requirePermiso("inventario"),
+    requirePermisoAccion("inventario", "editar"),
     asyncHandler(async (req, res) => {
       const out = await inventarioAjusteService.registrarAjuste(
         req.body as Record<string, unknown>,
@@ -1710,7 +1728,7 @@ export function registerHttpRoutes(app: Express) {
 
   api.post(
     "/whatsapp/recordatorio/:citaId",
-    requirePermiso("citas"),
+    requirePermisoAccion("citas", "editar"),
     asyncHandler(async (req, res) => {
       const id = Number(req.params.citaId);
       if (!Number.isFinite(id)) {
@@ -1909,6 +1927,179 @@ export function registerHttpRoutes(app: Express) {
       const id = parseId(req, res);
       if (id == null) return;
       await usuarioService.delete(id);
+      res.status(204).send();
+    })
+  );
+
+  // ═══════════════════ Descuentos ═══════════════════
+
+  api.get(
+    "/descuentos",
+    requirePermiso("ventas"),
+    asyncHandler(async (req, res) => {
+      const alcanceRaw = typeof req.query.alcance === "string" ? req.query.alcance : undefined;
+      const alcance =
+        alcanceRaw === "cliente" || alcanceRaw === "producto" || alcanceRaw === "todos"
+          ? alcanceRaw
+          : undefined;
+      const cliRaw = req.query.cliente_id;
+      const prodRaw = req.query.producto_id;
+      const cliente_id =
+        cliRaw != null && String(cliRaw).trim() !== "" && Number.isFinite(Number(cliRaw))
+          ? Number(cliRaw)
+          : undefined;
+      const producto_id =
+        prodRaw != null && String(prodRaw).trim() !== "" && Number.isFinite(Number(prodRaw))
+          ? Number(prodRaw)
+          : undefined;
+      const incluir_inactivos =
+        req.query.incluir_inactivos === "1" || req.query.incluir_inactivos === "true";
+      const search = typeof req.query.search === "string" ? req.query.search : undefined;
+      res.json(
+        await descuentoService.list({ alcance, cliente_id, producto_id, incluir_inactivos, search })
+      );
+    })
+  );
+
+  api.get(
+    "/descuentos/aplicaciones",
+    requirePermiso("ventas"),
+    asyncHandler(async (req, res) => {
+      const desde = typeof req.query.desde === "string" ? req.query.desde : undefined;
+      const hasta = typeof req.query.hasta === "string" ? req.query.hasta : undefined;
+      const cliRaw = req.query.cliente_id;
+      const descRaw = req.query.descuento_id;
+      const cliente_id =
+        cliRaw != null && String(cliRaw).trim() !== "" && Number.isFinite(Number(cliRaw))
+          ? Number(cliRaw)
+          : undefined;
+      const descuento_id =
+        descRaw != null && String(descRaw).trim() !== "" && Number.isFinite(Number(descRaw))
+          ? Number(descRaw)
+          : undefined;
+      const origenRaw = typeof req.query.origen === "string" ? req.query.origen : undefined;
+      const origen =
+        origenRaw === "cliente" || origenRaw === "producto" || origenRaw === "manual"
+          ? origenRaw
+          : undefined;
+      const limitRaw = req.query.limit;
+      const limit =
+        limitRaw != null && Number.isFinite(Number(limitRaw)) ? Number(limitRaw) : undefined;
+      res.json(
+        await descuentoService.historialAplicaciones({
+          desde,
+          hasta,
+          cliente_id,
+          descuento_id,
+          origen,
+          limit,
+        })
+      );
+    })
+  );
+
+  api.get(
+    "/descuentos/auditoria",
+    requirePermiso("ventas"),
+    asyncHandler(async (req, res) => {
+      const descRaw = req.query.descuento_id;
+      const descuento_id =
+        descRaw != null && String(descRaw).trim() !== "" && Number.isFinite(Number(descRaw))
+          ? Number(descRaw)
+          : undefined;
+      const limitRaw = req.query.limit;
+      const limit =
+        limitRaw != null && Number.isFinite(Number(limitRaw)) ? Number(limitRaw) : undefined;
+      res.json(await descuentoService.auditoria({ descuento_id, limit }));
+    })
+  );
+
+  api.get(
+    "/descuentos/vigentes",
+    requirePermiso("ventas"),
+    asyncHandler(async (req, res) => {
+      const cliRaw = req.query.cliente_id;
+      const cliente_id =
+        cliRaw != null && String(cliRaw).trim() !== "" && Number.isFinite(Number(cliRaw))
+          ? Number(cliRaw)
+          : null;
+      const idsRaw = req.query.producto_ids;
+      let producto_ids: number[] = [];
+      if (typeof idsRaw === "string" && idsRaw.trim()) {
+        producto_ids = idsRaw
+          .split(",")
+          .map((s) => Number(s.trim()))
+          .filter((n) => Number.isFinite(n));
+      } else if (Array.isArray(idsRaw)) {
+        producto_ids = idsRaw
+          .map((s) => Number(String(s).trim()))
+          .filter((n) => Number.isFinite(n));
+      }
+      res.json(await descuentoService.vigentesParaVenta({ cliente_id, producto_ids }));
+    })
+  );
+
+  api.get(
+    "/descuentos/:id",
+    requirePermiso("ventas"),
+    asyncHandler(async (req, res) => {
+      const id = parseId(req, res);
+      if (id == null) return;
+      res.json(await descuentoService.getById(id));
+    })
+  );
+
+  api.post(
+    "/descuentos",
+    requirePermisoAccion("ventas", "crear"),
+    asyncHandler(async (req, res) => {
+      const row = await descuentoService.create(req.body as Record<string, unknown>, req.user?.sub);
+      const id = (row as { id?: number }).id ?? null;
+      await auditService.log(req.user?.sub, "crear", "descuento", id, {
+        alcance: (row as { alcance?: string }).alcance,
+      });
+      res.status(201).json(row);
+    })
+  );
+
+  api.patch(
+    "/descuentos/:id",
+    requirePermisoAccion("ventas", "editar"),
+    asyncHandler(async (req, res) => {
+      const id = parseId(req, res);
+      if (id == null) return;
+      const row = await descuentoService.update(
+        id,
+        req.body as Record<string, unknown>,
+        req.user?.sub
+      );
+      await auditService.log(req.user?.sub, "editar", "descuento", id);
+      res.json(row);
+    })
+  );
+
+  api.patch(
+    "/descuentos/:id/estado",
+    requirePermisoAccion("ventas", "editar"),
+    asyncHandler(async (req, res) => {
+      const id = parseId(req, res);
+      if (id == null) return;
+      const b = req.body as Record<string, unknown>;
+      const activo = Boolean(b.activo);
+      const row = await descuentoService.patchEstado(id, activo, req.user?.sub);
+      await auditService.log(req.user?.sub, activo ? "activar" : "desactivar", "descuento", id);
+      res.json(row);
+    })
+  );
+
+  api.delete(
+    "/descuentos/:id",
+    requirePermisoAccion("ventas", "eliminar"),
+    asyncHandler(async (req, res) => {
+      const id = parseId(req, res);
+      if (id == null) return;
+      await descuentoService.remove(id, req.user?.sub);
+      await auditService.log(req.user?.sub, "eliminar", "descuento", id);
       res.status(204).send();
     })
   );

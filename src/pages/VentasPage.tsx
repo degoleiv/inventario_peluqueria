@@ -73,6 +73,11 @@ import { VentasCierreSection } from "../components/ventas/VentasCierreSection";
 import { readVentasTab, VENTAS_TABS, type VentasTab } from "../lib/moduleRoutes";
 import { publishPosClienteDisplay } from "../lib/posClientDisplay";
 import { lineasServicioDesdeTextoAgenda, parsePosPreloadCita } from "../lib/posPrecargaDesdeCita";
+import {
+  clearSessionDraft,
+  loadSessionDraft,
+  saveSessionDraft,
+} from "../lib/sessionDraft";
 
 type CartLine = {
   producto_id: number;
@@ -90,6 +95,29 @@ type ServicioLine = {
 };
 
 type VentaStep = "items" | "pagos";
+
+const POS_DRAFT_KEY = "peluqueria_pos_draft_v1";
+
+type PosDraft = {
+  cart?: CartLine[];
+  cartServicios?: ServicioLine[];
+  citaOrigenId?: number | null;
+  citaOrigenInfo?: string | null;
+  search?: string;
+  clienteId?: number | "";
+  clienteBusqueda?: string;
+  metodoPagoVenta?: MetodoPagoVentaInput;
+  notasVenta?: string;
+  puntosCanjeados?: number | "";
+  vendedorId?: number | "";
+  ventaStep?: VentaStep;
+};
+
+function readPosDraft(): PosDraft | null {
+  const d = loadSessionDraft<PosDraft>(POS_DRAFT_KEY);
+  if (!d || typeof d !== "object") return null;
+  return d;
+}
 
 function mergeClienteLista(prev: Cliente[], c: Cliente): Cliente[] {
   const rest = prev.filter((x) => x.id !== c.id);
@@ -110,24 +138,46 @@ export function VentasPage() {
   const [productos, setProductos] = useState<Producto[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
-  const [cart, setCart] = useState<CartLine[]>([]);
-  const [cartServicios, setCartServicios] = useState<ServicioLine[]>([]);
+  const posDraft0 = useMemo(() => readPosDraft(), []);
+  const [cart, setCart] = useState<CartLine[]>(() =>
+    Array.isArray(posDraft0?.cart) ? posDraft0.cart : []
+  );
+  const [cartServicios, setCartServicios] = useState<ServicioLine[]>(() =>
+    Array.isArray(posDraft0?.cartServicios) ? posDraft0.cartServicios : []
+  );
   const [serviciosCatalogo, setServiciosCatalogo] = useState<CategoriaServicio[]>([]);
-  const [citaOrigenId, setCitaOrigenId] = useState<number | null>(null);
-  const [citaOrigenInfo, setCitaOrigenInfo] = useState<string | null>(null);
+  const [citaOrigenId, setCitaOrigenId] = useState<number | null>(() =>
+    typeof posDraft0?.citaOrigenId === "number" ? posDraft0.citaOrigenId : posDraft0?.citaOrigenId === null ? null : null
+  );
+  const [citaOrigenInfo, setCitaOrigenInfo] = useState<string | null>(() =>
+    typeof posDraft0?.citaOrigenInfo === "string" ? posDraft0.citaOrigenInfo : null
+  );
   const [citasParaAsociar, setCitasParaAsociar] = useState<Cita[]>([]);
   const citaSyncTimerRef = useRef<number | null>(null);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(() => (typeof posDraft0?.search === "string" ? posDraft0.search : ""));
   const [lookupBusy, setLookupBusy] = useState(false);
 
-  const [clienteId, setClienteId] = useState<number | "">("");
+  const [clienteId, setClienteId] = useState<number | "">(() =>
+    posDraft0?.clienteId === "" || typeof posDraft0?.clienteId === "number" ? posDraft0.clienteId : ""
+  );
   const [metodoPagoVenta, setMetodoPagoVenta] = useState<MetodoPagoVentaInput>(() => ({
     ...METODO_PAGO_VENTA_INICIAL,
+    ...(posDraft0?.metodoPagoVenta && typeof posDraft0.metodoPagoVenta === "object"
+      ? posDraft0.metodoPagoVenta
+      : {}),
   }));
-  const [notasVenta, setNotasVenta] = useState("");
+  const [notasVenta, setNotasVenta] = useState(() =>
+    typeof posDraft0?.notasVenta === "string" ? posDraft0.notasVenta : ""
+  );
   const [emitirFactura] = useState(true);
-  const [puntosCanjeados, setPuntosCanjeados] = useState<number | "">("");
-  const [vendedorId, setVendedorId] = useState<number | "">("");
+  const [puntosCanjeados, setPuntosCanjeados] = useState<number | "">(() =>
+    posDraft0?.puntosCanjeados === "" || typeof posDraft0?.puntosCanjeados === "number"
+      ? posDraft0.puntosCanjeados
+      : ""
+  );
+  const [vendedorId, setVendedorId] = useState<number | "">(() =>
+    posDraft0?.vendedorId === "" || typeof posDraft0?.vendedorId === "number" ? posDraft0.vendedorId : ""
+  );
   const [pinTick, setPinTick] = useState(0);
   const [flashId, setFlashId] = useState<number | null>(null);
   /** Índice de línea seleccionada en carrito (↑↓); null = modo solo escáner */
@@ -136,7 +186,9 @@ export function VentasPage() {
   const [filtroCategoriaCatalogo, setFiltroCategoriaCatalogo] = useState("todos");
   const [filtroProveedorCatalogo, setFiltroProveedorCatalogo] = useState("todos");
   const [inventarioCatalogo, setInventarioCatalogo] = useState<InventarioCatalogo | null>(null);
-  const [clienteBusqueda, setClienteBusqueda] = useState("");
+  const [clienteBusqueda, setClienteBusqueda] = useState(() =>
+    typeof posDraft0?.clienteBusqueda === "string" ? posDraft0.clienteBusqueda : ""
+  );
   const [createClienteOpen, setCreateClienteOpen] = useState(false);
   const [equipo, setEquipo] = useState<EquipoMiembro[]>([]);
   const [nuevaCitaOpen, setNuevaCitaOpen] = useState(false);
@@ -149,7 +201,9 @@ export function VentasPage() {
   const [clienteOpen, setClienteOpen] = useState(false);
   const [clienteHover, setClienteHover] = useState(0);
   const clienteComboRef = useRef<HTMLDivElement>(null);
-  const [ventaStep, setVentaStep] = useState<VentaStep>("items");
+  const [ventaStep, setVentaStep] = useState<VentaStep>(() =>
+    posDraft0?.ventaStep === "pagos" || posDraft0?.ventaStep === "items" ? posDraft0.ventaStep : "items"
+  );
   /** En pantalla estrecha: pestaña activa del carrito (productos | servicios). */
   const [cartMobileTab, setCartMobileTab] = useState<"prods" | "svcs">("prods");
   /** En pantalla estrecha: acordeón de productos (escritorio). */
@@ -331,6 +385,50 @@ export function VentasPage() {
     setCartSel(null);
   }, [search]);
 
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      const empty =
+        cart.length === 0 &&
+        cartServicios.length === 0 &&
+        !search.trim() &&
+        !clienteId &&
+        !notasVenta.trim() &&
+        ventaStep === "items";
+      if (empty) {
+        clearSessionDraft(POS_DRAFT_KEY);
+        return;
+      }
+      saveSessionDraft(POS_DRAFT_KEY, {
+        cart,
+        cartServicios,
+        citaOrigenId,
+        citaOrigenInfo,
+        search,
+        clienteId,
+        clienteBusqueda,
+        metodoPagoVenta,
+        notasVenta,
+        puntosCanjeados,
+        vendedorId,
+        ventaStep,
+      });
+    }, 250);
+    return () => clearTimeout(t);
+  }, [
+    cart,
+    cartServicios,
+    citaOrigenId,
+    citaOrigenInfo,
+    search,
+    clienteId,
+    clienteBusqueda,
+    metodoPagoVenta,
+    notasVenta,
+    puntosCanjeados,
+    vendedorId,
+    ventaStep,
+  ]);
+
   const nuevaVenta = useCallback(() => {
     setCart([]);
     setCartServicios([]);
@@ -345,6 +443,7 @@ export function VentasPage() {
     setPuntosCanjeados("");
     setMetodoPagoVenta({ ...METODO_PAGO_VENTA_INICIAL });
     setVentaStep("items");
+    clearSessionDraft(POS_DRAFT_KEY);
     toast("Nueva venta lista", "info");
     window.setTimeout(() => barcodeRef.current?.focus(), 0);
   }, [toast]);
@@ -358,6 +457,7 @@ export function VentasPage() {
     setSearch("");
     setCartSel(null);
     setVentaStep("items");
+    clearSessionDraft(POS_DRAFT_KEY);
     toast("Venta cancelada", "warning");
     window.setTimeout(() => barcodeRef.current?.focus(), 0);
   }, [cart.length, cartServicios.length, search, toast]);
@@ -376,6 +476,7 @@ export function VentasPage() {
     setPuntosCanjeados("");
     setMetodoPagoVenta({ ...METODO_PAGO_VENTA_INICIAL });
     setVentaStep("items");
+    clearSessionDraft(POS_DRAFT_KEY);
     void load();
     window.setTimeout(() => barcodeRef.current?.focus(), 0);
   }, [load]);

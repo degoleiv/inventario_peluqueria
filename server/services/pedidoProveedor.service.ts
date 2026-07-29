@@ -459,4 +459,199 @@ export const pedidoProveedorService = {
     await recordSyncEvent("pedido_proveedor", "actualizado", { pedido_proveedor_id: id });
     return await pedidoProveedorService.getById(id);
   },
+
+  /**
+   * Edición completa (solo admin): puede cambiar proveedor, metadatos y líneas.
+   * Reversa stock/movimientos de las líneas actuales y aplica las nuevas en una transacción.
+   */
+  async updateFull(id: number, body: Record<string, unknown>) {
+    const cur = (await db.prepare(`SELECT * FROM pedidos_proveedor WHERE id = ?`).get(id)) as
+      | Record<string, unknown>
+      | undefined;
+    if (!cur) throw new AppError("no encontrado", 404);
+
+    const lineasIn = body.lineas;
+    if (!Array.isArray(lineasIn) || lineasIn.length === 0) {
+      throw new AppError("Debe incluir al menos una línea de pedido");
+    }
+
+    const proveedor_id =
+      body.proveedor_id != null && body.proveedor_id !== ""
+        ? Number(body.proveedor_id)
+        : Number(cur.proveedor_id);
+    if (!Number.isFinite(proveedor_id) || proveedor_id <= 0) {
+      throw new AppError("proveedor_id inválido");
+    }
+    const pr = (await db.prepare(`SELECT nombre FROM proveedores WHERE id = ?`).get(proveedor_id)) as
+      | { nombre: string }
+      | undefined;
+    if (!pr) throw new AppError("Proveedor no encontrado");
+
+    const fecha =
+      typeof body.fecha === "string" && body.fecha.trim() ? body.fecha.trim() : String(cur.fecha);
+    const fecha_pago_con_descuento =
+      body.fecha_pago_con_descuento !== undefined
+        ? typeof body.fecha_pago_con_descuento === "string" && body.fecha_pago_con_descuento.trim()
+          ? body.fecha_pago_con_descuento.trim().slice(0, 10)
+          : null
+        : (cur.fecha_pago_con_descuento as string | null);
+    const fecha_pago_maxima =
+      body.fecha_pago_maxima !== undefined
+        ? typeof body.fecha_pago_maxima === "string" && body.fecha_pago_maxima.trim()
+          ? body.fecha_pago_maxima.trim().slice(0, 10)
+          : null
+        : (cur.fecha_pago_maxima as string | null);
+    const valor_pago_con_descuento =
+      body.valor_pago_con_descuento !== undefined
+        ? body.valor_pago_con_descuento === null || body.valor_pago_con_descuento === ""
+          ? null
+          : Number(body.valor_pago_con_descuento)
+        : (cur.valor_pago_con_descuento as number | null);
+    const valor_pago_sin_descuento =
+      body.valor_pago_sin_descuento !== undefined
+        ? body.valor_pago_sin_descuento === null || body.valor_pago_sin_descuento === ""
+          ? null
+          : Number(body.valor_pago_sin_descuento)
+        : (cur.valor_pago_sin_descuento as number | null);
+
+    let estado = String(cur.estado ?? "pendiente");
+    if (body.estado !== undefined && typeof body.estado === "string" && body.estado.trim()) {
+      const cand = body.estado.trim();
+      if (ESTADOS.has(cand)) estado = cand;
+    }
+
+    const notas =
+      body.notas !== undefined
+        ? typeof body.notas === "string"
+          ? body.notas || null
+          : (cur.notas as string | null)
+        : (cur.notas as string | null);
+    const referencia =
+      body.referencia !== undefined
+        ? typeof body.referencia === "string"
+          ? body.referencia || null
+          : (cur.referencia as string | null)
+        : (cur.referencia as string | null);
+
+    validatePedidoFechasYMontos({
+      fecha,
+      fecha_pago_con_descuento,
+      fecha_pago_maxima,
+      valor_pago_con_descuento,
+      valor_pago_sin_descuento,
+    });
+
+    const now = new Date().toISOString();
+
+    // Preparar líneas nuevas (solo productos existentes; crear productos nuevos no aplica al editar).
+    const resolvedLines: {
+      producto_id: number;
+      cantidad: number;
+      costo_unitario: number;
+      subtotal: number;
+    }[] = [];
+    let totalNuevo = 0;
+    for (const raw of lineasIn as LineIn[]) {
+      const producto_id = Number(raw.producto_id);
+      const cantidad = Math.floor(Number(raw.cantidad));
+      const costo_unitario = Number(raw.costo_unitario);
+      if (!Number.isFinite(producto_id) || producto_id <= 0) {
+        throw new AppError("producto_id inválido en línea");
+      }
+      if (!Number.isFinite(cantidad) || cantidad <= 0) {
+        throw new AppError("Cantidad inválida en línea de pedido");
+      }
+      if (!Number.isFinite(costo_unitario) || costo_unitario < 0) {
+        throw new AppError("Costo unitario inválido");
+      }
+      const exists = await db.prepare(`SELECT id FROM productos WHERE id = ?`).get(producto_id);
+      if (!exists) throw new AppError(`Producto ${producto_id} no existe`);
+      const subtotal = costo_unitario * cantidad;
+      totalNuevo += subtotal;
+      resolvedLines.push({ producto_id, cantidad, costo_unitario, subtotal });
+    }
+
+    const lineasActuales = (await db
+      .prepare(
+        `SELECT producto_id, cantidad FROM pedido_proveedor_lineas WHERE pedido_proveedor_id = ?`
+      )
+      .all(id)) as { producto_id: number; cantidad: number }[];
+
+    const updStock = db.prepare(
+      `UPDATE productos SET stock = stock + ?, updated_at = ? WHERE id = ?`
+    );
+    const delLineas = db.prepare(
+      `DELETE FROM pedido_proveedor_lineas WHERE pedido_proveedor_id = ?`
+    );
+    const delMovs = db.prepare(
+      `DELETE FROM movimientos_inventario WHERE pedido_proveedor_id = ?`
+    );
+    const insLine = db.prepare(
+      `INSERT INTO pedido_proveedor_lineas (pedido_proveedor_id, producto_id, cantidad, costo_unitario, subtotal)
+       VALUES (?,?,?,?,?)`
+    );
+    const insMov = db.prepare(
+      `INSERT INTO movimientos_inventario (producto_id, tipo, cantidad, venta_id, pedido_proveedor_id, referencia, created_at)
+       VALUES (?, 'ENTRADA', ?, NULL, ?, ?, ?)`
+    );
+
+    await db.transaction(async () => {
+      // Reversar stock de líneas actuales (fueron ENTRADAS, restamos).
+      for (const ln of lineasActuales) {
+        await updStock.run(-ln.cantidad, now, ln.producto_id);
+      }
+      // Eliminar líneas y movimientos previos.
+      await delMovs.run(id);
+      await delLineas.run(id);
+
+      // Insertar nuevas líneas, aplicar stock y registrar movimientos.
+      for (const ln of resolvedLines) {
+        await insLine.run(id, ln.producto_id, ln.cantidad, ln.costo_unitario, ln.subtotal);
+        await updStock.run(ln.cantidad, now, ln.producto_id);
+        await insMov.run(ln.producto_id, ln.cantidad, id, `pedido_proveedor:${id}`, now);
+      }
+
+      await db
+        .prepare(
+          `UPDATE pedidos_proveedor SET
+            proveedor_id = ?,
+            proveedor_nombre = ?,
+            fecha = ?,
+            fecha_pago_con_descuento = ?,
+            fecha_pago_maxima = ?,
+            valor_pago_con_descuento = ?,
+            valor_pago_sin_descuento = ?,
+            total = ?,
+            estado = ?,
+            notas = ?,
+            referencia = ?
+          WHERE id = ?`
+        )
+        .run(
+          proveedor_id,
+          pr.nombre,
+          fecha,
+          fecha_pago_con_descuento,
+          fecha_pago_maxima,
+          valor_pago_con_descuento != null && Number.isFinite(valor_pago_con_descuento)
+            ? valor_pago_con_descuento
+            : null,
+          valor_pago_sin_descuento != null && Number.isFinite(valor_pago_sin_descuento)
+            ? valor_pago_sin_descuento
+            : null,
+          totalNuevo,
+          estado,
+          notas,
+          referencia,
+          id
+        );
+    });
+
+    await recordSyncEvent("pedido_proveedor", "editado_admin", {
+      pedido_proveedor_id: id,
+      total: totalNuevo,
+      lineas: resolvedLines.length,
+    });
+    return await pedidoProveedorService.getById(id);
+  },
 };

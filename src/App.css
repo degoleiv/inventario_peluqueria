@@ -1608,16 +1608,23 @@ select {
   margin: 0 auto;
 }
 
-/* TabbedOutlet: contenedor real donde se monta la pestaña de trabajo activa.
-   display:contents lo saca del árbol de layout (sus hijos se comportan como
-   hijos directos de .main-pro-content), pero los selectores `>` de abajo sí
-   necesitan pasar por él porque no cambia la estructura del DOM. */
+/* TabbedOutlet: contenedor de pestañas de trabajo.
+   display:contents lo saca del árbol de layout; cada host activo también usa
+   contents para que SubNav/páginas sigan participando como hijos de .main-pro-content. */
 .tab-pane-mount {
   display: contents;
 }
 
+.tab-pane-host:not(.tab-pane-host--active) {
+  display: none !important;
+}
+
+.tab-pane-host--active {
+  display: contents;
+}
+
 /* Citas: más ancho útil para filtros + calendario sin comprimir selects ni forzar scroll horizontal */
-.main-pro-content:has(> .tab-pane-mount > .citas-filtros-lista) {
+.main-pro-content:has(> .tab-pane-mount > .tab-pane-host--active > .citas-filtros-lista) {
   max-width: min(100%, 1680px);
   overflow-x: visible;
 }
@@ -1648,7 +1655,7 @@ select {
 }
 
 /* Una sola raíz (ej. .page-clientes) llena el área y hace scroll interno */
-.main-pro-content .tab-pane-mount > *:only-child:not(.drawer-root) {
+.main-pro-content .tab-pane-mount > .tab-pane-host--active > *:only-child:not(.drawer-root) {
   flex: 1;
   min-height: 0;
   overflow-x: hidden;
@@ -1656,11 +1663,11 @@ select {
 }
 
 /* Patrón SubNav + contenido (fragment sin wrapper) */
-.main-pro-content .tab-pane-mount > .subnav-wrap {
+.main-pro-content .tab-pane-mount > .tab-pane-host--active > .subnav-wrap {
   flex-shrink: 0;
 }
 
-.main-pro-content .tab-pane-mount > .subnav-wrap + *:not(.drawer-root) {
+.main-pro-content .tab-pane-mount > .tab-pane-host--active > .subnav-wrap + *:not(.drawer-root) {
   flex: 1;
   min-height: 0;
   min-width: 0;
@@ -1678,8 +1685,8 @@ select {
 
 /* Citas: esta tarjeta no debe ser el “cuerpo flex” del patrón SubNav+*
    (display:flex + min-height:0 recortaba el bloque y parecía “colapsado”). */
-.main-pro-content .tab-pane-mount > .citas-filtros-lista,
-.main-pro-content .tab-pane-mount > .subnav-wrap + .citas-filtros-lista {
+.main-pro-content .tab-pane-mount > .tab-pane-host--active > .citas-filtros-lista,
+.main-pro-content .tab-pane-mount > .tab-pane-host--active > .subnav-wrap + .citas-filtros-lista {
   flex: 0 0 auto;
   min-height: unset;
   min-width: 0;
@@ -1723,7 +1730,7 @@ select {
 }
 
 /* Citas > calendario: no estirar la tarjeta para llenar el viewport (evita hueco vacío abajo) */
-.main-pro-content .tab-pane-mount > .agenda-section.agenda-section--calendario {
+.main-pro-content .tab-pane-mount > .tab-pane-host--active > .agenda-section.agenda-section--calendario {
   flex: 0 1 auto;
 }
 
@@ -1732,14 +1739,14 @@ select {
   padding-bottom: 0.5rem;
 }
 
-.main-pro-content .tab-pane-mount > .citas-busqueda-card {
+.main-pro-content .tab-pane-mount > .tab-pane-host--active > .citas-busqueda-card {
   flex: 0 1 auto;
   min-width: 0;
 }
 
 /* Aire entre SubNav y calendario / búsqueda (fragmentos sueltos) */
-.main-pro-content .tab-pane-mount > .subnav-wrap + .agenda-section.agenda-section--calendario,
-.main-pro-content .tab-pane-mount > .subnav-wrap + .citas-busqueda-card {
+.main-pro-content .tab-pane-mount > .tab-pane-host--active > .subnav-wrap + .agenda-section.agenda-section--calendario,
+.main-pro-content .tab-pane-mount > .tab-pane-host--active > .subnav-wrap + .citas-busqueda-card {
   margin-top: 0.65rem;
 }
 
@@ -3933,7 +3940,7 @@ select {
     overflow: hidden;
   }
 
-  .main-pro-content:has(.page-pos--saas) .tab-pane-mount > .subnav-wrap + *:not(.drawer-root) {
+  .main-pro-content:has(.page-pos--saas) .tab-pane-mount > .tab-pane-host--active > .subnav-wrap + *:not(.drawer-root) {
     flex: 1 1 0;
     min-height: 0;
     max-height: 100%;
@@ -6358,7 +6365,7 @@ select {
   -webkit-overflow-scrolling: touch;
 }
 
-.main-pro-content:has(.page-pos--saas) .tab-pane-mount > .subnav-wrap + *:not(.drawer-root) {
+.main-pro-content:has(.page-pos--saas) .tab-pane-mount > .tab-pane-host--active > .subnav-wrap + *:not(.drawer-root) {
   flex: 1 1 0;
   align-self: stretch;
   min-height: 0;
@@ -6369,8 +6376,8 @@ select {
   overflow: hidden;
 }
 
-.main-pro-content:has(.sales-history-page) .tab-pane-mount > .subnav-wrap + *:not(.drawer-root),
-.main-pro-content:has(.cierre-dia-page) .tab-pane-mount > .subnav-wrap + *:not(.drawer-root) {
+.main-pro-content:has(.sales-history-page) .tab-pane-mount > .tab-pane-host--active > .subnav-wrap + *:not(.drawer-root),
+.main-pro-content:has(.cierre-dia-page) .tab-pane-mount > .tab-pane-host--active > .subnav-wrap + *:not(.drawer-root) {
   flex: 0 1 auto;
   align-self: stretch;
   min-height: min-content;
@@ -6400,7 +6407,7 @@ select {
  * Con flex:1 + overflow:auto el resumen largo (productos + notas) quedaba recortado o
  * imposible de ver; el scroll debe hacerse en .main-pro-content.
  */
-.main-pro-content .tab-pane-mount > .page-pedidos:only-child {
+.main-pro-content .tab-pane-mount > .tab-pane-host--active > .page-pedidos:only-child {
   flex: 0 1 auto;
   align-self: stretch;
   min-height: min-content;
@@ -6414,7 +6421,7 @@ select {
   padding: 0.45rem 1.1rem 0.6rem;
 }
 
-.main-pro-content .tab-pane-mount > .page-finanzas:only-child {
+.main-pro-content .tab-pane-mount > .tab-pane-host--active > .page-finanzas:only-child {
   flex: 0 1 auto;
   align-self: stretch;
   min-height: min-content;
@@ -8773,15 +8780,33 @@ select {
 }
 
 .page-pedidos .pedidos-btn--ghost {
-  color: var(--pp-muted);
+  color: var(--pp-text);
   background: var(--pp-card);
   border-color: var(--pp-line);
 }
 
 .page-pedidos .pedidos-btn--ghost:hover:not(:disabled) {
   color: var(--pp-text);
+  background: color-mix(in srgb, var(--pp-primary) 6%, var(--pp-card));
   border-color: var(--pp-line-hover);
   box-shadow: var(--clay-shadow-a, 0 2px 8px rgba(0, 0, 0, 0.05));
+}
+
+.page-pedidos .pedidos-btn--secondary {
+  color: var(--pp-text);
+  background: color-mix(in srgb, var(--pp-primary) 10%, var(--pp-card));
+  border-color: color-mix(in srgb, var(--pp-primary) 35%, var(--pp-line));
+  font-weight: 600;
+}
+
+.page-pedidos .pedidos-btn--secondary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--pp-primary) 18%, var(--pp-card));
+  border-color: var(--pp-primary);
+  transform: translateY(-1px);
+}
+
+.page-pedidos .pedidos-btn--secondary:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .page-pedidos .pedido-toggle input:checked + .pedido-toggle__track {
@@ -8990,12 +9015,72 @@ select {
   border-radius: var(--pp-radius-lg) !important;
   border: 1px solid var(--pp-line) !important;
   box-shadow: var(--pp-shadow) !important;
+  /* Wizard de edición: panel ancho (~70% viewport) para mejor relación de aspecto */
+  width: min(70vw, 1120px) !important;
+  max-width: min(70vw, 1120px) !important;
+  max-height: min(92vh, 900px) !important;
+}
+
+@media (max-width: 640px) {
+  .page-pedidos .pedidos-drawer-card {
+    width: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
+  }
+}
+
+.page-pedidos .pedidos-drawer-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
 }
 
 .page-pedidos .pedidos-drawer-card__title {
   font-size: 1.15rem;
   font-weight: 700;
   color: var(--pp-text);
+  margin: 0;
+}
+
+.page-pedidos .pedidos-drawer-card__close {
+  appearance: none;
+  border: 1px solid var(--pp-line);
+  background: var(--pp-card);
+  color: var(--pp-text);
+  width: 34px;
+  height: 34px;
+  border-radius: var(--pp-radius-sm);
+  font-size: 1.3rem;
+  line-height: 1;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.12s ease;
+}
+
+.page-pedidos .pedidos-drawer-card__close:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--pp-danger, #dc2626) 12%, var(--pp-card));
+  border-color: var(--pp-danger, #dc2626);
+  color: var(--pp-danger, #dc2626);
+}
+
+.page-pedidos .pedidos-drawer-card__close:focus-visible {
+  outline: 2px solid var(--pp-primary);
+  outline-offset: 2px;
+}
+
+.page-pedidos .pedidos-drawer-card__close:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .page-pedidos .pedidos-drawer-card__lede {
@@ -9404,7 +9489,7 @@ html.pos-focus-active body {
 }
 
 /* Dashboard: usar todo el ancho del main y, en pantallas anchas, más ancho que el default 1280px */
-.main-pro-content:has(> .tab-pane-mount > .dash-page) {
+.main-pro-content:has(> .tab-pane-mount > .tab-pane-host--active > .dash-page) {
   max-width: min(100%, 1680px);
 }
 
@@ -13869,12 +13954,12 @@ html.pos-focus-active body {
   overflow-y: auto;
 }
 
-.main-pro-content .tab-pane-mount > *:only-child:not(.drawer-root),
-.main-pro-content .tab-pane-mount > .subnav-wrap + *:not(.drawer-root):not(.page-pos),
-.main-pro-content:has(.sales-history-page) .tab-pane-mount > .subnav-wrap + *:not(.drawer-root),
-.main-pro-content:has(.cierre-dia-page) .tab-pane-mount > .subnav-wrap + *:not(.drawer-root),
-.main-pro-content .tab-pane-mount > .page-pedidos:only-child,
-.main-pro-content .tab-pane-mount > .page-finanzas:only-child {
+.main-pro-content .tab-pane-mount > .tab-pane-host--active > *:only-child:not(.drawer-root),
+.main-pro-content .tab-pane-mount > .tab-pane-host--active > .subnav-wrap + *:not(.drawer-root):not(.page-pos),
+.main-pro-content:has(.sales-history-page) .tab-pane-mount > .tab-pane-host--active > .subnav-wrap + *:not(.drawer-root),
+.main-pro-content:has(.cierre-dia-page) .tab-pane-mount > .tab-pane-host--active > .subnav-wrap + *:not(.drawer-root),
+.main-pro-content .tab-pane-mount > .tab-pane-host--active > .page-pedidos:only-child,
+.main-pro-content .tab-pane-mount > .tab-pane-host--active > .page-finanzas:only-child {
   flex: 0 1 auto;
   min-height: min-content;
   overflow-x: hidden;
@@ -13905,7 +13990,7 @@ html.pos-focus-active body {
   min-height: 0;
 }
 
-.main-pro-content:has(.page-pos--saas) .tab-pane-mount > .subnav-wrap + *:not(.drawer-root) {
+.main-pro-content:has(.page-pos--saas) .tab-pane-mount > .tab-pane-host--active > .subnav-wrap + *:not(.drawer-root) {
   flex: 1 1 0;
   align-self: stretch;
   width: 100%;
@@ -14062,7 +14147,7 @@ tr {
 }
 
 /* —— Main content area: fade-in sutil al cargar —— */
-.main-pro-content .tab-pane-mount > *:first-child:not(.drawer-root):not(.subnav-wrap) {
+.main-pro-content .tab-pane-mount > .tab-pane-host--active > *:first-child:not(.drawer-root):not(.subnav-wrap) {
   animation: content-fadein 0.22s ease-out;
 }
 

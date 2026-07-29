@@ -1604,6 +1604,17 @@ export async function updatePedidoProveedorMeta(
   });
 }
 
+/** Edición completa (solo admin): incluye proveedor y líneas. Ajusta stock automáticamente. */
+export async function updatePedidoProveedorFull(
+  id: number,
+  body: Record<string, unknown>
+): Promise<PedidoProveedor> {
+  return requestJson(`/api/pedidos-proveedores/${id}/full`, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+}
+
 export type FacturaElectronica = {
   id: number;
   venta_id: number;

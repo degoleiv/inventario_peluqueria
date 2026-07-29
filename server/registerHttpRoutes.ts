@@ -1244,6 +1244,16 @@ export function registerHttpRoutes(app: Express) {
     })
   );
 
+  api.put(
+    "/pedidos-proveedores/:id/full",
+    requireAdmin,
+    asyncHandler(async (req, res) => {
+      const id = parseId(req, res);
+      if (id == null) return;
+      res.json(await pedidoProveedorService.updateFull(id, req.body as Record<string, unknown>));
+    })
+  );
+
   api.get(
     "/facturas-electronicas",
     requirePermiso("facturas"),

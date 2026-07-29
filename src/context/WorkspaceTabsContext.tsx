@@ -213,12 +213,47 @@ export function WorkspaceTabsProvider({
       if (hit) {
         next = hit.id === activeTabId ? { tabs, activeTabId } : { tabs, activeTabId: hit.id };
       } else {
-        next = {
-          tabs: tabs.map((t) =>
-            t.id === activeTabId ? { ...t, path: pk, title: titleForWorkspacePath(location.pathname) } : t
-          ),
-          activeTabId,
-        };
+        const navKey = pathToNavKey(location.pathname);
+        const moduleHit = tabs.find(
+          (t) => pathToNavKey(t.path.split("?")[0] || t.path) === navKey
+        );
+        if (moduleHit) {
+          // Misma módulo en otra pestaña: activarla y actualizar su ruta (no pisar otra).
+          next = {
+            tabs: tabs.map((t) =>
+              t.id === moduleHit.id
+                ? { ...t, path: pk, title: titleForWorkspacePath(location.pathname) }
+                : t
+            ),
+            activeTabId: moduleHit.id,
+          };
+        } else {
+          const activeTab = tabs.find((t) => t.id === activeTabId);
+          const activeKey = activeTab
+            ? pathToNavKey(activeTab.path.split("?")[0] || activeTab.path)
+            : null;
+          if (activeKey === navKey) {
+            // Misma módulo, sub-ruta distinta: actualizar la pestaña activa.
+            next = {
+              tabs: tabs.map((t) =>
+                t.id === activeTabId
+                  ? { ...t, path: pk, title: titleForWorkspacePath(location.pathname) }
+                  : t
+              ),
+              activeTabId,
+            };
+          } else {
+            // Otro módulo: abrir pestaña nueva para no perder el borrador de la actual.
+            const id = newId();
+            next = {
+              tabs: [
+                ...tabs,
+                { id, path: pk, title: titleForWorkspacePath(location.pathname) },
+              ],
+              activeTabId: id,
+            };
+          }
+        }
       }
 
       if (

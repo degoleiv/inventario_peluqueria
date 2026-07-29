@@ -12,13 +12,16 @@ import {
   createInventarioCategoriaProducto,
   createPedidoProveedor,
   createProductoRapidoProveedor,
+  fetchAuthMe,
   fetchInventarioCatalogo,
+  fetchPedidoProveedor,
   fetchPedidosProveedores,
   fetchProductos,
   fetchProductosProveedor,
   fetchProveedores,
   lookupBarcode,
   resolveImageSrc,
+  updatePedidoProveedorFull,
   updatePedidoProveedorMeta,
   updateProducto,
   type InventarioCatalogo,
@@ -36,6 +39,11 @@ import {
 } from "../components/ProductoCatalogoForm";
 import { Drawer } from "../components/Drawer";
 import { useToast } from "../context/ToastContext";
+import {
+  clearSessionDraft,
+  loadSessionDraft,
+  saveSessionDraft,
+} from "../lib/sessionDraft";
 import {
   filterIntegerTyping,
 } from "../lib/decimalInput";
@@ -79,6 +87,33 @@ const HIST_FILTROS_VACIOS: HistorialFiltrosForm = {
   proveedorId: "",
   referencia: "",
 };
+
+const PEDIDO_DRAFT_KEY = "peluqueria_pedido_draft_v1";
+
+type PedidoWizardDraft = {
+  vistaTab?: VistaTab;
+  wizardStep?: number;
+  proveedorSearch?: string;
+  productoSearch?: string;
+  proveedorId?: number | "";
+  fechaPedido?: string;
+  fechaPagoDesc?: string;
+  fechaPagoMax?: string;
+  valorDesc?: number | "";
+  valorSinDesc?: number | "";
+  valorSinDescManual?: boolean;
+  tieneDescuento?: boolean;
+  estadoNuevo?: string;
+  notas?: string;
+  referencia?: string;
+  lineas?: Linea[];
+};
+
+function readPedidoDraft(): PedidoWizardDraft | null {
+  const d = loadSessionDraft<PedidoWizardDraft>(PEDIDO_DRAFT_KEY);
+  if (!d || typeof d !== "object") return null;
+  return d;
+}
 
 const pasos = ["Proveedor", "Productos", "Pagos", "Resumen y notas"] as const;
 
@@ -176,7 +211,12 @@ function ProveedorSelectableMedia({ proveedor }: { proveedor: Proveedor }) {
 export function PedidosProveedoresPage() {
   const toast = useToast();
   const resumenFocusRef = useRef<HTMLDivElement | null>(null);
-  const prevWizardStepRef = useRef(0);
+  const draft0 = useMemo(() => readPedidoDraft(), []);
+  const prevWizardStepRef = useRef(
+    typeof draft0?.wizardStep === "number" && draft0.wizardStep >= 0 && draft0.wizardStep <= 3
+      ? draft0.wizardStep
+      : 0
+  );
   const [bloqueoRegistrarPedido, setBloqueoRegistrarPedido] = useState(false);
   const [pedidos, setPedidos] = useState<PedidoProveedor[]>([]);
   const [productos, setProductos] = useState<Producto[]>([]);
@@ -185,23 +225,52 @@ export function PedidosProveedoresPage() {
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [vistaTab, setVistaTab] = useState<VistaTab>("pedido");
-  const [wizardStep, setWizardStep] = useState(0);
-  const [proveedorSearch, setProveedorSearch] = useState("");
-  const [productoSearch, setProductoSearch] = useState("");
+  const [vistaTab, setVistaTab] = useState<VistaTab>(() =>
+    draft0?.vistaTab === "pedido" || draft0?.vistaTab === "proveedores" || draft0?.vistaTab === "historial"
+      ? draft0.vistaTab
+      : "pedido"
+  );
+  const [wizardStep, setWizardStep] = useState(() => {
+    const s = draft0?.wizardStep;
+    return typeof s === "number" && s >= 0 && s <= 3 ? s : 0;
+  });
+  const [proveedorSearch, setProveedorSearch] = useState(() =>
+    typeof draft0?.proveedorSearch === "string" ? draft0.proveedorSearch : ""
+  );
+  const [productoSearch, setProductoSearch] = useState(() =>
+    typeof draft0?.productoSearch === "string" ? draft0.productoSearch : ""
+  );
 
-  const [proveedorId, setProveedorId] = useState<number | "">("");
-  const [fechaPedido, setFechaPedido] = useState(fechaLocalISO);
-  const [fechaPagoDesc, setFechaPagoDesc] = useState("");
-  const [fechaPagoMax, setFechaPagoMax] = useState("");
-  const [valorDesc, setValorDesc] = useState<number | "">("");
-  const [valorSinDesc, setValorSinDesc] = useState<number | "">("");
-  const [valorSinDescManual, setValorSinDescManual] = useState(false);
-  const [tieneDescuento, setTieneDescuento] = useState(false);
-  const [estadoNuevo, setEstadoNuevo] = useState("pendiente");
-  const [notas, setNotas] = useState("");
-  const [referencia, setReferencia] = useState("");
-  const [lineas, setLineas] = useState<Linea[]>([]);
+  const [proveedorId, setProveedorId] = useState<number | "">(() =>
+    draft0?.proveedorId === "" || typeof draft0?.proveedorId === "number" ? draft0.proveedorId : ""
+  );
+  const [fechaPedido, setFechaPedido] = useState(() =>
+    typeof draft0?.fechaPedido === "string" && draft0.fechaPedido ? draft0.fechaPedido : fechaLocalISO()
+  );
+  const [fechaPagoDesc, setFechaPagoDesc] = useState(() =>
+    typeof draft0?.fechaPagoDesc === "string" ? draft0.fechaPagoDesc : ""
+  );
+  const [fechaPagoMax, setFechaPagoMax] = useState(() =>
+    typeof draft0?.fechaPagoMax === "string" ? draft0.fechaPagoMax : ""
+  );
+  const [valorDesc, setValorDesc] = useState<number | "">(() =>
+    draft0?.valorDesc === "" || typeof draft0?.valorDesc === "number" ? draft0.valorDesc : ""
+  );
+  const [valorSinDesc, setValorSinDesc] = useState<number | "">(() =>
+    draft0?.valorSinDesc === "" || typeof draft0?.valorSinDesc === "number" ? draft0.valorSinDesc : ""
+  );
+  const [valorSinDescManual, setValorSinDescManual] = useState(() => Boolean(draft0?.valorSinDescManual));
+  const [tieneDescuento, setTieneDescuento] = useState(() => Boolean(draft0?.tieneDescuento));
+  const [estadoNuevo, setEstadoNuevo] = useState(() =>
+    typeof draft0?.estadoNuevo === "string" && draft0.estadoNuevo ? draft0.estadoNuevo : "pendiente"
+  );
+  const [notas, setNotas] = useState(() => (typeof draft0?.notas === "string" ? draft0.notas : ""));
+  const [referencia, setReferencia] = useState(() =>
+    typeof draft0?.referencia === "string" ? draft0.referencia : ""
+  );
+  const [lineas, setLineas] = useState<Linea[]>(() =>
+    Array.isArray(draft0?.lineas) ? draft0.lineas : []
+  );
 
   const [drawerNuevoProducto, setDrawerNuevoProducto] = useState(false);
   const [nuevoProdBusy, setNuevoProdBusy] = useState(false);
@@ -218,6 +287,8 @@ export function PedidosProveedoresPage() {
   inventarioCatalogoRef.current = inventarioCatalogo;
   nuevoCodigoRef.current = nuevoCatalogo.codigo;
 
+  const [isAdmin, setIsAdmin] = useState(false);
+
   const [edit, setEdit] = useState<PedidoProveedor | null>(null);
   const [editFecha, setEditFecha] = useState("");
   const [editFd, setEditFd] = useState("");
@@ -228,6 +299,13 @@ export function PedidosProveedoresPage() {
   const [editNotas, setEditNotas] = useState("");
   const [editRef, setEditRef] = useState("");
   const [editBusy, setEditBusy] = useState(false);
+  const [editProveedorId, setEditProveedorId] = useState<number | "">("");
+  const [editLineas, setEditLineas] = useState<Linea[]>([]);
+  const [editLoadingLineas, setEditLoadingLineas] = useState(false);
+  const [editCatalogo, setEditCatalogo] = useState<Producto[]>([]);
+  const [editCatalogoBusca, setEditCatalogoBusca] = useState("");
+  const [editProveedorBusca, setEditProveedorBusca] = useState("");
+  const [editWizardStep, setEditWizardStep] = useState(0);
 
   const historialFiltrosRef = useRef<HistorialFiltrosForm>({ ...HIST_FILTROS_VACIOS });
   const [historialForm, setHistorialForm] = useState<HistorialFiltrosForm>({ ...HIST_FILTROS_VACIOS });
@@ -280,6 +358,84 @@ export function PedidosProveedoresPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    void fetchAuthMe()
+      .then((m) => setIsAdmin((m.user.permisos ?? []).includes("*")))
+      .catch(() => setIsAdmin(false));
+  }, []);
+
+  useEffect(() => {
+    if (!edit || !isAdmin) {
+      setEditCatalogo([]);
+      return;
+    }
+    if (editProveedorId === "") {
+      setEditCatalogo([]);
+      return;
+    }
+    let cancelled = false;
+    void fetchProductosProveedor(Number(editProveedorId), { limit: 500 })
+      .then((rows) => {
+        if (!cancelled) setEditCatalogo(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setEditCatalogo([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [edit, isAdmin, editProveedorId]);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      const draft: PedidoWizardDraft = {
+        vistaTab,
+        wizardStep,
+        proveedorSearch,
+        productoSearch,
+        proveedorId,
+        fechaPedido,
+        fechaPagoDesc,
+        fechaPagoMax,
+        valorDesc,
+        valorSinDesc,
+        valorSinDescManual,
+        tieneDescuento,
+        estadoNuevo,
+        notas,
+        referencia,
+        lineas,
+      };
+      const empty =
+        !proveedorId &&
+        lineas.length === 0 &&
+        !notas.trim() &&
+        !referencia.trim() &&
+        wizardStep === 0 &&
+        vistaTab === "pedido";
+      if (empty) clearSessionDraft(PEDIDO_DRAFT_KEY);
+      else saveSessionDraft(PEDIDO_DRAFT_KEY, draft);
+    }, 250);
+    return () => clearTimeout(t);
+  }, [
+    vistaTab,
+    wizardStep,
+    proveedorSearch,
+    productoSearch,
+    proveedorId,
+    fechaPedido,
+    fechaPagoDesc,
+    fechaPagoMax,
+    valorDesc,
+    valorSinDesc,
+    valorSinDescManual,
+    tieneDescuento,
+    estadoNuevo,
+    notas,
+    referencia,
+    lineas,
+  ]);
 
   useEffect(() => {
     if (proveedorId === "") {
@@ -777,6 +933,7 @@ export function PedidosProveedoresPage() {
       setNotas("");
       setReferencia("");
       setLineas([]);
+      clearSessionDraft(PEDIDO_DRAFT_KEY);
       await load();
     } catch (err) {
       toast(err instanceof Error ? err.message : "Error al registrar pedido", "error");
@@ -793,23 +950,194 @@ export function PedidosProveedoresPage() {
     setEditEstado(p.estado ?? "pendiente");
     setEditNotas(p.notas ?? "");
     setEditRef(p.referencia ?? "");
+    setEditProveedorId(p.proveedor_id);
+    setEditCatalogoBusca("");
+    setEditProveedorBusca("");
+    setEditLineas([]);
+    setEditWizardStep(0);
+    if (isAdmin) {
+      setEditLoadingLineas(true);
+      void fetchPedidoProveedor(p.id)
+        .then((full) => {
+          const raw = Array.isArray(full.lineas) ? full.lineas : [];
+          const cargadas: Linea[] = raw
+            .map((ln) => ln as Record<string, unknown>)
+            .map<Linea>((ln) => ({
+              producto_id: Number(ln.producto_id ?? 0) || 0,
+              cantidad: Number(ln.cantidad ?? 1) || 1,
+              costo_unitario: Number(ln.costo_unitario ?? 0) || 0,
+              precio_venta: "",
+            }))
+            .filter((ln) => ln.producto_id > 0);
+          setEditLineas(cargadas);
+        })
+        .catch((err) => {
+          toast(err instanceof Error ? err.message : "No se pudieron cargar las líneas", "error");
+        })
+        .finally(() => setEditLoadingLineas(false));
+    }
+  }
+
+  function setEditLinea(i: number, patch: Partial<Linea>) {
+    setEditLineas((prev) => prev.map((l, j) => (j === i ? { ...l, ...patch } : l)));
+  }
+
+  function removeEditLinea(i: number) {
+    setEditLineas((prev) => prev.filter((_, j) => j !== i));
+  }
+
+  function addEditProductoExistente(producto: Producto) {
+    setEditLineas((prev) => {
+      const idx = prev.findIndex((ln) => ln.producto_id === producto.id);
+      if (idx >= 0) {
+        return prev.map((ln, i) =>
+          i === idx ? { ...ln, cantidad: Math.max(1, Number(ln.cantidad) || 1) + 1 } : ln
+        );
+      }
+      const nueva: Linea = {
+        producto_id: producto.id,
+        cantidad: 1,
+        costo_unitario: Number(producto.precio_compra ?? producto.precio ?? 0),
+        precio_venta: "",
+      };
+      return [...prev.filter((ln) => !isLineaPlaceholderExistente(ln)), nueva];
+    });
+  }
+
+  const editTotalGeneral = useMemo(() => {
+    let sum = 0;
+    for (const ln of editLineas) {
+      const unit = ln.costo_unitario === "" ? NaN : Number(ln.costo_unitario);
+      const qty = Math.max(1, Number(ln.cantidad) || 1);
+      if (!Number.isFinite(unit) || unit < 0) continue;
+      sum += qty * unit;
+    }
+    return sum;
+  }, [editLineas]);
+
+  const editCatalogoFiltrado = useMemo(
+    () => editCatalogo.filter((p) => matchesProductoSearch(p, editCatalogoBusca)),
+    [editCatalogo, editCatalogoBusca]
+  );
+
+  const editProveedoresFiltrados = useMemo(
+    () => proveedores.filter((p) => matchesProveedorSearch(p, editProveedorBusca)),
+    [proveedores, editProveedorBusca]
+  );
+
+  const editPasos = useMemo<readonly string[]>(
+    () => (isAdmin ? ["Proveedor", "Productos", "Pagos", "Resumen y notas"] : ["Pagos", "Resumen y notas"]),
+    [isAdmin]
+  );
+
+  function validateEditStep(step: number): string | null {
+    if (isAdmin) {
+      if (step === 0) {
+        if (editProveedorId === "") return "Elegí un proveedor.";
+        return null;
+      }
+      if (step === 1) {
+        if (editLineas.length === 0) return "Agregá al menos una línea de producto.";
+        for (const ln of editLineas) {
+          if (!ln.producto_id) return "Seleccioná un producto en cada línea.";
+          const cant = Number(ln.cantidad);
+          const costo = ln.costo_unitario === "" ? NaN : Number(ln.costo_unitario);
+          if (!Number.isFinite(cant) || cant <= 0 || !Number.isFinite(costo) || costo < 0) {
+            return "Revisá cantidad y costo en cada línea.";
+          }
+        }
+        return null;
+      }
+      if (step === 2) {
+        if (!editFecha.trim()) return "La fecha del pedido es obligatoria.";
+        return null;
+      }
+      return null;
+    }
+    // No-admin: paso 0 = Pagos, paso 1 = Notas
+    if (step === 0) {
+      if (!editFecha.trim()) return "La fecha del pedido es obligatoria.";
+    }
+    return null;
+  }
+
+  function onEditNextStep() {
+    const msg = validateEditStep(editWizardStep);
+    if (msg) {
+      toast(msg, "warning");
+      return;
+    }
+    setEditWizardStep((s) => Math.min(editPasos.length - 1, s + 1));
+  }
+
+  function onEditPrevStep() {
+    setEditWizardStep((s) => Math.max(0, s - 1));
+  }
+
+  function goToEditStep(target: number) {
+    if (target < 0 || target > editPasos.length - 1) return;
+    if (target <= editWizardStep) {
+      setEditWizardStep(target);
+      return;
+    }
+    for (let s = editWizardStep; s < target; s += 1) {
+      const msg = validateEditStep(s);
+      if (msg) {
+        toast(msg, "warning");
+        return;
+      }
+    }
+    setEditWizardStep(target);
   }
 
   async function onEditSave(e: FormEvent) {
     e.preventDefault();
     if (!edit) return;
+    // Si no estamos en el último paso, sólo avanzamos.
+    if (editWizardStep < editPasos.length - 1) {
+      onEditNextStep();
+      return;
+    }
+    // Revalidar todos los pasos por seguridad.
+    for (let s = 0; s < editPasos.length; s += 1) {
+      const msg = validateEditStep(s);
+      if (msg) {
+        toast(msg, "warning");
+        setEditWizardStep(s);
+        return;
+      }
+    }
     setEditBusy(true);
     try {
-      await updatePedidoProveedorMeta(edit.id, {
-        fecha: editFecha,
-        fecha_pago_con_descuento: editFd.trim() || null,
-        fecha_pago_maxima: editFm.trim() || null,
-        valor_pago_con_descuento: editVd === "" ? null : Number(editVd),
-        valor_pago_sin_descuento: editVs === "" ? null : Number(editVs),
-        estado: editEstado,
-        notas: editNotas.trim() || null,
-        referencia: editRef.trim() || null,
-      });
+      if (isAdmin) {
+        await updatePedidoProveedorFull(edit.id, {
+          proveedor_id: Number(editProveedorId),
+          fecha: editFecha,
+          fecha_pago_con_descuento: editFd.trim() || null,
+          fecha_pago_maxima: editFm.trim() || null,
+          valor_pago_con_descuento: editVd === "" ? null : Number(editVd),
+          valor_pago_sin_descuento: editVs === "" ? null : Number(editVs),
+          estado: editEstado,
+          notas: editNotas.trim() || null,
+          referencia: editRef.trim() || null,
+          lineas: editLineas.map((ln) => ({
+            producto_id: ln.producto_id,
+            cantidad: Number(ln.cantidad),
+            costo_unitario: Number(ln.costo_unitario),
+          })),
+        });
+      } else {
+        await updatePedidoProveedorMeta(edit.id, {
+          fecha: editFecha,
+          fecha_pago_con_descuento: editFd.trim() || null,
+          fecha_pago_maxima: editFm.trim() || null,
+          valor_pago_con_descuento: editVd === "" ? null : Number(editVd),
+          valor_pago_sin_descuento: editVs === "" ? null : Number(editVs),
+          estado: editEstado,
+          notas: editNotas.trim() || null,
+          referencia: editRef.trim() || null,
+        });
+      }
       setEdit(null);
       toast("Pedido actualizado.", "success");
       await load();
@@ -1562,7 +1890,15 @@ export function PedidosProveedoresPage() {
 
       {vistaTab === "proveedores" ? <ProveedoresPage /> : null}
 
-      {edit ? (
+      {edit ? (() => {
+        const stepProveedor = isAdmin && editWizardStep === 0;
+        const stepProductos = isAdmin && editWizardStep === 1;
+        const stepPagos = isAdmin ? editWizardStep === 2 : editWizardStep === 0;
+        const stepResumen = isAdmin ? editWizardStep === 3 : editWizardStep === 1;
+        const editProveedorSel =
+          editProveedorId === "" ? undefined : proveedores.find((p) => p.id === editProveedorId);
+        const isLastStep = editWizardStep === editPasos.length - 1;
+        return (
         <div
           className="drawer-overlay"
           role="dialog"
@@ -1570,90 +1906,469 @@ export function PedidosProveedoresPage() {
           aria-labelledby="edit-pedido-title"
         >
           <div className="card drawer-overlay-card pedidos-drawer-card" onClick={(e) => e.stopPropagation()}>
-            <h3 id="edit-pedido-title" className="pedidos-drawer-card__title">
-              Editar pedido #{edit.id}
-            </h3>
+            <div className="pedidos-drawer-card__header">
+              <h3 id="edit-pedido-title" className="pedidos-drawer-card__title">
+                Editar pedido #{edit.id}
+              </h3>
+              <button
+                type="button"
+                className="pedidos-drawer-card__close"
+                onClick={() => setEdit(null)}
+                aria-label="Cerrar"
+                disabled={editBusy}
+              >
+                ×
+              </button>
+            </div>
             <p className="pedidos-drawer-card__lede">
-              Solo fechas de pago, montos acordados, estado y notas. Las líneas y el proveedor no se modifican aquí.
+              {isAdmin
+                ? "Modo administrador: podés editar proveedor, productos, fechas, montos, estado y notas. Los cambios en líneas ajustan stock automáticamente."
+                : "Solo fechas de pago, montos acordados, estado y notas. Las líneas y el proveedor no se modifican aquí."}
             </p>
+            <ol className="pedidos-stepper" aria-label="Progreso de edición">
+              {editPasos.map((label, idx) => {
+                const active = idx === editWizardStep;
+                const done = idx < editWizardStep;
+                const pending = idx > editWizardStep;
+                return (
+                  <li key={label} className="pedidos-stepper__item">
+                    <button
+                      type="button"
+                      className={[
+                        "pedidos-stepper__hit",
+                        active ? "pedidos-stepper__hit--active" : "",
+                        done ? "pedidos-stepper__hit--done" : "",
+                        pending ? "pedidos-stepper__hit--pending" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      aria-current={active ? "step" : undefined}
+                      aria-label={`${label}${done ? ", completado" : ""}${active ? ", paso actual" : ""}`}
+                      onClick={() => goToEditStep(idx)}
+                    >
+                      <span className="pedidos-stepper__disc" aria-hidden>
+                        {done ? <Check size={16} weight="bold" /> : <span>{idx + 1}</span>}
+                      </span>
+                      <span className="pedidos-stepper__label">{label}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
             <form className="pedidos-form pedidos-drawer-form" onSubmit={onEditSave}>
-              <label className="pedidos-field">
-                <span className="pedidos-field__label">Fecha del pedido</span>
-                <input
-                  className="pedidos-input"
-                  type="date"
-                  value={editFecha}
-                  onChange={(e) => setEditFecha(e.target.value)}
-                  required
-                />
-              </label>
-              <label className="pedidos-field">
-                <span className="pedidos-field__label">Fecha pago con descuento</span>
-                <input className="pedidos-input" type="date" value={editFd} onChange={(e) => setEditFd(e.target.value)} />
-              </label>
-              <label className="pedidos-field">
-                <span className="pedidos-field__label">Fecha máxima de pago</span>
-                <input className="pedidos-input" type="date" value={editFm} onChange={(e) => setEditFm(e.target.value)} />
-              </label>
-              <label className="pedidos-field">
-                <span className="pedidos-field__label">Valor con descuento</span>
-                <input
-                  className="pedidos-input input-numeric"
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  value={editVd === "" ? "" : formatMoneyForInput(editVd)}
-                  onChange={(e) => setEditVd(parseMoneyInput(e.target.value))}
-                />
-              </label>
-              <label className="pedidos-field">
-                <span className="pedidos-field__label">Valor sin descuento</span>
-                <input
-                  className="pedidos-input input-numeric"
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  value={editVs === "" ? "" : formatMoneyForInput(editVs)}
-                  onChange={(e) => setEditVs(parseMoneyInput(e.target.value))}
-                />
-              </label>
-              <label className="pedidos-field">
-                <span className="pedidos-field__label">Estado</span>
-                <select
-                  className="pedidos-input pedidos-select"
-                  value={editEstado}
-                  onChange={(e) => setEditEstado(e.target.value)}
-                >
-                  <option value="pendiente">Pendiente</option>
-                  <option value="pagado">Pagado</option>
-                  <option value="vencido">Vencido</option>
-                </select>
-              </label>
-              <label className="pedidos-field">
-                <span className="pedidos-field__label">Referencia</span>
-                <input className="pedidos-input" value={editRef} onChange={(e) => setEditRef(e.target.value)} />
-              </label>
-              <label className="pedidos-field">
-                <span className="pedidos-field__label">Notas</span>
-                <textarea
-                  className="pedidos-input"
-                  rows={3}
-                  value={editNotas}
-                  onChange={(e) => setEditNotas(e.target.value)}
-                />
-              </label>
+              {stepProveedor ? (
+                <div className="pedidos-panel">
+                  <label className="pedidos-field">
+                    <span className="pedidos-field__label">Buscar proveedor</span>
+                    <span className="pedidos-input-wrap">
+                      <MagnifyingGlass className="pedidos-input-wrap__icon" size={18} weight="regular" aria-hidden />
+                      <input
+                        className="pedidos-input pedidos-input--with-icon"
+                        type="search"
+                        autoComplete="off"
+                        placeholder="Nombre, NIT, teléfono o email…"
+                        value={editProveedorBusca}
+                        onChange={(e) => setEditProveedorBusca(e.target.value)}
+                      />
+                    </span>
+                  </label>
+                  {editProveedoresFiltrados.length === 0 ? (
+                    <div className="pedidos-callout pedidos-callout--muted">
+                      No hay proveedores que coincidan con la búsqueda.
+                    </div>
+                  ) : (
+                    <div className="pedidos-prov-grid" role="list">
+                      {editProveedoresFiltrados.map((p) => {
+                        const selected = editProveedorId === p.id;
+                        return (
+                          <article
+                            key={p.id}
+                            className={["pedidos-prov-card", selected ? "pedidos-prov-card--selected" : ""]
+                              .filter(Boolean)
+                              .join(" ")}
+                            role="listitem"
+                            tabIndex={0}
+                            aria-pressed={selected}
+                            aria-label={`Seleccionar ${p.nombre}`}
+                            onClick={() => setEditProveedorId(p.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                setEditProveedorId(p.id);
+                              }
+                            }}
+                          >
+                            <ProveedorSelectableMedia proveedor={p} />
+                            <div className="pedidos-prov-card__body">
+                              <h3 className="pedidos-prov-card__name">{p.nombre}</h3>
+                              <p className="pedidos-prov-card__meta">NIT · {p.nit || "—"}</p>
+                              <p className="pedidos-prov-card__meta">
+                                {p.telefono || "—"} · {p.email || "—"}
+                              </p>
+                            </div>
+                            <div className="pedidos-prov-card__action">
+                              {selected ? (
+                                <span className="pedidos-prov-card__check" aria-hidden>
+                                  <Check size={18} weight="bold" />
+                                </span>
+                              ) : (
+                                <span className="pedidos-prov-card__cta">Elegir</span>
+                              )}
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ) : null}
+
+              {stepProductos ? (
+                <div className="pedidos-panel">
+                  {editLoadingLineas ? (
+                    <p className="pedidos-callout pedidos-callout--muted">Cargando líneas…</p>
+                  ) : (
+                    <div className="pedidos-dash-layout">
+                      <div className="pedidos-dash-layout__main">
+                        <div className="pedidos-lines-head">
+                          <h3 className="pedidos-lines-head__title">Líneas del pedido</h3>
+                        </div>
+                        {editLineas.length === 0 ? (
+                          <div className="pedidos-empty-lines">
+                            <p className="pedidos-empty-lines__title">Todavía no hay productos</p>
+                            <p className="pedidos-empty-lines__text">
+                              Buscá en el catálogo a la derecha y tocá un producto para sumarlo al pedido.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="table-wrap pedidos-lineas-table-wrap">
+                            <table className="table pedidos-lineas-table">
+                              <thead>
+                                <tr>
+                                  <th scope="col">Producto</th>
+                                  <th scope="col" className="pedidos-lineas-table__col-num">Cant.</th>
+                                  <th scope="col" className="pedidos-lineas-table__col-num">Costo u.</th>
+                                  <th scope="col" className="pedidos-lineas-table__col-num">Subtotal</th>
+                                  <th scope="col" className="pedidos-lineas-table__col-acc" />
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {editLineas.map((ln, idx) => {
+                                  const unit = ln.costo_unitario === "" ? 0 : Number(ln.costo_unitario);
+                                  const subtotal = Math.max(1, Number(ln.cantidad) || 1) * unit;
+                                  return (
+                                    <tr key={`edit-ln-${idx}`}>
+                                      <td>
+                                        <select
+                                          className="pedidos-input pedidos-select pedidos-lineas-table__control"
+                                          value={ln.producto_id || ""}
+                                          onChange={(e) =>
+                                            setEditLinea(idx, { producto_id: Number(e.target.value) || 0 })
+                                          }
+                                          aria-label="Producto"
+                                        >
+                                          <option value="">— Elegir —</option>
+                                          {editCatalogo.map((p) => (
+                                            <option key={p.id} value={p.id}>
+                                              {p.nombre}
+                                            </option>
+                                          ))}
+                                          {ln.producto_id && !editCatalogo.some((p) => p.id === ln.producto_id) ? (
+                                            <option value={ln.producto_id}>
+                                              {productos.find((p) => p.id === ln.producto_id)?.nombre ??
+                                                `Producto #${ln.producto_id}`}
+                                            </option>
+                                          ) : null}
+                                        </select>
+                                      </td>
+                                      <td className="pedidos-lineas-table__col-num">
+                                        <input
+                                          className="pedidos-input pedidos-lineas-table__control pedidos-lineas-table__control--qty input-numeric"
+                                          type="text"
+                                          inputMode="numeric"
+                                          autoComplete="off"
+                                          value={ln.cantidad === "" ? "" : String(ln.cantidad)}
+                                          onChange={(e) => {
+                                            const raw = filterIntegerTyping(e.target.value);
+                                            setEditLinea(idx, {
+                                              cantidad: raw === "" ? "" : Math.max(1, parseInt(raw, 10) || 1),
+                                            });
+                                          }}
+                                          aria-label="Cantidad"
+                                        />
+                                      </td>
+                                      <td className="pedidos-lineas-table__col-num">
+                                        <input
+                                          className="pedidos-input pedidos-lineas-table__control pedidos-lineas-table__control--money input-numeric"
+                                          type="text"
+                                          inputMode="numeric"
+                                          autoComplete="off"
+                                          value={ln.costo_unitario === "" ? "" : formatMoneyForInput(ln.costo_unitario)}
+                                          onChange={(e) =>
+                                            setEditLinea(idx, {
+                                              costo_unitario: parseMoneyInput(e.target.value),
+                                            })
+                                          }
+                                          aria-label="Costo unitario"
+                                        />
+                                      </td>
+                                      <td className="pedidos-lineas-table__col-num mono">{formatMoney(subtotal)}</td>
+                                      <td className="pedidos-lineas-table__col-acc">
+                                        <button
+                                          type="button"
+                                          className="pedidos-lineas-table__btn-remove"
+                                          onClick={() => removeEditLinea(idx)}
+                                        >
+                                          Quitar
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                        <div className="pedidos-total-strip">
+                          <span className="pedidos-total-strip__label">Total general del pedido</span>
+                          <span className="pedidos-total-strip__value">
+                            {formatMoney(roundMoney(editTotalGeneral))}
+                          </span>
+                        </div>
+                      </div>
+                      <aside className="pedidos-sidebar-card">
+                        <div className="pedidos-sidebar-card__head">
+                          <div>
+                            <h3 className="pedidos-sidebar-card__title">Catálogo del proveedor</h3>
+                          </div>
+                        </div>
+                        {editProveedorId === "" ? (
+                          <p className="pedidos-callout pedidos-callout--muted">
+                            Elegí un proveedor en el paso 1 para ver su catálogo.
+                          </p>
+                        ) : (
+                          <>
+                            <label className="pedidos-field pedidos-field--compact">
+                              <span className="pedidos-field__label">Buscar</span>
+                              <span className="pedidos-input-wrap">
+                                <MagnifyingGlass className="pedidos-input-wrap__icon" size={18} weight="regular" aria-hidden />
+                                <input
+                                  className="pedidos-input pedidos-input--with-icon"
+                                  type="search"
+                                  placeholder="Nombre, código, marca…"
+                                  value={editCatalogoBusca}
+                                  onChange={(e) => setEditCatalogoBusca(e.target.value)}
+                                />
+                              </span>
+                            </label>
+                            <div className="pedidos-sidebar-card__scroll">
+                              {editCatalogoFiltrado.length === 0 ? (
+                                <div className="pedidos-sidebar-empty">
+                                  <p className="pedidos-sidebar-empty__title">Sin resultados</p>
+                                </div>
+                              ) : (
+                                <div className="pedidos-catalog-list" role="list">
+                                  {editCatalogoFiltrado.slice(0, 200).map((p) => (
+                                    <button
+                                      key={p.id}
+                                      type="button"
+                                      className="pedidos-catalog-row"
+                                      role="listitem"
+                                      onClick={() => addEditProductoExistente(p)}
+                                    >
+                                      <span className="pedidos-catalog-row__name">{p.nombre}</span>
+                                      <span className="pedidos-catalog-row__price">
+                                        {formatMoney(Number(p.precio_compra ?? p.precio ?? 0))}
+                                      </span>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </aside>
+                    </div>
+                  )}
+                </div>
+              ) : null}
+
+              {stepPagos ? (
+                <div className="pedidos-panel">
+                  <div className="pedidos-form-grid">
+                    <label className="pedidos-field">
+                      <span className="pedidos-field__label">Fecha del pedido *</span>
+                      <input
+                        className="pedidos-input"
+                        type="date"
+                        value={editFecha}
+                        onChange={(e) => setEditFecha(e.target.value)}
+                        required
+                      />
+                    </label>
+                    <label className="pedidos-field">
+                      <span className="pedidos-field__label">Estado del pago</span>
+                      <select
+                        className="pedidos-input pedidos-select"
+                        value={editEstado}
+                        onChange={(e) => setEditEstado(e.target.value)}
+                      >
+                        <option value="pendiente">Pendiente</option>
+                        <option value="pagado">Pagado</option>
+                        <option value="vencido">Vencido</option>
+                      </select>
+                    </label>
+                    <label className="pedidos-field">
+                      <span className="pedidos-field__label">Fecha pago con descuento</span>
+                      <input
+                        className="pedidos-input"
+                        type="date"
+                        value={editFd}
+                        onChange={(e) => setEditFd(e.target.value)}
+                      />
+                    </label>
+                    <label className="pedidos-field">
+                      <span className="pedidos-field__label">Fecha máxima de pago</span>
+                      <input
+                        className="pedidos-input"
+                        type="date"
+                        value={editFm}
+                        onChange={(e) => setEditFm(e.target.value)}
+                      />
+                    </label>
+                    <label className="pedidos-field">
+                      <span className="pedidos-field__label">Valor con descuento</span>
+                      <input
+                        className="pedidos-input input-numeric"
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="off"
+                        value={editVd === "" ? "" : formatMoneyForInput(editVd)}
+                        onChange={(e) => setEditVd(parseMoneyInput(e.target.value))}
+                      />
+                    </label>
+                    <label className="pedidos-field">
+                      <span className="pedidos-field__label">Valor sin descuento</span>
+                      <input
+                        className="pedidos-input input-numeric"
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="off"
+                        value={editVs === "" ? "" : formatMoneyForInput(editVs)}
+                        onChange={(e) => setEditVs(parseMoneyInput(e.target.value))}
+                      />
+                    </label>
+                    <label className="pedidos-field">
+                      <span className="pedidos-field__label">Referencia</span>
+                      <input
+                        className="pedidos-input"
+                        value={editRef}
+                        onChange={(e) => setEditRef(e.target.value)}
+                      />
+                    </label>
+                  </div>
+                </div>
+              ) : null}
+
+              {stepResumen ? (
+                <div className="pedidos-panel pedidos-panel--resumen" aria-label="Resumen del pedido">
+                  <div className="pedidos-resumen-grid">
+                    {isAdmin ? (
+                      <>
+                        <div className="pedidos-resumen-tile">
+                          <div className="pedidos-resumen-tile__head">
+                            <span className="pedidos-resumen-tile__eyebrow">Proveedor</span>
+                            <button type="button" className="pedidos-link-btn" onClick={() => goToEditStep(0)}>
+                              Editar
+                            </button>
+                          </div>
+                          <p className="pedidos-resumen-tile__strong">
+                            {editProveedorSel?.nombre ?? "No seleccionado"}
+                          </p>
+                          <p className="pedidos-resumen-tile__meta">
+                            NIT: {editProveedorSel?.nit || "—"} · Tel: {editProveedorSel?.telefono || "—"}
+                          </p>
+                        </div>
+                        <div className="pedidos-resumen-tile">
+                          <div className="pedidos-resumen-tile__head">
+                            <span className="pedidos-resumen-tile__eyebrow">Totales</span>
+                            <button type="button" className="pedidos-link-btn" onClick={() => goToEditStep(1)}>
+                              Editar
+                            </button>
+                          </div>
+                          <p className="pedidos-resumen-tile__strong">{editLineas.length} línea(s)</p>
+                          <p className="pedidos-resumen-tile__meta">
+                            Total general: {formatMoney(roundMoney(editTotalGeneral))}
+                          </p>
+                        </div>
+                      </>
+                    ) : null}
+                    <div className="pedidos-resumen-tile pedidos-resumen-tile--wide">
+                      <div className="pedidos-resumen-tile__head">
+                        <span className="pedidos-resumen-tile__eyebrow">Pagos</span>
+                        <button
+                          type="button"
+                          className="pedidos-link-btn"
+                          onClick={() => goToEditStep(isAdmin ? 2 : 0)}
+                        >
+                          Editar
+                        </button>
+                      </div>
+                      <p className="pedidos-resumen-tile__body">
+                        Con descuento: {editVd === "" ? "—" : formatMoney(Number(editVd))} · Sin descuento:{" "}
+                        {editVs === "" ? "—" : formatMoney(Number(editVs))}
+                      </p>
+                      <p className="pedidos-resumen-tile__meta">Estado: {labelEstadoPago(editEstado)}</p>
+                      <p className="pedidos-resumen-tile__meta">
+                        Plazos: desc. hasta {editFd || "—"} · máx. {editFm || "—"}
+                      </p>
+                      <p className="pedidos-resumen-tile__meta">
+                        Fecha pedido: {editFecha || "—"} · Ref.: {editRef.trim() || "—"}
+                      </p>
+                    </div>
+                    <div className="pedidos-resumen-notes">
+                      <label className="pedidos-field">
+                        <span className="pedidos-field__label">Notas finales (opcional)</span>
+                        <textarea
+                          className="pedidos-input"
+                          rows={4}
+                          value={editNotas}
+                          onChange={(e) => setEditNotas(e.target.value)}
+                          placeholder="Observaciones sobre el pedido, entrega, condiciones…"
+                        />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
               <div className="pedidos-wizard-footer pedidos-drawer-footer">
-                <button type="button" className="pedidos-btn pedidos-btn--ghost" onClick={() => setEdit(null)}>
-                  Cancelar
-                </button>
-                <button type="submit" className="pedidos-btn pedidos-btn--primary" disabled={editBusy}>
-                  Guardar
-                </button>
+                {editWizardStep > 0 ? (
+                  <button
+                    type="button"
+                    className="pedidos-btn pedidos-btn--secondary"
+                    onClick={onEditPrevStep}
+                  >
+                    Anterior
+                  </button>
+                ) : (
+                  <span />
+                )}
+                {!isLastStep ? (
+                  <button type="button" className="pedidos-btn pedidos-btn--primary" onClick={onEditNextStep}>
+                    Siguiente
+                  </button>
+                ) : (
+                  <button type="submit" className="pedidos-btn pedidos-btn--primary" disabled={editBusy}>
+                    {editBusy ? "Guardando…" : "Guardar cambios"}
+                  </button>
+                )}
               </div>
             </form>
           </div>
         </div>
-      ) : null}
+        );
+      })() : null}
 
       <Drawer
         open={drawerNuevoProducto}

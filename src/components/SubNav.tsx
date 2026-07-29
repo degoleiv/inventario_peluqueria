@@ -1,11 +1,13 @@
 import { useEffect, type ReactNode } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
+import { Info } from "@phosphor-icons/react";
 import { persistLastTab } from "../lib/moduleRoutes";
 
 export type SubNavItem = {
   id: string;
   label: string;
   to: string;
+  description?: string;
 };
 
 type Props = {
@@ -50,21 +52,21 @@ export function SubNav({
   return (
     <div className="subnav-wrap">
       <nav className={rootClass} aria-label="Subsecciones del módulo">
-        {items.map((it, idx) => (
+        {items.map((it) => (
           <NavLink
             key={it.id}
             to={it.to}
             end={false}
+            title={it.description}
+            aria-label={it.description ? `${it.label}. ${it.description}` : it.label}
             className={({ isActive }) =>
               isActive ? "subnav-link subnav-link--active" : "subnav-link"
             }
             onClick={() => persistLastTab(moduleId, it.id)}
           >
             <span className="subnav-label">{it.label}</span>
-            {idx < 3 ? (
-              <kbd className="subnav-kbd" title={`Ctrl+${idx + 1}`}>
-                {idx + 1}
-              </kbd>
+            {it.description ? (
+              <Info className="subnav-info" size={15} weight="bold" aria-hidden />
             ) : null}
           </NavLink>
         ))}

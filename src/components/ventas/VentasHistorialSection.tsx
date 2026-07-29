@@ -41,12 +41,6 @@ export function VentasHistorialSection({ puedeCrear, puedeEliminar }: Props) {
   return (
     <div className="sales-history-page">
       <header className="sales-history-header">
-        <div className="sales-history-header-text">
-          <h1 className="sales-history-title">Historial de Ventas</h1>
-          <p className="sales-history-subtitle muted">
-            Consulta, filtra y analiza todas las transacciones registradas
-          </p>
-        </div>
         <div className="sales-history-header-actions">
           {puedeCrear ? (
             <Link to="/ventas/cierre" className="btn secondary">

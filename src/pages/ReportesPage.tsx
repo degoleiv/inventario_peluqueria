@@ -134,7 +134,7 @@ export function ReportesPage() {
   const sumaFiltrada = ventas.reduce((a, v) => a + v.total, 0);
 
   return (
-    <>
+    <div className="page-reportes">
       <section className="card">
         <h2 className="card-title">Resumen del negocio</h2>
         {loading && !dash ? (
@@ -482,6 +482,6 @@ export function ReportesPage() {
           </div>
         </section>
       ) : null}
-    </>
+    </div>
   );
 }

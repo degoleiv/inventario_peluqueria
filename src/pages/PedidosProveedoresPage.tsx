@@ -7,7 +7,7 @@ import {
   useState,
   type FormEvent,
 } from "react";
-import { Check, MagnifyingGlass, Plus } from "@phosphor-icons/react";
+import { Check, Info, MagnifyingGlass, Plus } from "@phosphor-icons/react";
 import {
   createInventarioCategoriaProducto,
   createPedidoProveedor,
@@ -1179,12 +1179,26 @@ export function PedidosProveedoresPage() {
 
   return (
     <div className="page-pedidos">
-      <nav className="pedidos-segmented" aria-label="Navegación de pedidos" role="tablist">
+      <nav className="subnav subnav--tabs pedidos-module-nav" aria-label="Navegación de pedidos" role="tablist">
         {(
           [
-            ...(puedeCrear ? [{ id: "pedido" as const, label: "Pedido" }] : []),
-            { id: "proveedores" as const, label: "Proveedores" },
-            { id: "historial" as const, label: "Historial" },
+            ...(puedeCrear
+              ? [{
+                  id: "pedido" as const,
+                  label: "Pedido",
+                  description: "Creá un pedido de proveedor y registrá productos, pagos y notas.",
+                }]
+              : []),
+            {
+              id: "proveedores" as const,
+              label: "Proveedores",
+              description: "Consultá y administrá los proveedores del negocio.",
+            },
+            {
+              id: "historial" as const,
+              label: "Historial",
+              description: "Consultá pedidos anteriores y editá plazos, montos o notas de pago.",
+            },
           ] as const
         ).map((tab) => {
           const active = vistaTab === tab.id;
@@ -1194,12 +1208,13 @@ export function PedidosProveedoresPage() {
               type="button"
               role="tab"
               aria-selected={active}
-              className={
-                active ? "pedidos-segmented__tab pedidos-segmented__tab--active" : "pedidos-segmented__tab"
-              }
+              title={tab.description}
+              aria-label={`${tab.label}. ${tab.description}`}
+              className={active ? "subnav-link subnav-link--active" : "subnav-link"}
               onClick={() => setVistaTab(tab.id)}
             >
-              {tab.label}
+              <span className="subnav-label">{tab.label}</span>
+              <Info className="subnav-info" size={15} weight="bold" aria-hidden />
             </button>
           );
         })}
@@ -1806,9 +1821,6 @@ export function PedidosProveedoresPage() {
           <div className="pedidos-historial-shell__head">
             <div>
               <h2 className="pedidos-historial-shell__title">Historial de pedidos</h2>
-              <p className="pedidos-historial-shell__lede">
-                Consultá pedidos anteriores y editá plazos, montos o notas de pago.
-              </p>
             </div>
             <button type="button" className="pedidos-btn pedidos-btn--ghost" onClick={aplicarFiltrosHistorialYRefrescar}>
               Actualizar

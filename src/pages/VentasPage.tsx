@@ -8,9 +8,6 @@ import {
   MagnifyingGlass,
   Minus,
   Plus,
-  ArrowsIn,
-  ArrowsOut,
-  ClockCounterClockwise,
   ShoppingCart,
   Trash,
 } from "@phosphor-icons/react";
@@ -48,7 +45,6 @@ import { useToast } from "../context/ToastContext";
 import { usePuede } from "../context/PermisosContext";
 import { filterIntegerTyping } from "../lib/decimalInput";
 import { formatMoney, formatMoneyForInput, parseMoneyInput } from "../lib/money";
-import { usePosFocus } from "../context/PosFocusContext";
 import {
   getPinnedClienteIds,
   getPinnedProductIds,
@@ -1383,34 +1379,41 @@ export function VentasPage() {
   if (tabRequiereCrear && !puedeCrearVenta) {
     return <Navigate to="/ventas/historial" replace />;
   }
-  const { posFocus, setPosFocus } = usePosFocus();
-
-  const onTogglePosFocus = async () => {
-    if (!posFocus) {
-      setPosFocus(true);
-      try {
-        await document.documentElement.requestFullscreen();
-      } catch {
-        /* sin permiso de pantalla completa del navegador */
-      }
-    } else {
-      setPosFocus(false);
-      if (document.fullscreenElement) void document.exitFullscreen();
-    }
-  };
 
   return (
     <>
-      {!posFocus ? (
       <SubNav
         moduleId="ventas"
         items={[
           ...(puedeCrearVenta ? [{ id: "ventas", label: "Ventas", to: "/ventas/ventas" }] : []),
-          { id: "historial", label: "Historial", to: "/ventas/historial" },
-          ...(puedeCrearVenta ? [{ id: "cierre", label: "Cierre de día", to: "/ventas/cierre" }] : []),
-          { id: "devoluciones", label: "Devoluciones", to: "/ventas/devoluciones" },
+          {
+            id: "historial",
+            label: "Historial",
+            to: "/ventas/historial",
+            description: "Consulta, filtra y analiza todas las transacciones registradas.",
+          },
+          ...(puedeCrearVenta
+            ? [{
+                id: "cierre",
+                label: "Cierre de día",
+                to: "/ventas/cierre",
+                description:
+                  "Compará lo reportado por ventas con el dinero en caja y cuentas. Dejá la nota de cierre.",
+              }]
+            : []),
+          {
+            id: "devoluciones",
+            label: "Devoluciones",
+            to: "/ventas/devoluciones",
+            description: "Gestioná devoluciones de productos y servicios.",
+          },
           ...(puedeEditarVenta || puedeCrearVenta || puedeEliminarVenta
-            ? [{ id: "descuentos", label: "Descuentos", to: "/ventas/descuentos" }]
+            ? [{
+                id: "descuentos",
+                label: "Descuentos",
+                to: "/ventas/descuentos",
+                description: "Configurá descuentos fijos por cliente o producto y revisá el historial.",
+              }]
             : []),
         ]}
         quickActions={
@@ -1427,34 +1430,9 @@ export function VentasPage() {
           ) : null
         }
       />
-      ) : null}
 
       {tab === "ventas" ? (
-        <div className={`page-pos page-pos--saas page-pos--optimized${posFocus ? " page-pos--focus" : ""}`}>
-          <header className="pos-saas-head pos-saas-head--compact">
-            <div className="pos-saas-head-text">
-              <h1 className="pos-saas-head-title">
-                <ShoppingCart className="pos-saas-head-icon" size={28} weight="duotone" aria-hidden />
-                Nueva venta
-              </h1>
-            </div>
-            <div className="pos-saas-head-actions">
-              <button
-                type="button"
-                className="btn ghost small pos-saas-btn-focus"
-                onClick={() => void onTogglePosFocus()}
-                title={posFocus ? "Salir de pantalla completa" : "Maximizar POS (ocultar menú)"}
-              >
-                {posFocus ? <ArrowsIn size={18} aria-hidden /> : <ArrowsOut size={18} aria-hidden />}
-                {posFocus ? "Salir pantalla completa" : "Pantalla completa"}
-              </button>
-              <Link to="/ventas/historial" className="btn ghost small pos-saas-link-history">
-                <ClockCounterClockwise size={18} aria-hidden />
-                Historial de ventas
-              </Link>
-            </div>
-          </header>
-
+        <div className="page-pos page-pos--saas page-pos--optimized">
           <form
             ref={saleFormRef}
             className={`pos-saas-grid pos-saas-grid--triple pos-sale-form pos-sale-form--optimized ${
@@ -1756,10 +1734,11 @@ export function VentasPage() {
                       ) : null}
                     </span>
                     <div className="pos-cart-cita-pickrow">
-                      <select
-                        className="pos-saas-select pos-cart-cita-select"
-                        value={citaOrigenId == null ? "" : String(citaOrigenId)}
-                        onChange={(e) => {
+                      <div className="pos-cart-cita-select-wrap">
+                        <select
+                          className="pos-saas-select pos-cart-cita-select"
+                          value={citaOrigenId == null ? "" : String(citaOrigenId)}
+                          onChange={(e) => {
                           const raw = e.target.value;
                           if (raw === "") {
                             setCitaOrigenId(null);
@@ -1810,45 +1789,47 @@ export function VentasPage() {
                           if (clienteId === "") setClienteId(c.cliente_id);
                           if (uid != null && equipo.some((em) => em.id === uid)) setVendedorId(uid);
                           posBeepOk();
-                        }}
-                        aria-label="Asociar venta a cita de agenda"
-                      >
-                        <option value="">
-                          {clienteId !== ""
-                            ? citasParaAsociarFiltradas.length === 0
-                              ? "— Sin cita asociada —"
-                              : "— Sin cita (opcional) —"
-                            : "— Sin cita (opcional) —"}
-                        </option>
-                        {citaOrigenId != null &&
-                        !citasParaAsociarFiltradas.some((x) => x.id === citaOrigenId) ? (
-                          <option value={String(citaOrigenId)}>
-                            {citaOrigenInfo ?? `Cita #${citaOrigenId} (precargada)`}
+                          }}
+                          aria-label="Asociar venta a cita de agenda"
+                        >
+                          <option value="">
+                            {clienteId !== ""
+                              ? citasParaAsociarFiltradas.length === 0
+                                ? "— Sin cita asociada —"
+                                : "— Sin cita (opcional) —"
+                              : "— Sin cita (opcional) —"}
                           </option>
-                        ) : null}
-                        {citasParaAsociarFiltradas.map((c) => {
-                          const t =
-                            c.inicio && !Number.isNaN(new Date(c.inicio).getTime())
-                              ? new Date(c.inicio).toLocaleString("es", {
-                                  weekday: "short",
-                                  day: "numeric",
-                                  month: "short",
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                })
-                              : "";
-                          const conCliente = clienteId === "";
-                          return (
-                            <option key={c.id} value={c.id}>
-                              #{c.id}
-                              {conCliente ? ` · ${c.cliente_nombre}` : ""} · {t}
-                              {(c.servicio ?? "").trim()
-                                ? ` · ${(c.servicio ?? "").trim().slice(0, 42)}`
-                                : ""}
+                          {citaOrigenId != null &&
+                          !citasParaAsociarFiltradas.some((x) => x.id === citaOrigenId) ? (
+                            <option value={String(citaOrigenId)}>
+                              {citaOrigenInfo ?? `Cita #${citaOrigenId} (precargada)`}
                             </option>
-                          );
-                        })}
-                      </select>
+                          ) : null}
+                          {citasParaAsociarFiltradas.map((c) => {
+                            const t =
+                              c.inicio && !Number.isNaN(new Date(c.inicio).getTime())
+                                ? new Date(c.inicio).toLocaleString("es", {
+                                    weekday: "short",
+                                    day: "numeric",
+                                    month: "short",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })
+                                : "";
+                            const conCliente = clienteId === "";
+                            return (
+                              <option key={c.id} value={c.id}>
+                                #{c.id}
+                                {conCliente ? ` · ${c.cliente_nombre}` : ""} · {t}
+                                {(c.servicio ?? "").trim()
+                                  ? ` · ${(c.servicio ?? "").trim().slice(0, 42)}`
+                                  : ""}
+                              </option>
+                            );
+                          })}
+                        </select>
+                        <CaretDown className="pos-cart-cita-select-arrow" size={16} weight="bold" aria-hidden />
+                      </div>
                       <button
                         type="button"
                         className="btn ghost small pos-cart-cita-add"

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowClockwise, Pencil, Plus, Tag, Trash } from "@phosphor-icons/react";
+import { ArrowClockwise, Pencil, Plus, Trash } from "@phosphor-icons/react";
 import {
   createDescuento,
   deleteDescuento,
@@ -286,15 +286,6 @@ export function DescuentosSection({ puedeCrear, puedeEditar, puedeEliminar }: Se
   return (
     <div className="sales-history-page" style={{ padding: 16 }}>
       <header className="sales-history-header">
-        <div className="sales-history-header-text">
-          <h1 className="sales-history-title">
-            <Tag size={22} weight="duotone" aria-hidden style={{ verticalAlign: "-4px", marginRight: 6 }} />
-            Descuentos
-          </h1>
-          <p className="sales-history-subtitle muted">
-            Configurá descuentos fijos por cliente o producto y revisá el historial.
-          </p>
-        </div>
         <div className="sales-history-header-actions">
           {subTab === "config" ? (
             <>

@@ -806,6 +806,12 @@ export function EmpleadosPage({ onChanged }: Props) {
                       {u.nombre || "—"}
                     </p>
 
+                    {u.email ? (
+                      <p className="empleado-card__email" title={u.email}>
+                        {u.email}
+                      </p>
+                    ) : null}
+
                     {activo ? (
                       <span className="badge-ok empleado-card__estado">Activo</span>
                     ) : (

@@ -8,6 +8,7 @@ import {
   ChartLineUp,
   Check,
   FileArrowUp,
+  Info,
   Paperclip,
   Plus,
   Trash,
@@ -545,12 +546,24 @@ export function FinanzasPage() {
 
   return (
     <div className="page-pedidos page-finanzas">
-      <nav className="pedidos-segmented" aria-label="Secciones de finanzas" role="tablist">
+      <nav className="subnav subnav--tabs pedidos-module-nav" aria-label="Secciones de finanzas" role="tablist">
         {(
           [
-            { id: "flujo" as const, label: "Flujo de caja" },
-            { id: "gastos" as const, label: "Gastos operativos" },
-            { id: "cobrar" as const, label: "Cuentas por cobrar" },
+            {
+              id: "flujo" as const,
+              label: "Flujo de caja",
+              description: "Analizá ingresos, egresos y balance neto para un período.",
+            },
+            {
+              id: "gastos" as const,
+              label: "Gastos operativos",
+              description: "Registrá gastos y consultalos en calendario e historial.",
+            },
+            {
+              id: "cobrar" as const,
+              label: "Cuentas por cobrar",
+              description: "Registrá deudas de clientes, vencimientos y pagos.",
+            },
           ] as const
         ).map((t) => {
           const active = tab === t.id;
@@ -560,12 +573,13 @@ export function FinanzasPage() {
               type="button"
               role="tab"
               aria-selected={active}
-              className={
-                active ? "pedidos-segmented__tab pedidos-segmented__tab--active" : "pedidos-segmented__tab"
-              }
+              title={t.description}
+              aria-label={`${t.label}. ${t.description}`}
+              className={active ? "subnav-link subnav-link--active" : "subnav-link"}
               onClick={() => setTab(t.id)}
             >
-              {t.label}
+              <span className="subnav-label">{t.label}</span>
+              <Info className="subnav-info" size={15} weight="bold" aria-hidden />
             </button>
           );
         })}
@@ -577,10 +591,6 @@ export function FinanzasPage() {
             <h2 id="finanzas-flujo-title" className="pedidos-wizard-card__title">
               Flujo de caja
             </h2>
-            <p className="pedidos-wizard-card__subtitle">
-              Ingresos: suma de ventas en el período. Egresos: gastos operativos más total de pedidos a
-              proveedor (valor de líneas). El balance neto es la diferencia.
-            </p>
           </div>
 
           <div className="finanzas-flujo-fechas">
@@ -664,14 +674,6 @@ export function FinanzasPage() {
               <h2 id="finanzas-gastos-title" className="pedidos-wizard-card__title">
                 Registrar gasto
               </h2>
-              <p className="pedidos-wizard-card__subtitle">
-                Arriendo, servicios, insumos administrativos, etc. Solo administrador. La{" "}
-                <strong>categoría</strong> define el concepto del gasto. Las categorías se gestionan en{" "}
-                <Link to="/configuracion/parametros" className="finanzas-inline-link">
-                  Parámetros generales
-                </Link>
-                .
-              </p>
             </div>
             {loading ? <p className="pedidos-inline-hint">Cargando lista…</p> : null}
             <form className="finanzas-form-card" onSubmit={onGasto}>
@@ -736,10 +738,6 @@ export function FinanzasPage() {
                 <h2 id="finanzas-gastos-cal" className="pedidos-wizard-card__title">
                   Calendario de gastos
                 </h2>
-                <p className="pedidos-wizard-card__subtitle">
-                  Cada gasto aparece como etiqueta en el día. Tocá un día para ver el detalle o registrar
-                  uno nuevo.
-                </p>
               </div>
               <div className="fin-cal-total" aria-live="polite">
                 <span className="fin-cal-total__label">Total del mes</span>
@@ -846,7 +844,6 @@ export function FinanzasPage() {
             <h2 id="finanzas-gastos-lista" className="pedidos-wizard-card__title">
               Historial de gastos
             </h2>
-            <p className="pedidos-wizard-card__subtitle">Últimos movimientos registrados (orden por fecha).</p>
             {gastos.length > 0 ? (
               <div className="finanzas-table-wrap">
                 <table className="finanzas-table">
@@ -1146,9 +1143,6 @@ export function FinanzasPage() {
               <h2 id="finanzas-cobrar-form" className="pedidos-wizard-card__title">
                 Nueva cuenta por cobrar
               </h2>
-              <p className="pedidos-wizard-card__subtitle">
-                Registrá deudas de clientes con monto y vencimiento. Los pagos se registran desde la tabla inferior.
-              </p>
             </div>
             <form className="finanzas-form-card" onSubmit={onDeuda}>
               <div className="pedidos-form-grid">
@@ -1217,7 +1211,6 @@ export function FinanzasPage() {
             <h2 id="finanzas-cobrar-lista" className="pedidos-wizard-card__title">
               Cuentas pendientes
             </h2>
-            <p className="pedidos-wizard-card__subtitle">Saldo actual y vencimiento por cada deuda abierta.</p>
             {cobranzas.length > 0 ? (
               <>
                 <div className="finanzas-deuda-chip" role="status">

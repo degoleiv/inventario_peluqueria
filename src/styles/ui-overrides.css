@@ -1094,13 +1094,19 @@ body.theme-slate select {
   background-size: 14px 9px;
 }
 
-:root[data-theme="dark"] body.theme-default select,
-:root[data-theme="dark"] body.theme-neon select,
-:root[data-theme="dark"] body.theme-girly select,
-:root[data-theme="dark"] body.theme-purple select,
-:root[data-theme="dark"] body.theme-ocean select,
-:root[data-theme="dark"] body.theme-slate select {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9' fill='none' viewBox='0 0 14 9'%3E%3Cpath stroke='%23e8dfd7' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.75' d='M1 1.75 7 7.25 13 1.75'/%3E%3C/svg%3E");
+:root[data-theme="dark"] body.theme-default select:not(.pos-cart-cita-select),
+:root[data-theme="dark"] body.theme-neon select:not(.pos-cart-cita-select),
+:root[data-theme="dark"] body.theme-girly select:not(.pos-cart-cita-select),
+:root[data-theme="dark"] body.theme-purple select:not(.pos-cart-cita-select),
+:root[data-theme="dark"] body.theme-ocean select:not(.pos-cart-cita-select),
+:root[data-theme="dark"] body.theme-slate select:not(.pos-cart-cita-select) {
+  -webkit-appearance: auto;
+  -moz-appearance: auto;
+  appearance: auto;
+  padding-inline-end: 0.75rem;
+  background-image: none;
+  background-repeat: no-repeat;
+  color-scheme: dark;
 }
 
 @media (max-width: 480px) {
@@ -1279,4 +1285,43 @@ select::-ms-expand {
 .searchable-select__no-hit {
   margin: 0;
   padding: 0.25rem 0.35rem;
+}
+
+/* Reportes: contraste legible y homogéneo en modo oscuro. */
+:root[data-theme="dark"] .page-reportes {
+  color: var(--text, #f8fafc);
+}
+
+:root[data-theme="dark"] .page-reportes .card-title,
+:root[data-theme="dark"] .page-reportes strong,
+:root[data-theme="dark"] .page-reportes .table td {
+  color: #ffffff;
+}
+
+:root[data-theme="dark"] .page-reportes .report-list {
+  color: #e5e7eb;
+}
+
+:root[data-theme="dark"] .page-reportes .muted,
+:root[data-theme="dark"] .page-reportes .hint,
+:root[data-theme="dark"] .page-reportes .field span {
+  color: #cbd5e1;
+}
+
+:root[data-theme="dark"] .page-reportes .table-wrap {
+  border-color: #4b5563;
+  background: color-mix(in srgb, var(--surface) 92%, #000 8%);
+}
+
+:root[data-theme="dark"] .page-reportes .table th {
+  color: #dbe4f0;
+  border-bottom-color: #4b5563;
+}
+
+:root[data-theme="dark"] .page-reportes .table tbody td {
+  background: color-mix(in srgb, var(--surface) 94%, #ffffff 6%);
+}
+
+:root[data-theme="dark"] .page-reportes .table tbody tr:hover td {
+  background: color-mix(in srgb, var(--primary) 16%, var(--surface));
 }

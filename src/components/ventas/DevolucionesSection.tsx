@@ -20,12 +20,6 @@ export function DevolucionesSection({ puedeCrear, puedeEditar, puedeEliminar }: 
   return (
     <div className="returns-page">
       <header className="returns-header">
-        <div className="returns-header-text">
-          <h1 className="returns-title">Devoluciones</h1>
-          <p className="returns-subtitle muted">
-            Gestioná devoluciones de productos y servicios
-          </p>
-        </div>
         <div className="returns-header-actions">
           {puedeCrear ? (
             <button

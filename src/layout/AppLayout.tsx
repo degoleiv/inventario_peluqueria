@@ -1,9 +1,8 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { resolveImageSrc } from "../api";
 import { WorkspaceTabsBar } from "../components/WorkspaceTabsBar";
-import { usePosFocus } from "../context/PosFocusContext";
 import { usePuede } from "../context/PermisosContext";
-import { ArrowsIn } from "@phosphor-icons/react";
+import { ArrowsIn, ArrowsOut } from "@phosphor-icons/react";
 import {
   NAV_GROUPS,
   NAV_LABEL,
@@ -182,33 +181,30 @@ export function AppLayout({
 }: Props) {
   const pageTitle = NAV_LABEL[nav];
   const displayBrand = brandTitle?.trim() || "Peluquería";
-  const { chromeHidden, setPosFocus } = usePosFocus();
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(
+    () => typeof document !== "undefined" && document.fullscreenElement != null
+  );
+
+  useEffect(() => {
+    const sync = () => setIsFullscreen(document.fullscreenElement != null);
+    document.addEventListener("fullscreenchange", sync);
+    return () => document.removeEventListener("fullscreenchange", sync);
+  }, []);
+
+  const toggleFullscreen = async () => {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else {
+        await document.documentElement.requestFullscreen();
+      }
+    } catch {
+      /* sin permiso de pantalla completa del navegador */
+    }
+  };
 
   if (fullscreenContent) {
     return <div className="app-root app-root--customer-display">{children}</div>;
-  }
-
-  if (chromeHidden) {
-    return (
-      <div className="app-root app-root--pos-focus">
-        <div className="pos-focus-toolbar">
-          <span className="pos-focus-toolbar-title">Nueva venta</span>
-          <button
-            type="button"
-            className="btn ghost small pos-focus-exit"
-            onClick={() => {
-              setPosFocus(false);
-              if (document.fullscreenElement) void document.exitFullscreen();
-            }}
-          >
-            <ArrowsIn size={18} aria-hidden />
-            Salir de pantalla completa
-          </button>
-          <kbd className="pos-focus-kbd">Esc</kbd>
-        </div>
-        <div className="pos-focus-body">{children}</div>
-      </div>
-    );
   }
 
   const sidebarGroups = NAV_GROUPS.map((g) => ({
@@ -277,6 +273,20 @@ export function AppLayout({
               <circle cx="11" cy="11" r="8" />
               <line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>
+          </button>
+          <button
+            type="button"
+            className="btn-icon"
+            onClick={() => void toggleFullscreen()}
+            title={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
+            aria-label={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
+            aria-pressed={isFullscreen}
+          >
+            {isFullscreen ? (
+              <ArrowsIn size={16} aria-hidden />
+            ) : (
+              <ArrowsOut size={16} aria-hidden />
+            )}
           </button>
           <span className="topbar-user" title={userEmail ?? ""}>
             {userFotoUrl ? (

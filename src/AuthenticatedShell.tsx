@@ -11,7 +11,6 @@ import { CommandPalette, type PaletteAction } from "./components/CommandPalette"
 import { TabbedOutlet } from "./components/TabbedOutlet";
 import { AppLayout } from "./layout/AppLayout";
 import { WorkspaceTabsProvider, clearWorkspaceTabsStorage } from "./context/WorkspaceTabsContext";
-import { PosFocusProvider } from "./context/PosFocusContext";
 import { PermisosProvider } from "./context/PermisosContext";
 import {
   NAV_LABEL,
@@ -269,7 +268,6 @@ export function AuthenticatedShell() {
     <>
       <PermisosProvider permisos={permisos}>
       <WorkspaceTabsProvider permisos={permisos}>
-        <PosFocusProvider>
         <AppLayout
           nav={nav}
           setNav={setNav}
@@ -298,7 +296,6 @@ export function AuthenticatedShell() {
           <Outlet />
           <TabbedOutlet />
         </AppLayout>
-        </PosFocusProvider>
       </WorkspaceTabsProvider>
       </PermisosProvider>
       <CommandPalette

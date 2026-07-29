@@ -1600,6 +1600,15 @@ export function CitasPage() {
         </div>
       ) : null}
 
+      <SubNav
+        moduleId="citas"
+        enableNumberShortcuts={!drawerOpen && !cuadriculaHorasAbierta && !busquedaMenu}
+        items={[
+          { id: "calendario", label: "Calendario", to: rutaCalendario },
+          { id: "buscar", label: "Buscar citas", to: "/citas/buscar" },
+        ]}
+      />
+
       <section className="card citas-filtros-lista" aria-label="Filtros de citas por rango y empleado">
         <div className="card-head">
           <h2 className="card-title">Filtros de lista</h2>
@@ -1639,15 +1648,6 @@ export function CitasPage() {
           </label>
         </div>
       </section>
-
-      <SubNav
-        moduleId="citas"
-        enableNumberShortcuts={!drawerOpen && !cuadriculaHorasAbierta && !busquedaMenu}
-        items={[
-          { id: "calendario", label: "Calendario", to: rutaCalendario },
-          { id: "buscar", label: "Buscar citas", to: "/citas/buscar" },
-        ]}
-      />
 
       {tab === "calendario" ? (
         <>

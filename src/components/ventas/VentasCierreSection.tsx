@@ -178,12 +178,6 @@ export function VentasCierreSection() {
   return (
     <div className="cierre-dia-page">
       <header className="cierre-dia-header">
-        <div>
-          <h1 className="cierre-dia-title">Cierre de día</h1>
-          <p className="cierre-dia-subtitle muted">
-            Compará lo reportado por ventas con el dinero en caja y cuentas. Dejá la nota de cierre.
-          </p>
-        </div>
         <div className="cierre-dia-header-actions">
           <div className="cierre-dia-tabs" role="tablist">
             <button

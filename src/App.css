@@ -655,6 +655,17 @@ textarea {
   text-overflow: ellipsis;
 }
 
+.empleado-card__email {
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  color: rgba(44, 36, 32, 0.65);
+  width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .empleado-card__estado {
   flex: 0 0 auto;
   white-space: nowrap;
@@ -755,6 +766,10 @@ textarea {
 
 [data-theme="dark"] .empleado-card__nombre {
   color: var(--text, #f5efe8);
+}
+
+[data-theme="dark"] .empleado-card__email {
+  color: rgba(245, 239, 232, 0.6);
 }
 
 [data-theme="dark"] .empleado-card__estado--off {
@@ -1623,12 +1638,6 @@ select {
   display: contents;
 }
 
-/* Citas: más ancho útil para filtros + calendario sin comprimir selects ni forzar scroll horizontal */
-.main-pro-content:has(> .tab-pane-mount > .tab-pane-host--active > .citas-filtros-lista) {
-  max-width: min(100%, 1680px);
-  overflow-x: visible;
-}
-
 /* Campos editables: cursor del sistema (los cursores SVG personalizados fallaban en algunos entornos y dejaban el puntero invisible). */
 
 .main-pro-content .card input:not(:disabled):not([readonly]):not([type="button"]):not([type="submit"]):not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]):not(.pos-scan-input),
@@ -1687,8 +1696,10 @@ select {
    (display:flex + min-height:0 recortaba el bloque y parecía “colapsado”). */
 .main-pro-content .tab-pane-mount > .tab-pane-host--active > .citas-filtros-lista,
 .main-pro-content .tab-pane-mount > .tab-pane-host--active > .subnav-wrap + .citas-filtros-lista {
-  flex: 0 0 auto;
-  min-height: unset;
+  flex: 0 0 auto !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none;
   min-width: 0;
   display: block;
   overflow-x: visible;
@@ -2559,6 +2570,16 @@ select {
 
 .subnav-label {
   white-space: nowrap;
+}
+
+.subnav-info {
+  flex: 0 0 auto;
+  opacity: 0.72;
+}
+
+.subnav-link:hover .subnav-info,
+.subnav-link--active .subnav-info {
+  opacity: 1;
 }
 
 .subnav-kbd {
@@ -4154,9 +4175,31 @@ select {
   align-items: stretch;
 }
 
-.pos-cart-cita-pickrow > .pos-cart-cita-select {
+.pos-cart-cita-pickrow > .pos-cart-cita-select-wrap {
   flex: 1 1 auto;
   min-width: 0;
+}
+
+.pos-cart-cita-select-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.pos-cart-cita-select-wrap .pos-cart-cita-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: var(--pos-saas-input-bg) !important;
+  background-image: none !important;
+  background-repeat: no-repeat !important;
+  padding-right: 2rem;
+}
+
+.pos-cart-cita-select-arrow {
+  position: absolute;
+  right: 0.65rem;
+  color: var(--pos-saas-muted);
+  pointer-events: none;
 }
 
 .pos-cart-cita-add {
@@ -5330,6 +5373,27 @@ select {
   color: var(--pos-saas-text);
 }
 
+[data-theme="dark"] .page-pos--saas {
+  --pos-saas-text: #ffffff;
+  --pos-saas-muted: #d1d5db;
+  color: #ffffff;
+}
+
+[data-theme="dark"] .page-pos--saas .muted {
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .page-pos--saas input::placeholder,
+[data-theme="dark"] .page-pos--saas textarea::placeholder {
+  color: #aeb8c7;
+  opacity: 1;
+}
+
+[data-theme="dark"] .page-pos--saas select option {
+  background: var(--pos-saas-input-bg);
+  color: #ffffff;
+}
+
 .page-pos--saas .pos-saas-input:focus,
 .page-pos--saas .pos-saas-select:focus {
   outline: none;
@@ -6340,11 +6404,6 @@ select {
   padding: 0.35rem 0 0.15rem;
 }
 
-/* Ventas POS en modo focus: sin subnav ni chrome del layout */
-.app-root--pos-focus .page-pos--saas {
-  padding: 0.35rem 0.65rem 0.5rem;
-}
-
 /* Ventas POS: llenar viewport bajo header + tabs + subnav; scroll solo en paneles */
 .main-pro-content:has(.page-pos--saas) {
   max-width: 100%;
@@ -6430,12 +6489,6 @@ select {
 }
 
 /* —— Finanzas (reutiliza tokens .page-pedidos; overrides solo presentación) —— */
-.page-pedidos.page-finanzas .pedidos-segmented__tab--active {
-  color: var(--pp-text);
-  background: var(--pp-card);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-}
-
 .page-pedidos.page-finanzas .pedidos-wizard-card {
   border-radius: 10px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
@@ -7570,45 +7623,14 @@ select {
   max-width: 40rem;
 }
 
-.page-pedidos .pedidos-segmented {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3px;
-  padding: 3px;
+.page-pedidos .pedidos-module-nav {
+  width: fit-content;
   margin-bottom: 14px;
-  border-radius: var(--pp-radius-md);
-  border: 1px solid var(--pp-line);
-  background: var(--pp-card);
-  box-shadow: var(--clay-shadow-a, 0 1px 2px rgba(0, 0, 0, 0.04));
 }
 
-.page-pedidos .pedidos-segmented__tab {
-  flex: 1 1 auto;
-  min-width: 0;
-  border: 0;
-  border-radius: var(--pp-radius-sm);
-  padding: 6px 12px;
+.page-pedidos .pedidos-module-nav .subnav-link {
   font-family: inherit;
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--pp-muted);
-  background: transparent;
   cursor: pointer;
-  transition:
-    background-color 0.16s ease,
-    color 0.16s ease,
-    box-shadow 0.16s ease;
-}
-
-.page-pedidos .pedidos-segmented__tab:hover {
-  color: var(--pp-text);
-  background: var(--pp-bg);
-}
-
-.page-pedidos .pedidos-segmented__tab--active {
-  color: var(--pp-text);
-  background: var(--pp-violet-soft);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pp-primary) 22%, transparent);
 }
 
 .page-pedidos .pedidos-wizard-card {
@@ -9293,74 +9315,6 @@ select {
 .app-root--customer-display {
   padding: clamp(1rem, 3vw, 2.25rem);
   box-sizing: border-box;
-}
-
-/* POS maximizado: sin sidebar, topbar ni pestañas del workspace */
-html.pos-focus-active,
-html.pos-focus-active body {
-  overflow: hidden;
-  height: 100%;
-}
-
-.app-root--pos-focus {
-  display: flex;
-  flex-direction: column;
-  min-height: 100dvh;
-  height: 100dvh;
-  max-height: 100dvh;
-  overflow: hidden;
-  background: var(--background);
-}
-
-.pos-focus-toolbar {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  padding: 0.4rem 0.75rem;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
-}
-
-.pos-focus-toolbar-title {
-  flex: 1 1 auto;
-  font-weight: 600;
-  font-size: 0.95rem;
-  color: var(--text);
-}
-
-.pos-focus-exit {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-}
-
-.pos-focus-kbd {
-  font-size: 0.72rem;
-  padding: 0.15rem 0.4rem;
-  border-radius: 4px;
-  border: 1px solid var(--border);
-  background: var(--input-bg);
-  color: var(--text-muted);
-}
-
-.pos-focus-body {
-  flex: 1 1 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.app-root--pos-focus .pos-focus-body > .page-pos--saas,
-.app-root--pos-focus .page-pos.page-pos--saas {
-  flex: 1 1 0;
-  min-height: 0;
-  height: 100%;
-}
-
-.app-root--pos-focus .pos-saas-btn-focus {
-  font-weight: 600;
 }
 
 .pos-client-display {
@@ -14275,6 +14229,12 @@ textarea:focus-visible {
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
+}
+
+.sales-history-header-actions:only-child,
+.cierre-dia-header-actions:only-child,
+.returns-header-actions:only-child {
+  margin-left: auto;
 }
 
 /* KPI cards */

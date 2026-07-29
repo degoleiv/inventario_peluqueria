@@ -32,6 +32,7 @@ import { inventarioAjusteService } from "./services/inventarioAjuste.service.js"
 import { inventarioCatalogoService } from "./services/inventarioCatalogo.service.js";
 import { promocionesService } from "./services/promociones.service.js";
 import { commissionService } from "./services/commission.service.js";
+import { devolucionService } from "./services/devolucion.service.js";
 import { turnoService } from "./services/turno.service.js";
 import { empleadoMovimientoService } from "./services/empleadoMovimiento.service.js";
 import { certificadoController } from "./controllers/certificado.controller.js";
@@ -962,6 +963,139 @@ export function registerHttpRoutes(app: Express) {
     })
   );
 
+  // ═══════════════════ Devoluciones ═══════════════════
+
+  api.get(
+    "/devoluciones",
+    requirePermiso("ventas"),
+    asyncHandler(async (_req, res) => {
+      const desde = typeof _req.query.desde === "string" ? _req.query.desde : undefined;
+      const hasta = typeof _req.query.hasta === "string" ? _req.query.hasta : undefined;
+      const estado = typeof _req.query.estado === "string" ? _req.query.estado : undefined;
+      const ventaIdRaw = _req.query.venta_id;
+      const venta_id = ventaIdRaw != null && Number.isFinite(Number(ventaIdRaw)) ? Number(ventaIdRaw) : undefined;
+      res.json(await devolucionService.list({ desde, hasta, estado, venta_id }));
+    })
+  );
+
+  api.get(
+    "/devoluciones/kpis",
+    requirePermiso("ventas"),
+    asyncHandler(async (req, res) => {
+      const desde = typeof req.query.desde === "string" ? req.query.desde : undefined;
+      const hasta = typeof req.query.hasta === "string" ? req.query.hasta : undefined;
+      res.json(await devolucionService.kpis(desde, hasta));
+    })
+  );
+
+  api.get(
+    "/devoluciones/motivos",
+    requirePermiso("ventas"),
+    asyncHandler(async (_req, res) => {
+      res.json(await devolucionService.motivos());
+    })
+  );
+
+  api.get(
+    "/devoluciones/venta/:ventaId/devuelto",
+    requirePermiso("ventas"),
+    asyncHandler(async (req, res) => {
+      const ventaId = Number(req.params.ventaId);
+      if (!Number.isFinite(ventaId)) { res.status(400).json({ error: "ventaId inválido" }); return; }
+      res.json(await devolucionService.devueltoPorVentaLinea(ventaId));
+    })
+  );
+
+  api.get(
+    "/devoluciones/:id",
+    requirePermiso("ventas"),
+    asyncHandler(async (req, res) => {
+      const id = parseId(req, res);
+      if (id == null) return;
+      res.json(await devolucionService.getById(id));
+    })
+  );
+
+  api.post(
+    "/devoluciones",
+    requirePermiso("ventas"),
+    asyncHandler(async (req, res) => {
+      const userId = req.user?.sub;
+      if (userId == null) { res.status(401).json({ error: "No autenticado" }); return; }
+      const data = await devolucionService.create(req.body as Record<string, unknown>, userId);
+      await auditService.log(userId, "crear", "devolucion", data.id, {
+        venta_id: data.venta_id,
+        total: data.total_devolucion,
+      });
+      res.status(201).json(data);
+    })
+  );
+
+  api.patch(
+    "/devoluciones/:id/aprobar",
+    requirePermiso("ventas"),
+    asyncHandler(async (req, res) => {
+      const id = parseId(req, res);
+      if (id == null) return;
+      const userId = req.user?.sub;
+      if (userId == null) { res.status(401).json({ error: "No autenticado" }); return; }
+      const data = await devolucionService.aprobar(id, userId);
+      await auditService.log(userId, "aprobar", "devolucion", id);
+      res.json(data);
+    })
+  );
+
+  api.patch(
+    "/devoluciones/:id/procesar",
+    requirePermiso("ventas"),
+    asyncHandler(async (req, res) => {
+      const id = parseId(req, res);
+      if (id == null) return;
+      const userId = req.user?.sub;
+      if (userId == null) { res.status(401).json({ error: "No autenticado" }); return; }
+      const b = req.body as Record<string, unknown>;
+      const data = await devolucionService.procesar(id, userId, {
+        metodo_reembolso: typeof b.metodo_reembolso === "string" ? b.metodo_reembolso : undefined,
+      });
+      await auditService.log(userId, "procesar", "devolucion", id);
+      res.json(data);
+    })
+  );
+
+  api.patch(
+    "/devoluciones/:id/rechazar",
+    requirePermiso("ventas"),
+    asyncHandler(async (req, res) => {
+      const id = parseId(req, res);
+      if (id == null) return;
+      const userId = req.user?.sub;
+      if (userId == null) { res.status(401).json({ error: "No autenticado" }); return; }
+      const b = req.body as Record<string, unknown>;
+      const motivo = typeof b.motivo === "string" ? b.motivo : "";
+      const data = await devolucionService.rechazar(id, userId, { motivo });
+      await auditService.log(userId, "rechazar", "devolucion", id, { motivo });
+      res.json(data);
+    })
+  );
+
+  api.patch(
+    "/devoluciones/:id/anular",
+    requirePermiso("ventas"),
+    asyncHandler(async (req, res) => {
+      const id = parseId(req, res);
+      if (id == null) return;
+      const userId = req.user?.sub;
+      if (userId == null) { res.status(401).json({ error: "No autenticado" }); return; }
+      const b = req.body as Record<string, unknown>;
+      const motivo = typeof b.motivo === "string" ? b.motivo : "";
+      const data = await devolucionService.anular(id, userId, { motivo });
+      await auditService.log(userId, "anular", "devolucion", id, { motivo });
+      res.json(data);
+    })
+  );
+
+  // ═══════════════════ Cierres de día ═══════════════════
+
   api.get(
     "/cierres-dia/resumen",
     requirePermiso("ventas"),
@@ -1265,6 +1399,14 @@ export function registerHttpRoutes(app: Express) {
         return;
       }
       res.json(await reporteService.ventasPorSemana(desde, hasta));
+    })
+  );
+
+  api.get(
+    "/reportes/inventario-resumen",
+    requirePermiso("reportes"),
+    asyncHandler(async (_req, res) => {
+      res.json(await reporteService.resumenInventario());
     })
   );
 

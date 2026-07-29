@@ -11,6 +11,7 @@ import {
   type SmtpPublicConfig,
 } from "../api";
 import { useToast } from "../context/ToastContext";
+import { formatMoney } from "../lib/money";
 import { PromptDialog } from "../components/PromptDialog";
 
 export function FacturasPage() {
@@ -263,7 +264,7 @@ export function FacturasPage() {
                     </td>
                     <td className="mono">{new Date(f.fecha_emision).toLocaleString()}</td>
                     <td>{f.cliente_nombre ?? "—"}</td>
-                    <td>{f.total.toFixed(2)}</td>
+                    <td>{formatMoney(f.total)}</td>
                     <td>#{f.venta_id}</td>
                     <td className="mono muted">
                       {f.email_enviado_at

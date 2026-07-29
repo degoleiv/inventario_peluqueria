@@ -218,6 +218,25 @@ export type DashboardStats = {
   proximas_citas_hoy: ProximaCitaDia[];
 };
 
+export type InventarioResumen = {
+  productos_total: number;
+  categorias_registradas: number;
+  categorias_con_productos: number;
+  unidades_stock: number;
+  valor_inventario_costo: number;
+  valor_inventario_venta: number;
+  productos_sin_categoria: number;
+  productos_bajo_stock: number;
+  categorias: Array<{
+    categoria: string;
+    emoji: string | null;
+    productos_count: number;
+    unidades_stock: number;
+    valor_costo: number;
+    valor_venta: number;
+  }>;
+};
+
 export type PuntosConfig = {
   activo: boolean;
   puntos_por_unidad_moneda: number;
@@ -1050,6 +1069,198 @@ export async function cancelarVenta(
   });
 }
 
+// ═══════════════════ Devoluciones ═══════════════════
+
+export type DevolucionEstado = "pendiente" | "aprobada" | "procesada" | "rechazada" | "anulada";
+
+export type DevolucionMotivo = {
+  id: number;
+  nombre: string;
+  descripcion: string | null;
+  activo: number;
+};
+
+export type Devolucion = {
+  id: number;
+  venta_id: number;
+  cliente_id: number | null;
+  usuario_id: number;
+  estado: DevolucionEstado;
+  motivo: string;
+  notas: string | null;
+  total_devolucion: number;
+  metodo_reembolso: string | null;
+  fecha: string;
+  created_at: string;
+  updated_at: string;
+  cliente_nombre: string | null;
+  vendedor_nombre: string | null;
+  venta_total: number;
+  num_productos: number;
+  num_servicios: number;
+};
+
+export type DevolucionProductoLinea = {
+  id: number;
+  devolucion_id: number;
+  venta_linea_id: number;
+  producto_id: number;
+  cantidad: number;
+  precio_unitario: number;
+  subtotal: number;
+  motivo_id: number | null;
+  notas: string | null;
+  producto_nombre: string;
+};
+
+export type DevolucionServicioLinea = {
+  id: number;
+  devolucion_id: number;
+  venta_servicio_id: number;
+  servicio_nombre: string;
+  cantidad: number;
+  valor_unitario: number;
+  subtotal: number;
+  motivo_id: number | null;
+  notas: string | null;
+};
+
+export type DevolucionAuditoriaEntry = {
+  id: number;
+  devolucion_id: number;
+  usuario_id: number | null;
+  accion: string;
+  estado_anterior: string | null;
+  estado_nuevo: string;
+  detalle_json: string | null;
+  created_at: string;
+  usuario_nombre: string | null;
+};
+
+export type DevolucionDetalle = Devolucion & {
+  productos: DevolucionProductoLinea[];
+  servicios: DevolucionServicioLinea[];
+  auditoria: DevolucionAuditoriaEntry[];
+  aprobado_por_nombre?: string | null;
+  procesado_por_nombre?: string | null;
+  rechazado_por_nombre?: string | null;
+  rechazado_motivo?: string | null;
+  anulado_por_nombre?: string | null;
+  anulado_motivo?: string | null;
+};
+
+export type DevolucionKpis = {
+  total_devoluciones: number;
+  monto_total_devuelto: number;
+  pendientes_count: number;
+  tasa_aprobacion: number;
+};
+
+export type VentaLineasDevueltas = {
+  producto: Record<number, number>;
+  servicio: Record<number, number>;
+};
+
+export async function fetchDevoluciones(params?: {
+  desde?: string;
+  hasta?: string;
+  estado?: string;
+}): Promise<Devolucion[]> {
+  const q = new URLSearchParams();
+  if (params?.desde) q.set("desde", params.desde);
+  if (params?.hasta) q.set("hasta", params.hasta);
+  if (params?.estado) q.set("estado", params.estado);
+  const suffix = q.toString() ? `?${q}` : "";
+  return requestJson(`/api/devoluciones${suffix}`);
+}
+
+export async function fetchDevolucion(id: number): Promise<DevolucionDetalle> {
+  return requestJson(`/api/devoluciones/${id}`);
+}
+
+export async function fetchDevolucionesKpis(
+  desde?: string,
+  hasta?: string
+): Promise<DevolucionKpis> {
+  const q = new URLSearchParams();
+  if (desde) q.set("desde", desde);
+  if (hasta) q.set("hasta", hasta);
+  const suffix = q.toString() ? `?${q}` : "";
+  return requestJson(`/api/devoluciones/kpis${suffix}`);
+}
+
+export async function fetchDevolucionMotivos(): Promise<DevolucionMotivo[]> {
+  return requestJson("/api/devoluciones/motivos");
+}
+
+export async function fetchVentaLineasDevueltas(ventaId: number): Promise<VentaLineasDevueltas> {
+  return requestJson(`/api/devoluciones/venta/${ventaId}/devuelto`);
+}
+
+export async function createDevolucion(body: {
+  venta_id: number;
+  motivo: string;
+  notas?: string | null;
+  productos: Array<{
+    venta_linea_id: number;
+    producto_id: number;
+    cantidad: number;
+    precio_unitario: number;
+    motivo_id?: number;
+  }>;
+  servicios?: Array<{
+    venta_servicio_id: number;
+    servicio_nombre: string;
+    cantidad: number;
+    valor_unitario: number;
+    motivo_id?: number;
+  }>;
+}): Promise<DevolucionDetalle> {
+  return requestJson("/api/devoluciones", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function aprobarDevolucion(id: number): Promise<DevolucionDetalle> {
+  return requestJson(`/api/devoluciones/${id}/aprobar`, {
+    method: "PATCH",
+    body: JSON.stringify({}),
+  });
+}
+
+export async function procesarDevolucion(
+  id: number,
+  body?: { metodo_reembolso?: string }
+): Promise<DevolucionDetalle> {
+  return requestJson(`/api/devoluciones/${id}/procesar`, {
+    method: "PATCH",
+    body: JSON.stringify(body ?? {}),
+  });
+}
+
+export async function rechazarDevolucion(
+  id: number,
+  body: { motivo: string }
+): Promise<DevolucionDetalle> {
+  return requestJson(`/api/devoluciones/${id}/rechazar`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function anularDevolucion(
+  id: number,
+  body: { motivo: string }
+): Promise<DevolucionDetalle> {
+  return requestJson(`/api/devoluciones/${id}/anular`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+// ═══════════════════ Cierre de día ═══════════════════
+
 export type MontosPorCanalCierre = Record<string, number>;
 
 export type CanalCierreMeta = {
@@ -1093,9 +1304,26 @@ export type LineaServicioCierre = {
   subtotal: number;
 };
 
+export type ResumenPorEmpleado = {
+  profesional_id: number | null;
+  profesional_nombre: string | null;
+  servicios_cantidad: number;
+  servicios_total: number;
+  servicios: { servicio_nombre: string; cantidad: number; valor_unitario: number; subtotal: number }[];
+};
+
+export type ResumenPorTipoServicio = {
+  servicio_nombre: string;
+  cantidad: number;
+  subtotal: number;
+  profesionales: { profesional_nombre: string | null; cantidad: number; valor_unitario: number; subtotal: number }[];
+};
+
 export type VentasDiaDetalle = {
   productos: LineaProductoCierre[];
   servicios: LineaServicioCierre[];
+  por_empleado: ResumenPorEmpleado[];
+  por_tipo_servicio: ResumenPorTipoServicio[];
   total_productos: number;
   total_servicios: number;
 };
@@ -1468,6 +1696,10 @@ export async function probarSmtpEmail(email: string): Promise<{ ok: boolean }> {
 /* Reportes */
 export async function fetchDashboard(): Promise<DashboardStats> {
   return requestJson("/api/reportes/dashboard");
+}
+
+export async function fetchInventarioResumen(): Promise<InventarioResumen> {
+  return requestJson("/api/reportes/inventario-resumen");
 }
 
 export async function fetchReporteVentas(desde?: string, hasta?: string): Promise<Venta[]> {

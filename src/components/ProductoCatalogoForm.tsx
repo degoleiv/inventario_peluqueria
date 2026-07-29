@@ -3,11 +3,10 @@ import { Link } from "react-router-dom";
 import { Plus } from "@phosphor-icons/react";
 import { resolveImageSrc } from "../api";
 import {
-  filterDecimalTyping,
   filterIntegerTyping,
-  parseOptionalDecimal,
   parseOptionalNonNegativeInt,
 } from "../lib/decimalInput";
+import { formatMoneyForInput, parseMoneyInput } from "../lib/money";
 import { SearchableSelect } from "./SearchableSelect";
 import { useToast } from "../context/ToastContext";
 import { PromptDialog } from "./PromptDialog";
@@ -361,34 +360,36 @@ export function ProductoCatalogoForm({
                   {cat.error}
                 </div>
               ) : null}
-              <div className="grid-2">
-                <SearchableSelect
-                  label="Proveedor *"
-                  value={values.proveedorId === "" ? "" : String(values.proveedorId)}
-                  onChange={(v) => {
-                    if (v === "") {
-                      onChange({ proveedorId: "", marca: "" });
-                      return;
+              <div className={proveedorResumen ? "producto-catalogo-cat-row producto-catalogo-cat-row--solo" : "grid-2"}>
+                {!proveedorResumen ? (
+                  <SearchableSelect
+                    label="Proveedor *"
+                    value={values.proveedorId === "" ? "" : String(values.proveedorId)}
+                    onChange={(v) => {
+                      if (v === "") {
+                        onChange({ proveedorId: "", marca: "" });
+                        return;
+                      }
+                      const id = Number(v);
+                      const pr = cat.proveedores.find((p) => p.id === id);
+                      onChange({ proveedorId: id, marca: pr?.nombre ?? "" });
+                    }}
+                    options={cat.proveedores.map((p) => ({
+                      value: String(p.id),
+                      label: p.nombre,
+                    }))}
+                    disabled={cat.loading}
+                    onPanelOpen={cat.onCatalogPanelOpen}
+                    emptySlot={provEmptySlot}
+                    hint={
+                      proveedorInactivoSeleccionado
+                        ? "El proveedor asignado está inactivo. Elegí uno de la lista."
+                        : cat.loading
+                          ? "Cargando proveedores…"
+                          : null
                     }
-                    const id = Number(v);
-                    const pr = cat.proveedores.find((p) => p.id === id);
-                    onChange({ proveedorId: id, marca: pr?.nombre ?? "" });
-                  }}
-                  options={cat.proveedores.map((p) => ({
-                    value: String(p.id),
-                    label: p.nombre,
-                  }))}
-                  disabled={cat.loading}
-                  onPanelOpen={cat.onCatalogPanelOpen}
-                  emptySlot={provEmptySlot}
-                  hint={
-                    proveedorInactivoSeleccionado
-                      ? "El proveedor asignado está inactivo. Elegí uno de la lista."
-                      : cat.loading
-                        ? "Cargando proveedores…"
-                        : null
-                  }
-                />
+                  />
+                ) : null}
                 <div className="producto-categoria-field">
                   <SearchableSelect
                     label="Categoría *"
@@ -456,11 +457,11 @@ export function ProductoCatalogoForm({
           <span>Precio compra</span>
           <input
             type="text"
-            inputMode="decimal"
+            inputMode="numeric"
             autoComplete="off"
             className="input-numeric"
-            value={values.precioCompra === "" ? "" : String(values.precioCompra)}
-            onChange={(e) => onChange({ precioCompra: parseOptionalDecimal(e.target.value) })}
+            value={values.precioCompra === "" ? "" : formatMoneyForInput(values.precioCompra)}
+            onChange={(e) => onChange({ precioCompra: parseMoneyInput(e.target.value) })}
           />
         </label>
       ) : (
@@ -469,25 +470,25 @@ export function ProductoCatalogoForm({
             <span>Precio compra</span>
             <input
               type="text"
-              inputMode="decimal"
+              inputMode="numeric"
               autoComplete="off"
               className="input-numeric"
-              value={values.precioCompra === "" ? "" : String(values.precioCompra)}
-              onChange={(e) => onChange({ precioCompra: parseOptionalDecimal(e.target.value) })}
-              placeholder="Ej. 6000"
+              value={values.precioCompra === "" ? "" : formatMoneyForInput(values.precioCompra)}
+              onChange={(e) => onChange({ precioCompra: parseMoneyInput(e.target.value) })}
+              placeholder="Ej. 6.000"
             />
           </label>
           <label className="field">
             <span>Precio venta *</span>
             <input
               type="text"
-              inputMode="decimal"
+              inputMode="numeric"
               autoComplete="off"
               className="input-numeric"
               required
-              value={values.precioVenta === "" ? "" : String(values.precioVenta)}
-              onChange={(e) => onChange({ precioVenta: parseOptionalDecimal(e.target.value) })}
-              placeholder="Ej. 15000"
+              value={values.precioVenta === "" ? "" : formatMoneyForInput(values.precioVenta)}
+              onChange={(e) => onChange({ precioVenta: parseMoneyInput(e.target.value) })}
+              placeholder="Ej. 15.000"
             />
           </label>
         </div>

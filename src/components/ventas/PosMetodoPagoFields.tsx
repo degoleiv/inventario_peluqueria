@@ -1,5 +1,5 @@
 import type { MedioPagoTransferencia } from "../../api";
-import { filterDecimalTyping } from "../../lib/decimalInput";
+import { formatMoney, filterMoneyTyping, formatMoneyForInput, parseMoneyInput } from "../../lib/money";
 import {
   etiquetaMedioTransferencia,
   mediosTransferenciaActivos,
@@ -17,13 +17,6 @@ type Props = {
   medios: MedioPagoTransferencia[];
   totalVenta: number;
 };
-
-const moneyPos = new Intl.NumberFormat("es-AR", {
-  style: "currency",
-  currency: "ARS",
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 0,
-});
 
 function LlaveTransferenciaPicker({
   value,
@@ -112,7 +105,7 @@ function MixtoMedioRow({
         <div className="pos-saas-mixto-monto pos-saas-mixto-monto--readonly">
           <span className="pos-saas-field-label">Monto</span>
           <output className="pos-saas-mixto-monto-value mono" aria-live="polite">
-            {typeof monto === "number" && monto > 0 ? moneyPos.format(monto) : "—"}
+            {typeof monto === "number" && monto > 0 ? formatMoney(monto) : "—"}
           </output>
         </div>
       ) : onMonto ? (
@@ -120,12 +113,12 @@ function MixtoMedioRow({
           <span className="pos-saas-field-label">Monto *</span>
           <input
             type="text"
-            inputMode="decimal"
+            inputMode="numeric"
             autoComplete="off"
             className="pos-saas-input mono input-numeric"
             placeholder="0"
-            value={monto === "" || monto == null ? "" : monto}
-            onChange={(e) => onMonto(filterDecimalTyping(e.target.value))}
+            value={monto === "" || monto == null ? "" : formatMoneyForInput(monto)}
+            onChange={(e) => onMonto(filterMoneyTyping(e.target.value))}
           />
         </label>
       ) : null}
@@ -154,7 +147,7 @@ export function PosMetodoPagoFields({ value, onChange, medios, totalVenta }: Pro
       <div className="pos-saas-pago-detalle pos-saas-pago-detalle--mixto">
         <p className="muted small pos-saas-mixto-hint">
           Elegí los dos medios. Ingresá el monto del medio 1; el medio 2 se completa con el resto (
-          {moneyPos.format(totalVenta)} total).
+          {formatMoney(totalVenta)} total).
         </p>
         <MixtoMedioRow
           label="Medio 1 *"
@@ -167,10 +160,8 @@ export function PosMetodoPagoFields({ value, onChange, medios, totalVenta }: Pro
           medios={medios}
           monto={value.mixto1Monto ?? ""}
           onMonto={(raw) => {
-            const n = raw.trim() === "" ? "" : Number(raw.replace(",", "."));
-            onChange({
-              mixto1Monto: raw.trim() === "" || !Number.isFinite(n) ? "" : Math.max(0, n),
-            });
+            const parsed = parseMoneyInput(raw);
+            onChange({ mixto1Monto: parsed === "" ? "" : parsed });
           }}
         />
         <MixtoMedioRow

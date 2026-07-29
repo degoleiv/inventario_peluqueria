@@ -8,18 +8,7 @@ import {
   useNavigate,
 } from "react-router-dom";
 import { CommandPalette, type PaletteAction } from "./components/CommandPalette";
-import { DashboardPage } from "./pages/DashboardPage";
-import { InventarioPage } from "./pages/InventarioPage";
-import { ClientesPage } from "./pages/ClientesPage";
-import { CitasPage } from "./pages/CitasPage";
-import { VentasPage } from "./pages/VentasPage";
-import { VentaClienteDisplayPage } from "./pages/VentaClienteDisplayPage";
-import { PedidosModulePage } from "./pages/PedidosModulePage";
-import { ProveedoresPage } from "./pages/ProveedoresPage";
-import { FinanzasPage } from "./pages/FinanzasPage";
-import { ReportesPage } from "./pages/ReportesPage";
-import { ConfiguracionPage } from "./pages/ConfiguracionPage";
-import { EmpleadosPage } from "./pages/EmpleadosPage";
+import { TabbedOutlet } from "./components/TabbedOutlet";
 import { AppLayout } from "./layout/AppLayout";
 import { WorkspaceTabsProvider, clearWorkspaceTabsStorage } from "./context/WorkspaceTabsContext";
 import { PosFocusProvider } from "./context/PosFocusContext";
@@ -38,15 +27,8 @@ import {
 } from "./api";
 import { clearAccessToken } from "./auth/token";
 import { applyBrandingToDocument } from "./lib/brandingDocument";
-import {
-  getModuleEntryPath,
-  pathToNavKey,
-  readCitasTab,
-  readConfigTab,
-  readEmpleadosTab,
-  readInventarioTab,
-  readVentasTab,
-} from "./lib/moduleRoutes";
+import { getModuleEntryPath, pathToNavKey } from "./lib/moduleRoutes";
+import { MODULE_ROUTE_DEFS } from "./lib/moduleRouteDefs";
 export function AuthenticatedShell() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -312,6 +294,7 @@ export function AuthenticatedShell() {
           hideModuleHeader
         >
           <Outlet />
+          <TabbedOutlet />
         </AppLayout>
         </PosFocusProvider>
       </WorkspaceTabsProvider>
@@ -330,53 +313,13 @@ export function AuthenticatedRoutes() {
     <Routes>
       <Route path="/" element={<AuthenticatedShell />}>
         <Route index element={<Navigate to="inicio" replace />} />
-        <Route path="inicio" element={<DashboardPage />} />
-        <Route path="citas" element={<Navigate to={`/citas/${readCitasTab()}`} replace />} />
-        <Route path="citas/:tab" element={<CitasPage />} />
-        <Route path="ventas/pantalla-cliente" element={<VentaClienteDisplayPage />} />
-        <Route
-          path="ventas"
-          element={<Navigate to={`/ventas/${readVentasTab()}`} replace />}
-        />
-        <Route path="ventas/:tab" element={<VentasPage />} />
-        <Route
-          path="inventario"
-          element={
-            <Navigate to={`/inventario/${readInventarioTab()}`} replace />
-          }
-        />
-        <Route path="inventario/:tab" element={<InventarioPage />} />
-        <Route path="clientes" element={<ClientesPage />} />
-        <Route path="clientes/:tab" element={<Navigate to="/clientes" replace />} />
-        <Route path="compras" element={<Navigate to="/pedidos" replace />} />
-        <Route path="proveedores" element={<ProveedoresPage />} />
-        <Route
-          path="pedidos-proveedores"
-          element={<Navigate to="/pedidos" replace />}
-        />
-        <Route path="pedidos" element={<PedidosModulePage />} />
-        <Route path="pedidos/:tab" element={<PedidosModulePage />} />
-        <Route path="finanzas" element={<FinanzasPage />} />
-        <Route path="facturas" element={<Navigate to="/finanzas" replace />} />
-        <Route path="reportes" element={<ReportesPage />} />
-        <Route path="usuarios" element={<Navigate to={`/empleados/${readEmpleadosTab()}`} replace />} />
-        <Route
-          path="configuracion"
-          element={<Navigate to={`/configuracion/${readConfigTab()}`} replace />}
-        />
-        <Route path="configuracion/:tab" element={<ConfiguracionPage />} />
-        <Route
-          path="empleados"
-          element={<Navigate to={`/empleados/${readEmpleadosTab()}`} replace />}
-        />
-        <Route
-          path="empleados/:tab"
-          element={
-            <EmpleadosPage
-              onChanged={() => window.dispatchEvent(new Event("peluqueria-auth-refresh"))}
-            />
-          }
-        />
+        {MODULE_ROUTE_DEFS.map((d) => (
+          // El contenido real lo pinta <TabbedOutlet/> (una instancia por pestaña
+          // de trabajo abierta); este <Routes> real solo se conserva para que
+          // sigan disparando los <Navigate> de rutas legacy/bare (element=null
+          // en las de contenido evita montarlas dos veces).
+          <Route key={d.path} path={d.path} element={d.redirect ? d.element : null} />
+        ))}
       </Route>
     </Routes>
   );

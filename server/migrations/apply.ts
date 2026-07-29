@@ -835,6 +835,109 @@ const MIGRATIONS: Migration[] = [
       `);
     },
   },
+
+  // ══════════════════════════════════════════
+  // 009 — Módulo de devoluciones
+  // ══════════════════════════════════════════
+  {
+    id: "009_devoluciones",
+    up: async (db) => {
+      await db.exec(`
+        CREATE TABLE IF NOT EXISTS devolucion_motivos (
+          id          INTEGER PRIMARY KEY AUTOINCREMENT,
+          nombre      TEXT NOT NULL,
+          descripcion TEXT,
+          activo      INTEGER NOT NULL DEFAULT 1,
+          created_at  TEXT NOT NULL
+        )
+      `);
+      await db.exec(`
+        INSERT OR IGNORE INTO devolucion_motivos (id, nombre, descripcion, activo, created_at) VALUES
+          (1, 'Producto defectuoso',  'El producto presenta defectos o daños',             1, datetime('now','localtime')),
+          (2, 'Error en la venta',    'Se cobró un producto o servicio incorrecto',         1, datetime('now','localtime')),
+          (3, 'Cliente insatisfecho', 'El cliente no quedó conforme con el resultado',      1, datetime('now','localtime')),
+          (4, 'Producto vencido',     'El producto estaba vencido al momento de la venta',  1, datetime('now','localtime')),
+          (5, 'Duplicado',            'Se cobró dos veces el mismo ítem',                   1, datetime('now','localtime')),
+          (6, 'Otro',                 'Motivo no especificado',                             1, datetime('now','localtime'))
+      `);
+
+      await db.exec(`
+        CREATE TABLE IF NOT EXISTS devoluciones (
+          id                INTEGER PRIMARY KEY AUTOINCREMENT,
+          venta_id          INTEGER NOT NULL REFERENCES ventas(id),
+          cliente_id        INTEGER REFERENCES clientes(id) ON DELETE SET NULL,
+          usuario_id        INTEGER NOT NULL REFERENCES usuarios(id),
+          estado            TEXT NOT NULL DEFAULT 'pendiente',
+          motivo            TEXT NOT NULL,
+          notas             TEXT,
+          total_devolucion  REAL NOT NULL DEFAULT 0,
+          metodo_reembolso  TEXT,
+          fecha             TEXT NOT NULL,
+          aprobado_por      INTEGER REFERENCES usuarios(id),
+          aprobado_at       TEXT,
+          procesado_por     INTEGER REFERENCES usuarios(id),
+          procesado_at      TEXT,
+          rechazado_por     INTEGER REFERENCES usuarios(id),
+          rechazado_at      TEXT,
+          rechazado_motivo  TEXT,
+          anulado_por       INTEGER REFERENCES usuarios(id),
+          anulado_at        TEXT,
+          anulado_motivo    TEXT,
+          created_at        TEXT NOT NULL,
+          updated_at        TEXT NOT NULL
+        )
+      `);
+      await db.exec(`CREATE INDEX IF NOT EXISTS idx_devoluciones_venta   ON devoluciones(venta_id)`);
+      await db.exec(`CREATE INDEX IF NOT EXISTS idx_devoluciones_estado  ON devoluciones(estado)`);
+      await db.exec(`CREATE INDEX IF NOT EXISTS idx_devoluciones_fecha   ON devoluciones(fecha)`);
+      await db.exec(`CREATE INDEX IF NOT EXISTS idx_devoluciones_cliente ON devoluciones(cliente_id)`);
+
+      await db.exec(`
+        CREATE TABLE IF NOT EXISTS devolucion_productos (
+          id              INTEGER PRIMARY KEY AUTOINCREMENT,
+          devolucion_id   INTEGER NOT NULL REFERENCES devoluciones(id) ON DELETE CASCADE,
+          venta_linea_id  INTEGER NOT NULL REFERENCES venta_lineas(id),
+          producto_id     INTEGER NOT NULL REFERENCES productos(id),
+          cantidad        INTEGER NOT NULL,
+          precio_unitario REAL NOT NULL,
+          subtotal        REAL NOT NULL,
+          motivo_id       INTEGER REFERENCES devolucion_motivos(id),
+          notas           TEXT
+        )
+      `);
+      await db.exec(`CREATE INDEX IF NOT EXISTS idx_devprod_devolucion   ON devolucion_productos(devolucion_id)`);
+      await db.exec(`CREATE INDEX IF NOT EXISTS idx_devprod_venta_linea  ON devolucion_productos(venta_linea_id)`);
+
+      await db.exec(`
+        CREATE TABLE IF NOT EXISTS devolucion_servicios (
+          id                INTEGER PRIMARY KEY AUTOINCREMENT,
+          devolucion_id     INTEGER NOT NULL REFERENCES devoluciones(id) ON DELETE CASCADE,
+          venta_servicio_id INTEGER NOT NULL REFERENCES venta_servicios(id),
+          servicio_nombre   TEXT NOT NULL,
+          cantidad          INTEGER NOT NULL DEFAULT 1,
+          valor_unitario    REAL NOT NULL,
+          subtotal          REAL NOT NULL,
+          motivo_id         INTEGER REFERENCES devolucion_motivos(id),
+          notas             TEXT
+        )
+      `);
+      await db.exec(`CREATE INDEX IF NOT EXISTS idx_devsvc_devolucion ON devolucion_servicios(devolucion_id)`);
+
+      await db.exec(`
+        CREATE TABLE IF NOT EXISTS devolucion_auditoria (
+          id              INTEGER PRIMARY KEY AUTOINCREMENT,
+          devolucion_id   INTEGER NOT NULL REFERENCES devoluciones(id) ON DELETE CASCADE,
+          usuario_id      INTEGER REFERENCES usuarios(id),
+          accion          TEXT NOT NULL,
+          estado_anterior TEXT,
+          estado_nuevo    TEXT NOT NULL,
+          detalle_json    TEXT,
+          created_at      TEXT NOT NULL
+        )
+      `);
+      await db.exec(`CREATE INDEX IF NOT EXISTS idx_devaudit_devolucion ON devolucion_auditoria(devolucion_id)`);
+    },
+  },
 ];
 
 // ─────────────────────────────────────────────

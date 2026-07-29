@@ -8,13 +8,7 @@ type SaleSuccessModalProps = {
   onClose: () => void;
 };
 
-function formatMoney(n: number) {
-  return new Intl.NumberFormat("es-AR", {
-    style: "currency",
-    currency: "ARS",
-    maximumFractionDigits: 0,
-  }).format(n);
-}
+import { formatMoney } from "../../lib/money";
 
 export function SaleSuccessModal({ open, total, invoiceNumber, onClose }: SaleSuccessModalProps) {
   const timerRef = useRef<number | null>(null);

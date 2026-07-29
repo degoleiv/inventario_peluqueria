@@ -1,5 +1,6 @@
 import { db } from "../db.js";
 import { AppError } from "../lib/AppError.js";
+import { rangoDiaCalendario, SQL_VENTAS_EN_RANGO_DIA } from "../lib/localDate.js";
 import {
   isOurMediaUrl,
   saveGastoComprobanteDataUrl,
@@ -176,23 +177,28 @@ export const finanzaService = {
 
   /** Ingresos por ventas, egresos por gastos operativos + total pedidos a proveedores en el período. */
   async flujoCaja(desde: string, hasta: string) {
+    const { desde: d, hasta: h } = rangoDiaCalendario(desde, hasta);
     const ingresos = (await db
-      .prepare(`SELECT COALESCE(SUM(total), 0) AS s FROM ventas WHERE fecha >= ? AND fecha <= ?`)
-      .get(desde, hasta)) as { s: number };
+      .prepare(
+        `SELECT COALESCE(SUM(total), 0) AS s, COUNT(*) AS n
+         FROM ventas WHERE ${SQL_VENTAS_EN_RANGO_DIA}`
+      )
+      .get(d, h)) as { s: number; n: number };
     const egresosGastos = (await db
       .prepare(
         `SELECT COALESCE(SUM(monto), 0) AS s FROM gastos_operativos WHERE fecha >= ? AND fecha <= ?`
       )
-      .get(desde.slice(0, 10), hasta.slice(0, 10))) as { s: number };
+      .get(d, h)) as { s: number };
     const egresosPedidos = (await db
       .prepare(
         `SELECT COALESCE(SUM(total), 0) AS s FROM pedidos_proveedor WHERE fecha >= ? AND fecha <= ?`
       )
-      .get(desde.slice(0, 10), hasta.slice(0, 10))) as { s: number };
+      .get(d, h)) as { s: number };
     const egresos = egresosGastos.s + egresosPedidos.s;
     return {
-      periodo: { desde, hasta },
+      periodo: { desde: d, hasta: h },
       ingresos_ventas: ingresos.s,
+      cantidad_ventas: ingresos.n,
       egresos_gastos: egresosGastos.s,
       /** Total facturado en pedidos (líneas de stock), mismo concepto que antes con compras. */
       egresos_pedidos_proveedor: egresosPedidos.s,

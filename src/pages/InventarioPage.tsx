@@ -28,6 +28,7 @@ import { SkeletonCard } from "../components/Skeleton";
 import { useToast } from "../context/ToastContext";
 import { SubNav } from "../components/SubNav";
 import { filterIntegerTyping, parseOptionalNonNegativeInt } from "../lib/decimalInput";
+import { formatMoney } from "../lib/money";
 import { INVENTARIO_TABS, readInventarioTab, type InventarioTab } from "../lib/moduleRoutes";
 
 function productoStockBadgeClass(p: Producto): string {
@@ -760,9 +761,6 @@ export function InventarioPage() {
             <button type="button" className="btn primary" onClick={openNuevoProducto}>
               Nuevo producto
             </button>
-            <button type="button" className="btn ghost small" onClick={() => void load()}>
-              Actualizar
-            </button>
           </div>
         </div>
         <div className="inventario-filtros">
@@ -902,7 +900,7 @@ export function InventarioPage() {
                     <span className="inventario-producto-card__stat">
                       <span className="inventario-producto-card__precio">
                         {(p.precio_venta ?? p.precio) != null
-                          ? `$${Math.round(p.precio_venta ?? p.precio ?? 0).toLocaleString("es-CO")}`
+                          ? formatMoney(p.precio_venta ?? p.precio ?? 0)
                           : "—"}
                       </span>
                     </span>
@@ -1046,14 +1044,14 @@ export function InventarioPage() {
               <dt className="muted small">Precio compra</dt>
               <dd style={{ margin: 0 }}>
                 {viewingProduct.precio_compra != null
-                  ? viewingProduct.precio_compra.toFixed(2)
+                  ? formatMoney(viewingProduct.precio_compra)
                   : "—"}
               </dd>
 
               <dt className="muted small">Precio venta</dt>
               <dd style={{ margin: 0 }}>
                 {(viewingProduct.precio_venta ?? viewingProduct.precio) != null
-                  ? (viewingProduct.precio_venta ?? viewingProduct.precio)!.toFixed(2)
+                  ? formatMoney((viewingProduct.precio_venta ?? viewingProduct.precio)!)
                   : "—"}
               </dd>
 

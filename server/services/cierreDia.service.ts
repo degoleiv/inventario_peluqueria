@@ -43,9 +43,37 @@ export type LineaServicioCierre = {
   subtotal: number;
 };
 
+export type LineaServicioDetalleCierre = {
+  venta_id: number;
+  servicio_nombre: string;
+  profesional_id: number | null;
+  profesional_nombre: string | null;
+  cliente_nombre: string | null;
+  cantidad: number;
+  valor_unitario: number;
+  subtotal: number;
+};
+
+export type ResumenPorEmpleado = {
+  profesional_id: number | null;
+  profesional_nombre: string | null;
+  servicios_cantidad: number;
+  servicios_total: number;
+  servicios: { servicio_nombre: string; cantidad: number; valor_unitario: number; subtotal: number }[];
+};
+
+export type ResumenPorTipoServicio = {
+  servicio_nombre: string;
+  cantidad: number;
+  subtotal: number;
+  profesionales: { profesional_nombre: string | null; cantidad: number; valor_unitario: number; subtotal: number }[];
+};
+
 export type DetalleVentasDia = {
   productos: LineaProductoCierre[];
   servicios: LineaServicioCierre[];
+  por_empleado: ResumenPorEmpleado[];
+  por_tipo_servicio: ResumenPorTipoServicio[];
   total_productos: number;
   total_servicios: number;
 };
@@ -109,8 +137,72 @@ async function detalleVentasDelDia(fecha: string): Promise<DetalleVentasDia> {
     )
     .all(fecha)) as LineaServicioCierre[];
 
+  const serviciosLineas = (await db
+    .prepare(
+      `SELECT vs.id AS linea_id,
+              vs.usuario_id AS profesional_id,
+              u.nombre AS profesional_nombre,
+              vs.servicio_nombre,
+              vs.cantidad,
+              vs.valor_unitario,
+              vs.subtotal
+       FROM venta_servicios vs
+       JOIN ventas v ON v.id = vs.venta_id
+       LEFT JOIN usuarios u ON u.id = vs.usuario_id
+       WHERE date(v.fecha) = date(?)
+         AND COALESCE(v.estado, 'confirmada') != 'cancelada'
+       ORDER BY u.nombre COLLATE NOCASE ASC, vs.servicio_nombre COLLATE NOCASE ASC`
+    )
+    .all(fecha)) as { linea_id: number; profesional_id: number | null; profesional_nombre: string | null; servicio_nombre: string; cantidad: number; valor_unitario: number; subtotal: number }[];
+
   const total_productos = productos.reduce((s, r) => s + Number(r.subtotal || 0), 0);
   const total_servicios = servicios.reduce((s, r) => s + Number(r.subtotal || 0), 0);
+
+  const empleadoMap = new Map<number | null, ResumenPorEmpleado>();
+  for (const row of serviciosLineas) {
+    const key = row.profesional_id;
+    let emp = empleadoMap.get(key);
+    if (!emp) {
+      emp = {
+        profesional_id: key,
+        profesional_nombre: row.profesional_nombre ?? null,
+        servicios_cantidad: 0,
+        servicios_total: 0,
+        servicios: [],
+      };
+      empleadoMap.set(key, emp);
+    }
+    const cant = Number(row.cantidad) || 0;
+    const sub = Number(row.subtotal) || 0;
+    emp.servicios_cantidad += cant;
+    emp.servicios_total += sub;
+    emp.servicios.push({
+      servicio_nombre: row.servicio_nombre,
+      cantidad: cant,
+      valor_unitario: Number(row.valor_unitario) || 0,
+      subtotal: sub,
+    });
+  }
+
+  const tipoMap = new Map<string, ResumenPorTipoServicio>();
+  for (const row of serviciosLineas) {
+    const key = row.servicio_nombre;
+    let tipo = tipoMap.get(key);
+    if (!tipo) {
+      tipo = { servicio_nombre: key, cantidad: 0, subtotal: 0, profesionales: [] };
+      tipoMap.set(key, tipo);
+    }
+    const cant = Number(row.cantidad) || 0;
+    const sub = Number(row.subtotal) || 0;
+    tipo.cantidad += cant;
+    tipo.subtotal += sub;
+    tipo.profesionales.push({
+      profesional_nombre: row.profesional_nombre ?? null,
+      cantidad: cant,
+      valor_unitario: Number(row.valor_unitario) || 0,
+      subtotal: sub,
+    });
+  }
 
   return {
     productos: productos.map((r) => ({
@@ -125,6 +217,8 @@ async function detalleVentasDelDia(fecha: string): Promise<DetalleVentasDia> {
       cantidad: Number(r.cantidad) || 0,
       subtotal: Number(r.subtotal) || 0,
     })),
+    por_empleado: [...empleadoMap.values()],
+    por_tipo_servicio: [...tipoMap.values()],
     total_productos,
     total_servicios,
   };

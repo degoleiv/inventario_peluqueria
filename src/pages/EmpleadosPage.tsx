@@ -35,6 +35,7 @@ import { esEmpleadoSalarioFijo } from "../lib/nominaEmpleado";
 import { EMPLEADOS_TABS, readEmpleadosTab, type EmpleadosTab } from "../lib/moduleRoutes";
 import { NAV_LABEL, PERMISO_MODULOS, type PermisoModulo } from "../nav";
 import { useToast } from "../context/ToastContext";
+import { formatMoney, filterMoneyTyping, parseMoneyLoose } from "../lib/money";
 import { CircleNotch, Download, PencilSimple, Plus, Trash } from "@phosphor-icons/react";
 
 type Props = { onChanged?: () => void };
@@ -71,10 +72,6 @@ function isoDesdeHaceDiasInclusive(dias: number) {
   const d = new Date();
   d.setDate(d.getDate() - (dias - 1));
   return d.toISOString().slice(0, 10);
-}
-
-function formatMoney(n: number) {
-  return new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 }).format(n);
 }
 
 function emptyPermMods(): Record<PermisoModulo, boolean> {
@@ -306,7 +303,7 @@ export function EmpleadosPage({ onChanged }: Props) {
   async function onSubmitDrawer(e: React.FormEvent) {
     e.preventDefault();
     try {
-      const vc = Number(form.valor_comision.replace(",", "."));
+      const vc = parseMoneyLoose(form.valor_comision);
       const salarioFijo = esEmpleadoSalarioFijo(form.rol, form.tipo_comision);
       const tipoComision = salarioFijo ? "salario" : form.tipo_comision;
       let turno_inicial: TurnoPlantillaInicial | undefined;
@@ -1087,7 +1084,7 @@ export function EmpleadosPage({ onChanged }: Props) {
                 toast("Elegí empleado.", "warning");
                 return;
               }
-              const monto = Number(movForm.monto.replace(",", "."));
+              const monto = parseMoneyLoose(movForm.monto);
               if (!Number.isFinite(monto) || monto <= 0) {
                 toast("Monto inválido.", "warning");
                 return;
@@ -1131,8 +1128,12 @@ export function EmpleadosPage({ onChanged }: Props) {
               <label className="field">
                 <span>Monto</span>
                 <input
+                  className="input-numeric"
+                  inputMode="numeric"
                   value={movForm.monto}
-                  onChange={(e) => setMovForm((x) => ({ ...x, monto: e.target.value }))}
+                  onChange={(e) =>
+                    setMovForm((x) => ({ ...x, monto: filterMoneyTyping(e.target.value) }))
+                  }
                 />
               </label>
               <label className="field">
@@ -1260,11 +1261,7 @@ export function EmpleadosPage({ onChanged }: Props) {
                 <div style={{ fontSize: "1.25rem", marginTop: "0.35rem" }}>
                   Total a pagar (todas):{" "}
                   <strong>
-                    {new Intl.NumberFormat("es-AR", {
-                      style: "currency",
-                      currency: "ARS",
-                      minimumFractionDigits: 2,
-                    }).format(liqData.total_general)}
+                    {formatMoney(liqData.total_general)}
                   </strong>
                 </div>
               </div>
@@ -1308,11 +1305,7 @@ export function EmpleadosPage({ onChanged }: Props) {
                           </div>
                           <div style={{ fontSize: "1.15rem" }}>
                             <strong>
-                              {new Intl.NumberFormat("es-AR", {
-                                style: "currency",
-                                currency: "ARS",
-                                minimumFractionDigits: 2,
-                              }).format(emp.total_comisiones)}
+                              {formatMoney(emp.total_comisiones)}
                             </strong>
                           </div>
                         </div>
@@ -1340,20 +1333,10 @@ export function EmpleadosPage({ onChanged }: Props) {
                                     <td>{ln.origen === "venta" ? "Venta" : "Cita"}</td>
                                     <td>{ln.detalle}</td>
                                     <td>
-                                      {ln.base != null
-                                        ? new Intl.NumberFormat("es-AR", {
-                                            style: "currency",
-                                            currency: "ARS",
-                                            minimumFractionDigits: 2,
-                                          }).format(ln.base)
-                                        : "—"}
+                                      {ln.base != null ? formatMoney(ln.base) : "—"}
                                     </td>
                                     <td>
-                                      {new Intl.NumberFormat("es-AR", {
-                                        style: "currency",
-                                        currency: "ARS",
-                                        minimumFractionDigits: 2,
-                                      }).format(ln.monto)}
+                                      {formatMoney(ln.monto)}
                                     </td>
                                   </tr>
                                 ))}
@@ -1624,10 +1607,13 @@ export function EmpleadosPage({ onChanged }: Props) {
             <label className="field">
               <span>Salario mensual</span>
               <input
-                inputMode="decimal"
+                className="input-numeric"
+                inputMode="numeric"
                 value={form.valor_comision}
-                onChange={(e) => setForm((x) => ({ ...x, valor_comision: e.target.value }))}
-                placeholder="Ej. 450000"
+                onChange={(e) =>
+                  setForm((x) => ({ ...x, valor_comision: filterMoneyTyping(e.target.value) }))
+                }
+                placeholder="Ej. 450.000"
               />
               <span className="muted small">
                 Los vendedores no generan comisiones por venta; la liquidación usa este salario fijo.
@@ -1653,9 +1639,18 @@ export function EmpleadosPage({ onChanged }: Props) {
               <label className="field">
                 <span>{form.tipo_comision === "fijo" ? "Monto fijo" : "Porcentaje (%)"}</span>
                 <input
-                  inputMode="decimal"
+                  inputMode={form.tipo_comision === "fijo" ? "numeric" : "decimal"}
+                  className={form.tipo_comision === "fijo" ? "input-numeric" : undefined}
                   value={form.valor_comision}
-                  onChange={(e) => setForm((x) => ({ ...x, valor_comision: e.target.value }))}
+                  onChange={(e) =>
+                    setForm((x) => ({
+                      ...x,
+                      valor_comision:
+                        form.tipo_comision === "fijo"
+                          ? filterMoneyTyping(e.target.value)
+                          : e.target.value,
+                    }))
+                  }
                 />
               </label>
             </div>

@@ -42,7 +42,8 @@ import { CreateClienteDrawer } from "../components/CreateClienteDrawer";
 import { SearchableSelect } from "../components/SearchableSelect";
 import { SkeletonCard } from "../components/Skeleton";
 import { useToast } from "../context/ToastContext";
-import { filterDecimalTyping, filterIntegerTyping } from "../lib/decimalInput";
+import { filterIntegerTyping } from "../lib/decimalInput";
+import { formatMoney, formatMoneyForInput, parseMoneyInput } from "../lib/money";
 import { usePosFocus } from "../context/PosFocusContext";
 import {
   getPinnedClienteIds,
@@ -67,6 +68,7 @@ import { useMediosPagoTransferencia } from "../hooks/useMediosPagoTransferencia"
 import { SubNav } from "../components/SubNav";
 import { SaleSuccessModal } from "../components/ventas/SaleSuccessModal";
 import { VentasHistorialSection } from "../components/ventas/VentasHistorialSection";
+import { DevolucionesSection } from "../components/ventas/DevolucionesSection";
 import { VentasCierreSection } from "../components/ventas/VentasCierreSection";
 import { readVentasTab, VENTAS_TABS, type VentasTab } from "../lib/moduleRoutes";
 import { publishPosClienteDisplay } from "../lib/posClientDisplay";
@@ -712,14 +714,6 @@ export function VentasPage() {
 
   function precioLista(p: Producto) {
     return p.precio_venta ?? p.precio ?? 0;
-  }
-
-  function formatMoney(n: number) {
-    return new Intl.NumberFormat("es-AR", {
-      style: "currency",
-      currency: "ARS",
-      maximumFractionDigits: 0,
-    }).format(n);
   }
 
   function stockBajo(p: Producto) {
@@ -1707,14 +1701,18 @@ export function VentasPage() {
                               <td className="pos-servicios-td-num">
                                 <input
                                   type="text"
-                                  inputMode="decimal"
+                                  inputMode="numeric"
                                   autoComplete="off"
                                   className="pos-servicios-input pos-servicios-input--price mono input-numeric"
-                                  value={sv.valor_unitario === 0 ? "" : sv.valor_unitario}
+                                  value={
+                                    sv.valor_unitario === 0
+                                      ? ""
+                                      : formatMoneyForInput(sv.valor_unitario)
+                                  }
                                   placeholder="0"
                                   onChange={(e) => {
-                                    const raw = filterDecimalTyping(e.target.value);
-                                    const n = raw === "" || raw === "." ? 0 : Math.max(0, Number(raw) || 0);
+                                    const parsed = parseMoneyInput(e.target.value);
+                                    const n = parsed === "" ? 0 : parsed;
                                     setCartServicios((prev) =>
                                       prev.map((row, i) =>
                                         i === idx ? { ...row, valor_unitario: n } : row
@@ -2189,15 +2187,7 @@ export function VentasPage() {
 
       {tab === "cierre" ? <VentasCierreSection /> : null}
 
-      {tab === "devoluciones" ? (
-        <section className="card-pro">
-          <h2 className="card-pro-title">Devoluciones</h2>
-          <p className="muted">
-            Módulo de devoluciones y notas de crédito: próximamente. Por ahora gestioná ajustes desde{" "}
-            <strong>Inventario</strong> o contactá soporte.
-          </p>
-        </section>
-      ) : null}
+      {tab === "devoluciones" ? <DevolucionesSection /> : null}
 
       <SaleSuccessModal
         open={successModal.open}

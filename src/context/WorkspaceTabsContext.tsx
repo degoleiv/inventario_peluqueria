@@ -17,7 +17,10 @@ import {
   puedeVerUsuariosAdmin,
 } from "../nav";
 
-const STORAGE_KEY = "peluqueria_workspace_tabs_v1";
+// v2: bump al pasar el contenido de pestañas a TabbedOutlet (montaje persistente
+// por pestaña) — invalida pestañas guardadas con sub-rutas legacy que podrían
+// disparar un <Navigate> de auto-corrección estando en segundo plano.
+const STORAGE_KEY = "peluqueria_workspace_tabs_v2";
 
 export type WorkspaceTab = {
   id: string;

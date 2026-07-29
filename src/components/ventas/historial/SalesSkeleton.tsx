@@ -6,7 +6,7 @@ export function SalesSkeleton() {
           <div key={i} className="sales-history-kpi card-pro skeleton-block" />
         ))}
       </div>
-      <div className="sales-history-filters card-pro skeleton-block" style={{ minHeight: 120 }} />
+      <div className="shfb skeleton-block" style={{ minHeight: 52 }} />
       {Array.from({ length: 6 }).map((_, i) => (
         <div key={i} className="sales-history-card skeleton-block" style={{ minHeight: 88 }} />
       ))}

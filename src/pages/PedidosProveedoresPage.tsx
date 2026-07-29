@@ -9,27 +9,53 @@ import {
 } from "react";
 import { Check, MagnifyingGlass, Plus } from "@phosphor-icons/react";
 import {
+  createInventarioCategoriaProducto,
   createPedidoProveedor,
   createProductoRapidoProveedor,
+  fetchInventarioCatalogo,
   fetchPedidosProveedores,
   fetchProductos,
   fetchProductosProveedor,
   fetchProveedores,
+  lookupBarcode,
   resolveImageSrc,
   updatePedidoProveedorMeta,
   updateProducto,
+  type InventarioCatalogo,
+  type LookupManual,
+  type LookupOk,
   type PedidoProveedor,
   type Producto,
   type Proveedor,
 } from "../api";
+import {
+  ProductoCatalogoForm,
+  catalogoFieldsToCreateBody,
+  emptyProductoCatalogoFields,
+  type ProductoCatalogoFields,
+} from "../components/ProductoCatalogoForm";
 import { Drawer } from "../components/Drawer";
 import { useToast } from "../context/ToastContext";
 import {
-  filterDecimalTyping,
   filterIntegerTyping,
-  parseOptionalDecimal,
 } from "../lib/decimalInput";
+import {
+  formatMoney,
+  formatMoneyForInput,
+  parseMoneyInput,
+  roundMoney,
+} from "../lib/money";
 import { ProveedoresPage } from "./ProveedoresPage";
+
+function labelFuenteLookup(fuente: string) {
+  if (fuente === "inventario") return "Datos desde tu inventario local";
+  if (fuente === "cache") return "Datos desde caché (consulta previa)";
+  if (fuente === "openfoodfacts") return "Datos desde Open Food Facts";
+  if (fuente === "openbeautyfacts") return "Datos desde Open Beauty Facts (cosmética / peluquería)";
+  if (fuente === "upcitemdb") return "Datos desde UPCitemdb (catálogo comercial, trial gratuito)";
+  if (fuente === "ean_search") return "Datos desde EAN-Search.org (token)";
+  return "Datos externos";
+}
 
 type Linea = {
   producto_id: number;
@@ -67,12 +93,6 @@ function fechaLocalISO(): string {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
-}
-
-const moneyEsAr = new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" });
-
-function roundMoney2(n: number): number {
-  return Math.round(n * 100) / 100;
 }
 
 function matchesProveedorSearch(p: Proveedor, query: string): boolean {
@@ -185,10 +205,18 @@ export function PedidosProveedoresPage() {
 
   const [drawerNuevoProducto, setDrawerNuevoProducto] = useState(false);
   const [nuevoProdBusy, setNuevoProdBusy] = useState(false);
-  const [nuevoNombre, setNuevoNombre] = useState("");
-  const [nuevoCodigo, setNuevoCodigo] = useState("");
-  const [nuevoPrecioCompra, setNuevoPrecioCompra] = useState<number | "">("");
-  const [nuevoPrecioVenta, setNuevoPrecioVenta] = useState<number | "">("");
+  const [nuevoCatalogo, setNuevoCatalogo] = useState<ProductoCatalogoFields>(() =>
+    emptyProductoCatalogoFields()
+  );
+  const [inventarioCatalogo, setInventarioCatalogo] = useState<InventarioCatalogo | null>(null);
+  const [catalogoLoading, setCatalogoLoading] = useState(false);
+  const [catalogoError, setCatalogoError] = useState<string | null>(null);
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupHint, setLookupHint] = useState<string | null>(null);
+  const nuevoCodigoRef = useRef("");
+  const inventarioCatalogoRef = useRef(inventarioCatalogo);
+  inventarioCatalogoRef.current = inventarioCatalogo;
+  nuevoCodigoRef.current = nuevoCatalogo.codigo;
 
   const [edit, setEdit] = useState<PedidoProveedor | null>(null);
   const [editFecha, setEditFecha] = useState("");
@@ -338,7 +366,7 @@ export function PedidosProveedoresPage() {
 
   useEffect(() => {
     if (valorSinDescManual) return;
-    const t = roundMoney2(totalGeneralPedido);
+    const t = roundMoney(totalGeneralPedido);
     setValorSinDesc(t > 0 ? t : "");
   }, [totalGeneralPedido, valorSinDescManual]);
 
@@ -346,46 +374,161 @@ export function PedidosProveedoresPage() {
     setLineas((prev) => prev.map((l, j) => (j === i ? { ...l, ...patch } : l)));
   }
 
+  function patchNuevoCatalogo(patch: Partial<ProductoCatalogoFields>) {
+    setNuevoCatalogo((prev) => ({ ...prev, ...patch }));
+  }
+
+  const loadInventarioCatalogo = useCallback(
+    async (mode: "initial" | "silent" = "initial") => {
+      const silent = mode === "silent";
+      setCatalogoError(null);
+      if (!silent) setCatalogoLoading(true);
+      try {
+        const data = await fetchInventarioCatalogo();
+        setInventarioCatalogo(data);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Error al cargar catálogo";
+        setCatalogoError(msg);
+        toast(msg, "error");
+      } finally {
+        if (!silent) setCatalogoLoading(false);
+      }
+    },
+    [toast]
+  );
+
+  const crearCategoriaDesdeFormulario = useCallback(
+    async (nombreCategoria: string) => {
+      const row = await createInventarioCategoriaProducto({ nombre_categoria: nombreCategoria });
+      setInventarioCatalogo((prev) => {
+        if (!prev) return { categorias: [row], proveedores: [] };
+        const exists = prev.categorias.some((c) => c.id === row.id);
+        const categorias = exists
+          ? prev.categorias.map((c) => (c.id === row.id ? row : c))
+          : [...prev.categorias, row].sort((a, b) =>
+              a.nombre_categoria.localeCompare(b.nombre_categoria, "es", { sensitivity: "base" })
+            );
+        return { ...prev, categorias };
+      });
+      await loadInventarioCatalogo("silent");
+      toast("Categoría creada.", "success");
+      return row.nombre_categoria;
+    },
+    [loadInventarioCatalogo, toast]
+  );
+
+  const aplicarRespuestaBarcode = useCallback((res: LookupOk | LookupManual) => {
+    if (res.ok) {
+      const d = res.data;
+      const cat = inventarioCatalogoRef.current;
+      let categoria = d.categoria ?? "";
+      if (cat) {
+        const cNom = categoria.trim().toLowerCase();
+        const hitC = cat.categorias.find((c) => c.nombre_categoria.trim().toLowerCase() === cNom);
+        if (hitC) categoria = hitC.nombre_categoria;
+      }
+      setNuevoCatalogo((prev) => ({
+        ...prev,
+        nombre: d.nombre,
+        marca: d.marca ?? prev.marca,
+        categoria,
+        descripcion: d.descripcion ?? "",
+        imagenUrl: d.imagen_url ?? "",
+      }));
+      setLookupHint(labelFuenteLookup(d.fuente));
+    } else {
+      setLookupHint("No se encontró producto en base de datos.");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!drawerNuevoProducto) return;
+    void loadInventarioCatalogo("initial");
+  }, [drawerNuevoProducto, loadInventarioCatalogo]);
+
+  useEffect(() => {
+    if (!drawerNuevoProducto) return;
+    const code = nuevoCatalogo.codigo.trim();
+    if (code.length < 8) return;
+    const t = window.setTimeout(async () => {
+      if (nuevoCodigoRef.current.trim() !== code) return;
+      setLookupLoading(true);
+      setLookupHint(null);
+      try {
+        const res = await lookupBarcode(code);
+        if (nuevoCodigoRef.current.trim() !== code) return;
+        aplicarRespuestaBarcode(res);
+      } catch {
+        if (nuevoCodigoRef.current.trim() === code) {
+          setLookupHint("No se pudo consultar las APIs (¿sin internet o servidor?). Probá de nuevo.");
+        }
+      } finally {
+        if (nuevoCodigoRef.current.trim() === code) setLookupLoading(false);
+      }
+    }, 550);
+    return () => clearTimeout(t);
+  }, [nuevoCatalogo.codigo, drawerNuevoProducto, aplicarRespuestaBarcode]);
+
+  async function onBuscarCodigoNuevoProducto() {
+    setLookupHint(null);
+    if (!nuevoCatalogo.codigo.trim()) {
+      setLookupHint("Ingresá o escaneá un código de barras");
+      return;
+    }
+    setLookupLoading(true);
+    try {
+      const res = await lookupBarcode(nuevoCatalogo.codigo.trim());
+      aplicarRespuestaBarcode(res);
+    } catch {
+      setLookupHint("No se pudo consultar. Completá manualmente.");
+    } finally {
+      setLookupLoading(false);
+    }
+  }
+
   function openDrawerNuevoProducto() {
     if (proveedorId === "") {
       toast("Elegí un proveedor en el paso 1.", "warning");
       return;
     }
-    setNuevoNombre("");
-    setNuevoCodigo("");
-    setNuevoPrecioCompra("");
-    setNuevoPrecioVenta("");
+    const pr = proveedores.find((p) => p.id === proveedorId);
+    setNuevoCatalogo({
+      ...emptyProductoCatalogoFields(),
+      proveedorId: Number(proveedorId),
+      marca: pr?.nombre ?? "",
+      stock: 0,
+    });
+    setLookupHint(null);
     setDrawerNuevoProducto(true);
   }
 
   async function guardarNuevoProducto(e: FormEvent) {
     e.preventDefault();
     if (proveedorId === "") return;
-    const nom = nuevoNombre.trim();
-    if (!nom) {
-      toast("El nombre es obligatorio.", "warning");
+    if (!nuevoCatalogo.nombre.trim()) {
+      toast("Ingresá el nombre del producto.", "warning");
       return;
     }
-    const pc = nuevoPrecioCompra === "" ? NaN : Number(nuevoPrecioCompra);
-    if (!Number.isFinite(pc) || pc < 0) {
-      toast("Indicá un precio de compra válido (≥ 0).", "warning");
+    if (!nuevoCatalogo.codigo.trim()) {
+      toast("Ingresá el código de barras", "warning");
       return;
     }
-    const pvRaw = nuevoPrecioVenta === "" ? NaN : Number(nuevoPrecioVenta);
-    const pv = Number.isFinite(pvRaw) && pvRaw >= 0 ? pvRaw : pc;
-    if (pv < pc) {
-      toast("El precio de venta debe ser mayor o igual al de compra.", "warning");
+    if (!nuevoCatalogo.categoria.trim()) {
+      toast("Seleccioná una categoría.", "warning");
       return;
     }
+    if (nuevoCatalogo.precioVenta === "" || Number(nuevoCatalogo.precioVenta) <= 0) {
+      toast("Ingresá un precio de venta mayor a 0", "warning");
+      return;
+    }
+    const body = catalogoFieldsToCreateBody({
+      ...nuevoCatalogo,
+      proveedorId: Number(proveedorId),
+      marca: proveedorSeleccionado?.nombre ?? nuevoCatalogo.marca,
+    });
     setNuevoProdBusy(true);
     try {
-      const created = await createProductoRapidoProveedor(Number(proveedorId), {
-        nombre: nom,
-        codigo_barras: nuevoCodigo.trim() || null,
-        precio_compra: pc,
-        precio_venta: pv,
-        stock: 0,
-      });
+      const created = await createProductoRapidoProveedor(Number(proveedorId), body);
       setCatalogoProveedor((prev) => {
         const sin = prev.filter((p) => p.id !== created.id);
         return [{ ...created, proveedor_id: created.proveedor_id ?? Number(proveedorId) }, ...sin];
@@ -868,8 +1011,8 @@ export function PedidosProveedoresPage() {
                                 const unit = ln.costo_unitario === "" ? 0 : Number(ln.costo_unitario);
                                 const subtotal = Math.max(1, Number(ln.cantidad) || 1) * unit;
                                 const subStr = Number.isFinite(subtotal)
-                                  ? moneyEsAr.format(subtotal)
-                                  : moneyEsAr.format(0);
+                                  ? formatMoney(subtotal)
+                                  : formatMoney(0);
                                 return (
                                   <tr key={`ped-line-${idx}`}>
                                     <td>
@@ -909,12 +1052,12 @@ export function PedidosProveedoresPage() {
                                       <input
                                         className="pedidos-input pedidos-lineas-table__control pedidos-lineas-table__control--money input-numeric"
                                         type="text"
-                                        inputMode="decimal"
+                                        inputMode="numeric"
                                         autoComplete="off"
-                                        value={ln.costo_unitario === "" ? "" : String(ln.costo_unitario)}
+                                        value={ln.costo_unitario === "" ? "" : formatMoneyForInput(ln.costo_unitario)}
                                         onChange={(e) =>
                                           setLinea(idx, {
-                                            costo_unitario: parseOptionalDecimal(e.target.value),
+                                            costo_unitario: parseMoneyInput(e.target.value),
                                           })
                                         }
                                         aria-label="Costo unitario"
@@ -924,12 +1067,12 @@ export function PedidosProveedoresPage() {
                                       <input
                                         className="pedidos-input pedidos-lineas-table__control pedidos-lineas-table__control--money input-numeric"
                                         type="text"
-                                        inputMode="decimal"
+                                        inputMode="numeric"
                                         autoComplete="off"
-                                        value={ln.precio_venta === "" ? "" : String(ln.precio_venta)}
+                                        value={ln.precio_venta === "" ? "" : formatMoneyForInput(ln.precio_venta)}
                                         onChange={(e) =>
                                           setLinea(idx, {
-                                            precio_venta: parseOptionalDecimal(e.target.value),
+                                            precio_venta: parseMoneyInput(e.target.value),
                                           })
                                         }
                                         aria-label="Precio de venta"
@@ -955,7 +1098,7 @@ export function PedidosProveedoresPage() {
                       <div className="pedidos-total-strip">
                         <span className="pedidos-total-strip__label">Total general del pedido</span>
                         <span className="pedidos-total-strip__value">
-                          {moneyEsAr.format(roundMoney2(totalGeneralPedido))}
+                          {formatMoney(roundMoney(totalGeneralPedido))}
                         </span>
                       </div>
                     </div>
@@ -1001,7 +1144,7 @@ export function PedidosProveedoresPage() {
                             >
                               <span className="pedidos-catalog-row__name">{p.nombre}</span>
                               <span className="pedidos-catalog-row__price">
-                                {moneyEsAr.format(Number(p.precio_compra ?? p.precio ?? 0))}
+                                {formatMoney(Number(p.precio_compra ?? p.precio ?? 0))}
                               </span>
                             </button>
                           ))}
@@ -1025,7 +1168,7 @@ export function PedidosProveedoresPage() {
               <div className="pedidos-panel">
                 <div className="pedidos-inline-hint">
                   Total del pedido:{" "}
-                  <strong>{moneyEsAr.format(roundMoney2(totalGeneralPedido))}</strong>. El valor sin descuento sigue
+                  <strong>{formatMoney(roundMoney(totalGeneralPedido))}</strong>. El valor sin descuento sigue
                   al total salvo que lo edites a mano.
                 </div>
                 {validatePagos() ? (
@@ -1115,10 +1258,10 @@ export function PedidosProveedoresPage() {
                       <input
                         className="pedidos-input input-numeric"
                         type="text"
-                        inputMode="decimal"
+                        inputMode="numeric"
                         autoComplete="off"
-                        value={valorDesc === "" ? "" : String(valorDesc)}
-                        onChange={(e) => setValorDesc(parseOptionalDecimal(e.target.value))}
+                        value={valorDesc === "" ? "" : formatMoneyForInput(valorDesc)}
+                        onChange={(e) => setValorDesc(parseMoneyInput(e.target.value))}
                         onKeyDown={(e) => {
                           if (e.key === "Enter") e.preventDefault();
                         }}
@@ -1130,19 +1273,19 @@ export function PedidosProveedoresPage() {
                     <input
                       className="pedidos-input input-numeric"
                       type="text"
-                      inputMode="decimal"
+                      inputMode="numeric"
                       autoComplete="off"
-                      value={valorSinDesc === "" ? "" : String(valorSinDesc)}
+                      value={valorSinDesc === "" ? "" : formatMoneyForInput(valorSinDesc)}
                       onChange={(e) => {
                         setValorSinDescManual(true);
-                        setValorSinDesc(parseOptionalDecimal(e.target.value));
+                        setValorSinDesc(parseMoneyInput(e.target.value));
                       }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") e.preventDefault();
                       }}
                     />
                     <span className="pedidos-field__hint">
-                      Sugerido: {moneyEsAr.format(roundMoney2(totalGeneralPedido))}
+                      Sugerido: {formatMoney(roundMoney(totalGeneralPedido))}
                       {valorSinDescManual ? " · editado manualmente" : " · enlazado al total"}
                     </span>
                   </label>
@@ -1153,10 +1296,10 @@ export function PedidosProveedoresPage() {
                     className="pedidos-btn pedidos-btn--ghost"
                     onClick={() => {
                       setValorSinDescManual(false);
-                      setValorSinDesc(roundMoney2(totalGeneralPedido));
+                      setValorSinDesc(roundMoney(totalGeneralPedido));
                     }}
                   >
-                    Usar total del pedido ({moneyEsAr.format(roundMoney2(totalGeneralPedido))})
+                    Usar total del pedido ({formatMoney(roundMoney(totalGeneralPedido))})
                   </button>
                 </div>
               </div>
@@ -1203,7 +1346,7 @@ export function PedidosProveedoresPage() {
                     </div>
                     <p className="pedidos-resumen-tile__strong">{lineas.length} línea(s)</p>
                     <p className="pedidos-resumen-tile__meta">
-                      Total general: {moneyEsAr.format(roundMoney2(totalGeneralPedido))}
+                      Total general: {formatMoney(roundMoney(totalGeneralPedido))}
                     </p>
                   </div>
                   <div className="pedidos-resumen-tile pedidos-resumen-tile--wide">
@@ -1227,9 +1370,9 @@ export function PedidosProveedoresPage() {
                             <li className="pedidos-resumen-line" key={`res-ln-${i}`}>
                               <span className="pedidos-resumen-line__name">{nombre}</span>
                               <span className="pedidos-resumen-line__detail">
-                                {qty} × {moneyEsAr.format(unit)}
+                                {qty} × {formatMoney(unit)}
                               </span>
-                              <span className="pedidos-resumen-line__amt">{moneyEsAr.format(subtotal)}</span>
+                              <span className="pedidos-resumen-line__amt">{formatMoney(subtotal)}</span>
                             </li>
                           );
                         })}
@@ -1248,9 +1391,9 @@ export function PedidosProveedoresPage() {
                       {tieneDescuento
                         ? valorDesc === ""
                           ? "—"
-                          : moneyEsAr.format(Number(valorDesc))
+                          : formatMoney(Number(valorDesc))
                         : "No aplica"}{" "}
-                      · Sin descuento: {valorSinDesc === "" ? "—" : moneyEsAr.format(Number(valorSinDesc))}
+                      · Sin descuento: {valorSinDesc === "" ? "—" : formatMoney(Number(valorSinDesc))}
                     </p>
                     <p className="pedidos-resumen-tile__meta">Estado: {labelEstadoPago(estadoNuevo)}</p>
                     <p className="pedidos-resumen-tile__meta">
@@ -1405,7 +1548,7 @@ export function PedidosProveedoresPage() {
                     </div>
                   </div>
                   <div className="pedidos-historial-row__aside">
-                    <span className="pedidos-historial-row__amount">{moneyEsAr.format(Number(c.total))}</span>
+                    <span className="pedidos-historial-row__amount">{formatMoney(Number(c.total))}</span>
                     <button type="button" className="pedidos-btn pedidos-btn--ghost" onClick={() => openEdit(c)}>
                       Editar
                     </button>
@@ -1457,10 +1600,10 @@ export function PedidosProveedoresPage() {
                 <input
                   className="pedidos-input input-numeric"
                   type="text"
-                  inputMode="decimal"
+                  inputMode="numeric"
                   autoComplete="off"
-                  value={editVd === "" ? "" : String(editVd)}
-                  onChange={(e) => setEditVd(parseOptionalDecimal(e.target.value))}
+                  value={editVd === "" ? "" : formatMoneyForInput(editVd)}
+                  onChange={(e) => setEditVd(parseMoneyInput(e.target.value))}
                 />
               </label>
               <label className="pedidos-field">
@@ -1468,10 +1611,10 @@ export function PedidosProveedoresPage() {
                 <input
                   className="pedidos-input input-numeric"
                   type="text"
-                  inputMode="decimal"
+                  inputMode="numeric"
                   autoComplete="off"
-                  value={editVs === "" ? "" : String(editVs)}
-                  onChange={(e) => setEditVs(parseOptionalDecimal(e.target.value))}
+                  value={editVs === "" ? "" : formatMoneyForInput(editVs)}
+                  onChange={(e) => setEditVs(parseMoneyInput(e.target.value))}
                 />
               </label>
               <label className="pedidos-field">
@@ -1514,7 +1657,8 @@ export function PedidosProveedoresPage() {
 
       <Drawer
         open={drawerNuevoProducto}
-        title="Nuevo producto en catálogo del proveedor"
+        title="Nuevo producto"
+        wide
         onClose={() => {
           if (!nuevoProdBusy) setDrawerNuevoProducto(false);
         }}
@@ -1529,55 +1673,39 @@ export function PedidosProveedoresPage() {
           </button>
         }
       >
-        <form id="form-nuevo-producto-proveedor" className="pedidos-form" onSubmit={guardarNuevoProducto}>
+        <form id="form-nuevo-producto-proveedor" className="pedidos-form form drawer-form" onSubmit={guardarNuevoProducto}>
           <p className="pedidos-callout pedidos-callout--info">
-            Quedará asociado a <strong>{proveedorSeleccionado?.nombre ?? "—"}</strong> y lo vas a ver en el catálogo
-            lateral para próximos pedidos.
+            Mismos campos que en inventario. Quedará asociado a{" "}
+            <strong>{proveedorSeleccionado?.nombre ?? "—"}</strong> y disponible en el catálogo lateral.
           </p>
-          <label className="pedidos-field">
-            <span className="pedidos-field__label">Nombre *</span>
-            <input
-              className="pedidos-input"
-              value={nuevoNombre}
-              onChange={(e) => setNuevoNombre(e.target.value)}
-              required
-              autoComplete="off"
-              autoFocus
-            />
-          </label>
-          <label className="pedidos-field">
-            <span className="pedidos-field__label">Código de barras (opcional)</span>
-            <input
-              className="pedidos-input"
-              value={nuevoCodigo}
-              onChange={(e) => setNuevoCodigo(e.target.value)}
-              autoComplete="off"
-            />
-          </label>
-          <label className="pedidos-field">
-            <span className="pedidos-field__label">Precio de compra *</span>
-            <input
-              className="pedidos-input input-numeric"
-              type="text"
-              inputMode="decimal"
-              autoComplete="off"
-              value={nuevoPrecioCompra === "" ? "" : String(nuevoPrecioCompra)}
-              onChange={(e) => setNuevoPrecioCompra(parseOptionalDecimal(e.target.value))}
-              required
-            />
-          </label>
-          <label className="pedidos-field">
-            <span className="pedidos-field__label">Precio de venta (opcional)</span>
-            <input
-              className="pedidos-input input-numeric"
-              type="text"
-              inputMode="decimal"
-              autoComplete="off"
-              value={nuevoPrecioVenta === "" ? "" : String(nuevoPrecioVenta)}
-              onChange={(e) => setNuevoPrecioVenta(parseOptionalDecimal(e.target.value))}
-              placeholder="Si lo dejás vacío, usamos el de compra"
-            />
-          </label>
+          <ProductoCatalogoForm
+            values={nuevoCatalogo}
+            onChange={patchNuevoCatalogo}
+            mode="create"
+            proveedorResumen={
+              proveedorSeleccionado
+                ? {
+                    nombre: proveedorSeleccionado.nombre,
+                    nit: proveedorSeleccionado.nit,
+                    telefono: proveedorSeleccionado.telefono,
+                    email: proveedorSeleccionado.email,
+                  }
+                : null
+            }
+            barcodeLookup={{
+              loading: lookupLoading,
+              hint: lookupHint,
+              onLookupClick: () => void onBuscarCodigoNuevoProducto(),
+            }}
+            inventarioCatalogo={{
+              loading: catalogoLoading,
+              error: catalogoError,
+              categorias: inventarioCatalogo?.categorias ?? [],
+              proveedores: inventarioCatalogo?.proveedores ?? [],
+              onCatalogPanelOpen: () => void loadInventarioCatalogo("silent"),
+              onCreateCategoria: crearCategoriaDesdeFormulario,
+            }}
+          />
         </form>
       </Drawer>
 

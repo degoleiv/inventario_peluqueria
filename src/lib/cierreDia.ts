@@ -55,9 +55,4 @@ export function isoDateLocal(d = new Date()) {
   return `${y}-${m}-${day}`;
 }
 
-export const moneyCierre = new Intl.NumberFormat("es-AR", {
-  style: "currency",
-  currency: "ARS",
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 0,
-});
+export { moneyFormatter as moneyCierre } from "./money";

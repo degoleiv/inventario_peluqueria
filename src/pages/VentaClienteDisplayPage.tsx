@@ -9,6 +9,7 @@ import {
   subscribePosClienteStorage,
   type PosClienteSnapshot,
 } from "../lib/posClientDisplay";
+import { formatMoney } from "../lib/money";
 
 const empty: PosClienteSnapshot = { lines: [], subtotal: 0 };
 
@@ -84,7 +85,7 @@ export function VentaClienteDisplayPage() {
             <li key={i} className="pos-client-display-line">
               <span className="pos-client-display-line-name">{l.nombre}</span>
               <span className="pos-client-display-line-qty mono">×{l.cantidad}</span>
-              <span className="pos-client-display-line-amount mono">{l.importe.toFixed(2)}</span>
+              <span className="pos-client-display-line-amount mono">{formatMoney(l.importe)}</span>
             </li>
           ))}
         </ul>
@@ -92,7 +93,7 @@ export function VentaClienteDisplayPage() {
 
       <footer className="pos-client-display-footer">
         <span className="pos-client-display-subtotal-label">Subtotal</span>
-        <span className="pos-client-display-subtotal-value mono">{snapshot.subtotal.toFixed(2)}</span>
+        <span className="pos-client-display-subtotal-value mono">{formatMoney(snapshot.subtotal)}</span>
       </footer>
     </div>
   );

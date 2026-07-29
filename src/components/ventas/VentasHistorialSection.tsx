@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowClockwise, DownloadSimple, LockSimple, Plus } from "@phosphor-icons/react";
+import { ArrowClockwise, LockSimple, Plus } from "@phosphor-icons/react";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { SalesCard } from "./historial/SalesCard";
 import { SalesDetailDrawer } from "./historial/SalesDetailDrawer";
@@ -51,10 +51,6 @@ export function VentasHistorialSection() {
             <Plus size={18} weight="bold" aria-hidden />
             Nueva venta
           </Link>
-          <button type="button" className="btn secondary" onClick={handleExport}>
-            <DownloadSimple size={18} aria-hidden />
-            Exportar
-          </button>
           <button type="button" className="btn ghost" onClick={() => void h.loadVentas()} disabled={h.loading}>
             <ArrowClockwise size={18} aria-hidden />
             Actualizar

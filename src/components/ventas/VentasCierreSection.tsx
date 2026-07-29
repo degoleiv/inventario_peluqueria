@@ -27,7 +27,7 @@ import {
   totalMontos,
   type MontosPorCanal,
 } from "../../lib/cierreDia";
-import { filterDecimalTyping } from "../../lib/decimalInput";
+import { filterMoneyTyping, formatMoneyForInput, parseMoneyLoose } from "../../lib/money";
 
 type Vista = "cerrar" | "historial";
 
@@ -153,8 +153,8 @@ export function VentasCierreSection() {
   }
 
   function patchReal(canalId: string, raw: string) {
-    const n = raw.trim() === "" ? 0 : Number(raw.replace(",", "."));
-    setReales((prev) => ({ ...prev, [canalId]: Number.isFinite(n) ? Math.max(0, n) : 0 }));
+    const n = parseMoneyLoose(raw);
+    setReales((prev) => ({ ...prev, [canalId]: Math.max(0, n) }));
   }
 
   const canalesActivos = useMemo(() => {
@@ -307,11 +307,11 @@ export function VentasCierreSection() {
                           <td>
                             <input
                               type="text"
-                              inputMode="decimal"
+                              inputMode="numeric"
                               autoComplete="off"
                               className="cierre-input-monto input-numeric"
-                              value={reales[canal.id] === 0 ? "" : reales[canal.id]}
-                              onChange={(e) => patchReal(canal.id, filterDecimalTyping(e.target.value))}
+                              value={reales[canal.id] === 0 ? "" : formatMoneyForInput(reales[canal.id])}
+                              onChange={(e) => patchReal(canal.id, filterMoneyTyping(e.target.value))}
                               disabled={busy}
                               placeholder="0"
                             />
@@ -429,6 +429,8 @@ export function VentasCierreSection() {
   );
 }
 
+type VistaDetalle = "general" | "por_empleado" | "por_tipo_servicio";
+
 function CierreVentasDelDia({
   detalle,
   compact = false,
@@ -436,80 +438,218 @@ function CierreVentasDelDia({
   detalle: VentasDiaDetalle;
   compact?: boolean;
 }) {
-  const { productos, servicios, total_productos, total_servicios } = detalle;
+  const [vistaDetalle, setVistaDetalle] = useState<VistaDetalle>("general");
+  const { productos, servicios, por_empleado, por_tipo_servicio, total_productos, total_servicios } = detalle;
+
   return (
     <div className={`cierre-ventas-dia${compact ? " cierre-ventas-dia--compact" : ""}`}>
-      <div className="cierre-ventas-dia-grid">
-        <section className="card-pro cierre-ventas-bloque">
-          <h2 className="cierre-section-title">Productos vendidos</h2>
-          {productos.length === 0 ? (
-            <p className="muted small">Sin productos en ventas de este día.</p>
-          ) : (
-            <div className="cierre-table-wrap">
-              <table className="cierre-table">
-                <thead>
-                  <tr>
-                    <th>Producto</th>
-                    <th className="cierre-col-num">Cant.</th>
-                    <th className="cierre-col-num">Subtotal</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {productos.map((p) => (
-                    <tr key={p.producto_id}>
-                      <td>{p.producto_nombre}</td>
-                      <td className="mono cierre-col-num">{p.cantidad}</td>
-                      <td className="mono cierre-col-num">{moneyCierre.format(p.subtotal)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr>
-                    <th colSpan={2}>Total productos</th>
-                    <th className="mono cierre-col-num">{moneyCierre.format(total_productos)}</th>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          )}
-        </section>
-
-        <section className="card-pro cierre-ventas-bloque">
-          <h2 className="cierre-section-title">Servicios realizados</h2>
-          {servicios.length === 0 ? (
-            <p className="muted small">Sin servicios en ventas de este día.</p>
-          ) : (
-            <div className="cierre-table-wrap">
-              <table className="cierre-table">
-                <thead>
-                  <tr>
-                    <th>Servicio</th>
-                    <th>Profesional</th>
-                    <th className="cierre-col-num">Cant.</th>
-                    <th className="cierre-col-num">Subtotal</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {servicios.map((s, i) => (
-                    <tr key={`${s.servicio_nombre}-${s.profesional_nombre ?? ""}-${i}`}>
-                      <td>{s.servicio_nombre}</td>
-                      <td className="muted">{s.profesional_nombre ?? "—"}</td>
-                      <td className="mono cierre-col-num">{s.cantidad}</td>
-                      <td className="mono cierre-col-num">{moneyCierre.format(s.subtotal)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr>
-                    <th colSpan={3}>Total servicios</th>
-                    <th className="mono cierre-col-num">{moneyCierre.format(total_servicios)}</th>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          )}
-        </section>
+      <div className="cierre-ventas-tabs" role="tablist">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={vistaDetalle === "general"}
+          className={`cierre-ventas-tab${vistaDetalle === "general" ? " is-active" : ""}`}
+          onClick={() => setVistaDetalle("general")}
+        >
+          General
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={vistaDetalle === "por_empleado"}
+          className={`cierre-ventas-tab${vistaDetalle === "por_empleado" ? " is-active" : ""}`}
+          onClick={() => setVistaDetalle("por_empleado")}
+        >
+          Por empleado
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={vistaDetalle === "por_tipo_servicio"}
+          className={`cierre-ventas-tab${vistaDetalle === "por_tipo_servicio" ? " is-active" : ""}`}
+          onClick={() => setVistaDetalle("por_tipo_servicio")}
+        >
+          Por tipo de servicio
+        </button>
       </div>
+
+      {vistaDetalle === "general" && (
+        <div className="cierre-ventas-dia-grid">
+          <section className="card-pro cierre-ventas-bloque">
+            <h2 className="cierre-section-title">Productos vendidos</h2>
+            {productos.length === 0 ? (
+              <p className="muted small">Sin productos en ventas de este día.</p>
+            ) : (
+              <div className="cierre-table-wrap">
+                <table className="cierre-table">
+                  <thead>
+                    <tr>
+                      <th>Producto</th>
+                      <th className="cierre-col-num">Cant.</th>
+                      <th className="cierre-col-num">Subtotal</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {productos.map((p) => (
+                      <tr key={p.producto_id}>
+                        <td>{p.producto_nombre}</td>
+                        <td className="mono cierre-col-num">{p.cantidad}</td>
+                        <td className="mono cierre-col-num">{moneyCierre.format(p.subtotal)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <th colSpan={2}>Total productos</th>
+                      <th className="mono cierre-col-num">{moneyCierre.format(total_productos)}</th>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+          </section>
+
+          <section className="card-pro cierre-ventas-bloque">
+            <h2 className="cierre-section-title">Servicios realizados</h2>
+            {servicios.length === 0 ? (
+              <p className="muted small">Sin servicios en ventas de este día.</p>
+            ) : (
+              <div className="cierre-table-wrap">
+                <table className="cierre-table">
+                  <thead>
+                    <tr>
+                      <th>Servicio</th>
+                      <th>Profesional</th>
+                      <th className="cierre-col-num">Cant.</th>
+                      <th className="cierre-col-num">Subtotal</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {servicios.map((s, i) => (
+                      <tr key={`${s.servicio_nombre}-${s.profesional_nombre ?? ""}-${i}`}>
+                        <td>{s.servicio_nombre}</td>
+                        <td className="muted">{s.profesional_nombre ?? "—"}</td>
+                        <td className="mono cierre-col-num">{s.cantidad}</td>
+                        <td className="mono cierre-col-num">{moneyCierre.format(s.subtotal)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <th colSpan={3}>Total servicios</th>
+                      <th className="mono cierre-col-num">{moneyCierre.format(total_servicios)}</th>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+          </section>
+        </div>
+      )}
+
+      {vistaDetalle === "por_empleado" && (
+        <div className="cierre-ventas-dia-grid cierre-ventas-dia-grid--single">
+          {(!por_empleado || por_empleado.length === 0) ? (
+            <section className="card-pro cierre-ventas-bloque">
+              <p className="muted small">Sin servicios registrados por empleados este día.</p>
+            </section>
+          ) : (
+            por_empleado.map((emp) => (
+              <section key={emp.profesional_id ?? "sin-asignar"} className="card-pro cierre-ventas-bloque">
+                <h2 className="cierre-section-title">{emp.profesional_nombre ?? "Sin asignar"}</h2>
+                <div className="cierre-empleado-kpis">
+                  <span className="cierre-empleado-kpi">
+                    <strong>{emp.servicios_cantidad}</strong> servicio{emp.servicios_cantidad !== 1 ? "s" : ""}
+                  </span>
+                  <span className="cierre-empleado-kpi">
+                    Total: <strong>{moneyCierre.format(emp.servicios_total)}</strong>
+                  </span>
+                </div>
+                <div className="cierre-table-wrap">
+                  <table className="cierre-table">
+                    <thead>
+                      <tr>
+                        <th>Servicio</th>
+                        <th className="cierre-col-num">Cant.</th>
+                        <th className="cierre-col-num">V. unit.</th>
+                        <th className="cierre-col-num">Subtotal</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {emp.servicios.map((s, i) => (
+                        <tr key={`${s.servicio_nombre}-${i}`}>
+                          <td>{s.servicio_nombre}</td>
+                          <td className="mono cierre-col-num">{s.cantidad}</td>
+                          <td className="mono cierre-col-num">{moneyCierre.format(s.valor_unitario)}</td>
+                          <td className="mono cierre-col-num">{moneyCierre.format(s.subtotal)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <th colSpan={3}>Total</th>
+                        <th className="mono cierre-col-num">{moneyCierre.format(emp.servicios_total)}</th>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </section>
+            ))
+          )}
+        </div>
+      )}
+
+      {vistaDetalle === "por_tipo_servicio" && (
+        <div className="cierre-ventas-dia-grid cierre-ventas-dia-grid--single">
+          {(!por_tipo_servicio || por_tipo_servicio.length === 0) ? (
+            <section className="card-pro cierre-ventas-bloque">
+              <p className="muted small">Sin servicios registrados este día.</p>
+            </section>
+          ) : (
+            por_tipo_servicio.map((tipo) => (
+              <section key={tipo.servicio_nombre} className="card-pro cierre-ventas-bloque">
+                <h2 className="cierre-section-title">{tipo.servicio_nombre}</h2>
+                <div className="cierre-empleado-kpis">
+                  <span className="cierre-empleado-kpi">
+                    <strong>{tipo.cantidad}</strong> realizado{tipo.cantidad !== 1 ? "s" : ""}
+                  </span>
+                  <span className="cierre-empleado-kpi">
+                    Total: <strong>{moneyCierre.format(tipo.subtotal)}</strong>
+                  </span>
+                </div>
+                <div className="cierre-table-wrap">
+                  <table className="cierre-table">
+                    <thead>
+                      <tr>
+                        <th>Profesional</th>
+                        <th className="cierre-col-num">Cant.</th>
+                        <th className="cierre-col-num">V. unit.</th>
+                        <th className="cierre-col-num">Subtotal</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tipo.profesionales.map((p, i) => (
+                        <tr key={`${p.profesional_nombre ?? "sin"}-${i}`}>
+                          <td>{p.profesional_nombre ?? "Sin asignar"}</td>
+                          <td className="mono cierre-col-num">{p.cantidad}</td>
+                          <td className="mono cierre-col-num">{moneyCierre.format(p.valor_unitario)}</td>
+                          <td className="mono cierre-col-num">{moneyCierre.format(p.subtotal)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <th colSpan={3}>Total</th>
+                        <th className="mono cierre-col-num">{moneyCierre.format(tipo.subtotal)}</th>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </section>
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 }

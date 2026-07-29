@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { fetchDashboard, type DashboardStats, type ProximaCitaDia } from "../api";
+import { formatMoney } from "../lib/money";
 import { useToast } from "../context/ToastContext";
 
 const DEMO_TRENDS = {
@@ -229,10 +230,7 @@ export function DashboardPage() {
             <span className="dash-metric__label">Ingresos hoy</span>
           </div>
           <div className="dash-metric__value dash-metric__value--hero">
-            {data.ventas_hoy_total.toLocaleString("es-AR", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}
+            {formatMoney(data.ventas_hoy_total)}
           </div>
           <div className="dash-metric__meta">{data.ventas_hoy_cantidad} ventas</div>
           <Trend pct={trends.ventas_hoy_pct} />
@@ -244,10 +242,7 @@ export function DashboardPage() {
             <span className="dash-metric__label">Ventas del mes</span>
           </div>
           <div className="dash-metric__value">
-            {data.ventas_mes_total.toLocaleString("es-AR", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}
+            {formatMoney(data.ventas_mes_total)}
           </div>
           <div className="dash-metric__meta">{data.ventas_mes_cantidad} tickets</div>
           <Trend pct={trends.ventas_mes_pct} />
@@ -347,7 +342,7 @@ export function DashboardPage() {
                   <div
                     className="bar-chart-bar"
                     style={{ height: `${(row.ingresos / maxIngresoDia) * 100}%` }}
-                    title={`${row.ingresos.toFixed(2)}`}
+                    title={formatMoney(row.ingresos)}
                   />
                   <span className="bar-chart-label">{row.dia.slice(5).replace("-", "/")}</span>
                 </div>

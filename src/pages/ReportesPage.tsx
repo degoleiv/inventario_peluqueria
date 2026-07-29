@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   fetchDashboard,
   fetchIngresosDiarios,
+  fetchInventarioResumen,
   fetchKpisNegocio,
   fetchProductosMasVendidos,
   fetchRentabilidad,
@@ -9,9 +10,11 @@ import {
   fetchSinRotacion,
   fetchSugerenciasCompra,
   type DashboardStats,
+  type InventarioResumen,
   type Venta,
 } from "../api";
 import { useToast } from "../context/ToastContext";
+import { formatMoney } from "../lib/money";
 
 /** Rango inclusivo por día calendario → ISO para comparar con `ventas.fecha` en el servidor. */
 function fechaDiaToIsoDesde(yyyyMmDd: string) {
@@ -25,6 +28,7 @@ function fechaDiaToIsoHasta(yyyyMmDd: string) {
 export function ReportesPage() {
   const toast = useToast();
   const [dash, setDash] = useState<DashboardStats | null>(null);
+  const [inventario, setInventario] = useState<InventarioResumen | null>(null);
   const [ventas, setVentas] = useState<Venta[]>([]);
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
@@ -61,7 +65,9 @@ export function ReportesPage() {
 
   const loadDash = useCallback(async () => {
     try {
-      setDash(await fetchDashboard());
+      const [d, inv] = await Promise.all([fetchDashboard(), fetchInventarioResumen()]);
+      setDash(d);
+      setInventario(inv);
     } catch (e) {
       toast(e instanceof Error ? e.message : "Error al cargar el resumen del negocio", "error");
     }
@@ -130,17 +136,27 @@ export function ReportesPage() {
   return (
     <>
       <section className="card">
-        <h2 className="card-title">Resumen</h2>
+        <h2 className="card-title">Resumen del negocio</h2>
         {loading && !dash ? (
           <p className="muted">Cargando…</p>
         ) : dash ? (
           <ul className="report-list">
             <li>
-              Ventas del mes: <strong>{dash.ventas_mes_total.toFixed(2)}</strong> (
+              Ventas del mes: <strong>{formatMoney(dash.ventas_mes_total)}</strong> (
               {dash.ventas_mes_cantidad} tickets)
             </li>
             <li>
+              Ventas hoy: <strong>{formatMoney(dash.ventas_hoy_total)}</strong> (
+              {dash.ventas_hoy_cantidad} tickets)
+            </li>
+            <li>
               Citas hoy: <strong>{dash.citas_hoy}</strong>
+            </li>
+            <li>
+              Clientes registrados: <strong>{dash.clientes_total}</strong>
+            </li>
+            <li>
+              Productos en catálogo: <strong>{dash.productos_total}</strong>
             </li>
             <li>
               Productos con stock bajo: <strong>{dash.productos_bajo_stock}</strong>
@@ -151,6 +167,111 @@ export function ReportesPage() {
           </ul>
         ) : null}
       </section>
+
+      {inventario ? (
+        <section className="card">
+          <h2 className="card-title">Inventario por categorías</h2>
+          <ul className="report-list">
+            <li>
+              Total de productos: <strong>{inventario.productos_total}</strong>
+            </li>
+            <li>
+              Categorías registradas: <strong>{inventario.categorias_registradas}</strong> (
+              {inventario.categorias_con_productos} con productos asignados)
+            </li>
+            <li>
+              Unidades en stock: <strong>{inventario.unidades_stock}</strong>
+            </li>
+            <li>
+              Valor inventario (costo): <strong>{formatMoney(inventario.valor_inventario_costo)}</strong>
+            </li>
+            <li>
+              Valor inventario (precio venta):{" "}
+              <strong>{formatMoney(inventario.valor_inventario_venta)}</strong>
+            </li>
+            <li>
+              Productos sin categoría: <strong>{inventario.productos_sin_categoria}</strong>
+            </li>
+            <li>
+              Productos con stock bajo: <strong>{inventario.productos_bajo_stock}</strong>
+            </li>
+          </ul>
+          {inventario.categorias.length > 0 ? (
+            <div className="table-wrap" style={{ marginTop: "1rem" }}>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Categoría</th>
+                    <th>Productos</th>
+                    <th>Stock (u.)</th>
+                    <th>Valor costo</th>
+                    <th>Valor venta</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {inventario.categorias.map((c) => (
+                    <tr key={c.categoria}>
+                      <td>
+                        {c.emoji ? `${c.emoji} ` : ""}
+                        {c.categoria}
+                      </td>
+                      <td>{c.productos_count}</td>
+                      <td>{c.unidades_stock}</td>
+                      <td>{formatMoney(Number(c.valor_costo))}</td>
+                      <td>{formatMoney(Number(c.valor_venta))}</td>
+                    </tr>
+                  ))}
+                  <tr>
+                    <td>
+                      <strong>Total</strong>
+                    </td>
+                    <td>
+                      <strong>{inventario.productos_total}</strong>
+                    </td>
+                    <td>
+                      <strong>{inventario.unidades_stock}</strong>
+                    </td>
+                    <td>
+                      <strong>{formatMoney(inventario.valor_inventario_costo)}</strong>
+                    </td>
+                    <td>
+                      <strong>{formatMoney(inventario.valor_inventario_venta)}</strong>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="muted">No hay productos en inventario.</p>
+          )}
+        </section>
+      ) : null}
+
+      {dash && dash.top_productos.length > 0 ? (
+        <section className="card">
+          <h2 className="card-title">Top productos (30 días)</h2>
+          <ul className="report-list">
+            {dash.top_productos.map((p) => (
+              <li key={p.nombre}>
+                {p.nombre}: <strong>{p.unidades}</strong> unidades
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {dash && dash.top_servicios.length > 0 ? (
+        <section className="card">
+          <h2 className="card-title">Top servicios en citas (30 días)</h2>
+          <ul className="report-list">
+            {dash.top_servicios.map((s) => (
+              <li key={s.nombre}>
+                {s.nombre}: <strong>{s.unidades}</strong> citas
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <section className="card">
         <h2 className="card-title">Ventas por período</h2>
@@ -178,7 +299,7 @@ export function ReportesPage() {
           </button>
         </div>
         <p className="hint">
-          Total mostrado: <strong>{sumaFiltrada.toFixed(2)}</strong> ({ventas.length} ventas). Con
+          Total mostrado: <strong>{formatMoney(sumaFiltrada)}</strong> ({ventas.length} ventas). Con
           ambas fechas también se cargan rankings e ingresos diarios.
         </p>
         {loading ? (
@@ -201,7 +322,7 @@ export function ReportesPage() {
                   <tr key={v.id}>
                     <td className="mono">{new Date(v.fecha).toLocaleString()}</td>
                     <td>{v.cliente_nombre ?? "—"}</td>
-                    <td>{v.total.toFixed(2)}</td>
+                    <td>{formatMoney(v.total)}</td>
                     <td>{v.metodo_pago}</td>
                   </tr>
                 ))}
@@ -228,7 +349,7 @@ export function ReportesPage() {
                   <tr key={r.id}>
                     <td>{r.nombre}</td>
                     <td>{r.unidades}</td>
-                    <td>{Number(r.total_vendido).toFixed(2)}</td>
+                    <td>{formatMoney(Number(r.total_vendido))}</td>
                   </tr>
                 ))}
               </tbody>
@@ -253,7 +374,7 @@ export function ReportesPage() {
                 {ingresosDia.map((r) => (
                   <tr key={r.dia}>
                     <td className="mono">{r.dia}</td>
-                    <td>{Number(r.ingresos).toFixed(2)}</td>
+                    <td>{formatMoney(Number(r.ingresos))}</td>
                     <td>{r.cantidad_ventas}</td>
                   </tr>
                 ))}
@@ -269,9 +390,9 @@ export function ReportesPage() {
           <ul className="report-list">
             <li>
               Ticket promedio:{" "}
-              <strong>{Number(kpis.ticket_promedio ?? 0).toFixed(2)}</strong>
+              <strong>{formatMoney(Number(kpis.ticket_promedio ?? 0))}</strong>
             </li>
-            <li>Ingresos totales: {Number(kpis.ingresos_totales ?? 0).toFixed(2)}</li>
+            <li>Ingresos totales: {formatMoney(Number(kpis.ingresos_totales ?? 0))}</li>
             <li>Cantidad ventas: {Number(kpis.cantidad_ventas ?? 0)}</li>
             <li>Clientes distintos: {Number(kpis.clientes_distintos_en_periodo ?? 0)}</li>
             <li>Clientes con más de una compra: {Number(kpis.clientes_recurentes_mas_de_una_compra ?? 0)}</li>
@@ -299,9 +420,9 @@ export function ReportesPage() {
                 {rentabilidad.slice(0, 30).map((r) => (
                   <tr key={r.id}>
                     <td>{r.nombre}</td>
-                    <td>{Number(r.ventas_bruto).toFixed(2)}</td>
-                    <td>{Number(r.costo_estimado).toFixed(2)}</td>
-                    <td>{Number(r.margen_estimado).toFixed(2)}</td>
+                    <td>{formatMoney(Number(r.ventas_bruto))}</td>
+                    <td>{formatMoney(Number(r.costo_estimado))}</td>
+                    <td>{formatMoney(Number(r.margen_estimado))}</td>
                   </tr>
                 ))}
               </tbody>

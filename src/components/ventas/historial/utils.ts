@@ -3,11 +3,8 @@ import { labelMetodoPago, metodoPagoCoincideFiltro } from "../../../lib/ventaMet
 
 export { labelMetodoPago };
 
-export const moneyEsAr = new Intl.NumberFormat("es-AR", {
-  style: "currency",
-  currency: "ARS",
-  minimumFractionDigits: 2,
-});
+export { formatMoney, moneyFormatter as moneyEsAr } from "../../../lib/money";
+import { formatMoney, parseMoneyLoose } from "../../../lib/money";
 
 export type VentaEstadoUi = "completada" | "anulada" | "pendiente";
 
@@ -202,8 +199,8 @@ export function matchesFiltrosLocales(v: Venta, f: FiltrosHistorialState): boole
     }
   }
 
-  const min = f.montoMin.trim() ? Number(f.montoMin.replace(",", ".")) : NaN;
-  const max = f.montoMax.trim() ? Number(f.montoMax.replace(",", ".")) : NaN;
+  const min = f.montoMin.trim() ? parseMoneyLoose(f.montoMin) : NaN;
+  const max = f.montoMax.trim() ? parseMoneyLoose(f.montoMax) : NaN;
   const total = Number(v.total);
   if (Number.isFinite(min) && total < min) return false;
   if (Number.isFinite(max) && total > max) return false;
@@ -237,7 +234,7 @@ export function exportVentasCsv(ventas: Venta[]) {
         v.cliente_nombre ?? "",
         v.vendedor_nombre ?? "",
         resumenItemsVenta(v),
-        Number(v.total).toFixed(2),
+        formatMoney(Number(v.total)),
         labelMetodoPago(v.metodo_pago),
         ventaEstadoUi(v),
         (v.notas ?? "").replace(/\r?\n/g, " "),

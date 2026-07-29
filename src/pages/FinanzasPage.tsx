@@ -31,7 +31,7 @@ import {
   type GastoOperativo,
 } from "../api";
 import { useToast } from "../context/ToastContext";
-import { parseOptionalDecimal } from "../lib/decimalInput";
+import { formatMoney, formatMoneyForInput, parseMoneyInput } from "../lib/money";
 import { SearchableSelect } from "../components/SearchableSelect";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { PromptDialog } from "../components/PromptDialog";
@@ -50,6 +50,7 @@ type CobranzaRow = {
 
 type FlujoCaja = {
   ingresos_ventas: number;
+  cantidad_ventas?: number;
   egresos_gastos: number;
   egresos_pedidos_proveedor?: number;
   egresos_compras?: number;
@@ -630,20 +631,23 @@ export function FinanzasPage() {
             <div className="finanzas-flujo-grid">
               <article className="finanzas-stat-card finanzas-stat-card--ingresos">
                 <div className="finanzas-stat-card__eyebrow">Total ingresos</div>
-                <div className="finanzas-stat-card__value">{flujo.ingresos_ventas.toFixed(2)}</div>
-                <p className="finanzas-stat-card__hint">Ventas en el período</p>
+                <div className="finanzas-stat-card__value">{formatMoney(flujo.ingresos_ventas)}</div>
+                <p className="finanzas-stat-card__hint">
+                  Ventas en el período
+                  {flujo.cantidad_ventas != null ? ` (${flujo.cantidad_ventas} tickets)` : ""}
+                </p>
               </article>
               <article className="finanzas-stat-card finanzas-stat-card--egresos">
                 <div className="finanzas-stat-card__eyebrow">Total egresos</div>
-                <div className="finanzas-stat-card__value">{flujo.egresos_total.toFixed(2)}</div>
+                <div className="finanzas-stat-card__value">{formatMoney(flujo.egresos_total)}</div>
                 <p className="finanzas-stat-card__hint">
-                  Gastos {flujo.egresos_gastos.toFixed(2)} + pedidos{" "}
-                  {(flujo.egresos_pedidos_proveedor ?? flujo.egresos_compras ?? 0).toFixed(2)}
+                  Gastos {formatMoney(flujo.egresos_gastos)} + pedidos{" "}
+                  {formatMoney(flujo.egresos_pedidos_proveedor ?? flujo.egresos_compras ?? 0)}
                 </p>
               </article>
               <article className="finanzas-stat-card finanzas-stat-card--balance">
                 <div className="finanzas-stat-card__eyebrow">Balance neto</div>
-                <div className="finanzas-stat-card__value">{flujo.resultado_neto.toFixed(2)}</div>
+                <div className="finanzas-stat-card__value">{formatMoney(flujo.resultado_neto)}</div>
                 <p className="finanzas-stat-card__hint">Ingresos − egresos totales</p>
               </article>
             </div>
@@ -709,10 +713,10 @@ export function FinanzasPage() {
                   <input
                     className="pedidos-input input-numeric"
                     type="text"
-                    inputMode="decimal"
+                    inputMode="numeric"
                     autoComplete="off"
-                    value={gMonto === "" ? "" : String(gMonto)}
-                    onChange={(e) => setGMonto(parseOptionalDecimal(e.target.value))}
+                    value={gMonto === "" ? "" : formatMoneyForInput(gMonto)}
+                    onChange={(e) => setGMonto(parseMoneyInput(e.target.value))}
                     placeholder="Ej: 450000"
                     required
                   />
@@ -751,7 +755,7 @@ export function FinanzasPage() {
               </div>
               <div className="fin-cal-total" aria-live="polite">
                 <span className="fin-cal-total__label">Total del mes</span>
-                <span className="fin-cal-total__value">{totalDelMes.toFixed(2)}</span>
+                <span className="fin-cal-total__value">{formatMoney(totalDelMes)}</span>
               </div>
             </div>
 
@@ -819,7 +823,7 @@ export function FinanzasPage() {
                     }}
                     aria-label={
                       items.length > 0
-                        ? `${cell.iso}: ${items.length} gasto${items.length === 1 ? "" : "s"}, total ${totalDay.toFixed(2)}`
+                        ? `${cell.iso}: ${items.length} gasto${items.length === 1 ? "" : "s"}, total ${formatMoney(totalDay)}`
                         : `${cell.iso}: sin gastos. Tocar para registrar uno`
                     }
                   >
@@ -831,7 +835,7 @@ export function FinanzasPage() {
                             ? emojiPorCategoria.get(g.categoria.trim().toLowerCase())
                             : null;
                           return (
-                            <li key={g.id} className="fin-cal-chip" title={`${g.concepto} · ${g.monto.toFixed(2)}`}>
+                            <li key={g.id} className="fin-cal-chip" title={`${g.concepto} · ${formatMoney(g.monto)}`}>
                               <span className="fin-cal-chip__emoji" aria-hidden>
                                 {emoji ?? "💸"}
                               </span>
@@ -877,7 +881,7 @@ export function FinanzasPage() {
                           <td className="finanzas-table__mono">{g.fecha}</td>
                           <td>{g.concepto}</td>
                           <td>{g.categoria ?? "—"}</td>
-                          <td className="finanzas-monto-out">{g.monto.toFixed(2)}</td>
+                          <td className="finanzas-monto-out">{formatMoney(g.monto)}</td>
                           <td>
                             {pagado ? (
                               <span className="fin-cal-day-item__badge fin-cal-day-item__badge--paid">
@@ -957,7 +961,7 @@ export function FinanzasPage() {
                     })}
                     <tr className="finanzas-total-row">
                       <td colSpan={3}>Total</td>
-                      <td className="finanzas-monto-out">{totalGastosMonto.toFixed(2)}</td>
+                      <td className="finanzas-monto-out">{formatMoney(totalGastosMonto)}</td>
                       <td colSpan={2} />
                     </tr>
                   </tbody>
@@ -1039,7 +1043,7 @@ export function FinanzasPage() {
                           </div>
                         </div>
                       </div>
-                      <div className="fin-cal-day-item__monto">{g.monto.toFixed(2)}</div>
+                      <div className="fin-cal-day-item__monto">{formatMoney(g.monto)}</div>
                       <div className="fin-cal-day-item__acts">
                         {g.comprobante_url ? (
                           <button
@@ -1121,7 +1125,7 @@ export function FinanzasPage() {
             {gastosDelDia.length > 0 ? (
               <div className="fin-cal-day-modal__total">
                 <span>Total del día</span>
-                <strong>{totalDelDia.toFixed(2)}</strong>
+                <strong>{formatMoney(totalDelDia)}</strong>
               </div>
             ) : null}
 
@@ -1180,10 +1184,10 @@ export function FinanzasPage() {
                   <input
                     className="pedidos-input input-numeric"
                     type="text"
-                    inputMode="decimal"
+                    inputMode="numeric"
                     autoComplete="off"
-                    value={cMonto === "" ? "" : String(cMonto)}
-                    onChange={(e) => setCMonto(parseOptionalDecimal(e.target.value))}
+                    value={cMonto === "" ? "" : formatMoneyForInput(cMonto)}
+                    onChange={(e) => setCMonto(parseMoneyInput(e.target.value))}
                     placeholder="Ej: 125000"
                     required
                   />
@@ -1226,7 +1230,7 @@ export function FinanzasPage() {
               <>
                 <div className="finanzas-deuda-chip" role="status">
                   <span className="finanzas-deuda-chip__label">Deuda pendiente total</span>
-                  <span className="finanzas-deuda-chip__value">{totalDeudaPendiente.toFixed(2)}</span>
+                  <span className="finanzas-deuda-chip__value">{formatMoney(totalDeudaPendiente)}</span>
                 </div>
                 <div className="finanzas-table-wrap">
                   <table className="finanzas-table">
@@ -1259,7 +1263,7 @@ export function FinanzasPage() {
                             <td>
                               <span className={badgeClass}>{badgeLabel}</span>
                             </td>
-                            <td className="finanzas-table__mono">{Number(c.saldo_pendiente).toFixed(2)}</td>
+                            <td className="finanzas-table__mono">{formatMoney(Number(c.saldo_pendiente))}</td>
                             <td className="finanzas-table__mono">{c.vencimiento ?? "—"}</td>
                             <td>
                               <button
@@ -1294,7 +1298,7 @@ export function FinanzasPage() {
         description={
           pagoDeudaModal ? (
             <>
-              Monto a registrar (máximo <strong>{pagoDeudaModal.saldo.toFixed(2)}</strong>).
+              Monto a registrar (máximo <strong>{formatMoney(pagoDeudaModal.saldo)}</strong>).
             </>
           ) : null
         }
@@ -1310,7 +1314,7 @@ export function FinanzasPage() {
           const n = Number(t.replace(",", "."));
           if (!Number.isFinite(n) || n <= 0) return "Ingresá un monto válido mayor a cero.";
           if (n > pagoDeudaModal.saldo + 1e-9) {
-            return `El monto no puede superar el saldo pendiente (${pagoDeudaModal.saldo.toFixed(2)}).`;
+            return `El monto no puede superar el saldo pendiente (${formatMoney(pagoDeudaModal.saldo)}).`;
           }
           return null;
         }}

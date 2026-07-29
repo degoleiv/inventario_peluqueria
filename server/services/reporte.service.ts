@@ -309,6 +309,81 @@ export const reporteService = {
     };
   },
 
+  /** Totales de inventario agrupados por categoría de producto. */
+  async resumenInventario() {
+    const totales = (await db
+      .prepare(
+        `SELECT COUNT(*) AS productos_total,
+                COALESCE(SUM(stock), 0) AS unidades_stock,
+                COALESCE(SUM(stock * COALESCE(precio_compra, 0)), 0) AS valor_costo,
+                COALESCE(SUM(stock * COALESCE(precio_venta, precio, 0)), 0) AS valor_venta,
+                SUM(CASE WHEN categoria IS NULL OR TRIM(categoria) = '' THEN 1 ELSE 0 END) AS sin_categoria
+         FROM productos`
+      )
+      .get()) as {
+      productos_total: number;
+      unidades_stock: number;
+      valor_costo: number;
+      valor_venta: number;
+      sin_categoria: number;
+    };
+
+    const categoriasRegistradas = (await db
+      .prepare(`SELECT COUNT(*) AS n FROM categorias_producto WHERE estado = 'activo'`)
+      .get()) as { n: number };
+
+    const bajoStock = (await db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM productos
+         WHERE stock = 0 OR (COALESCE(stock_minimo,0) > 0 AND stock > 0 AND stock <= stock_minimo)`
+      )
+      .get()) as { n: number };
+
+    const porCategoria = (await db
+      .prepare(
+        `SELECT COALESCE(NULLIF(TRIM(p.categoria), ''), 'Sin categoría') AS categoria,
+                COUNT(*) AS productos_count,
+                COALESCE(SUM(p.stock), 0) AS unidades_stock,
+                COALESCE(SUM(p.stock * COALESCE(p.precio_compra, 0)), 0) AS valor_costo,
+                COALESCE(SUM(p.stock * COALESCE(p.precio_venta, p.precio, 0)), 0) AS valor_venta
+         FROM productos p
+         GROUP BY LOWER(TRIM(COALESCE(p.categoria, '')))
+         ORDER BY productos_count DESC, categoria ASC`
+      )
+      .all()) as Array<{
+      categoria: string;
+      productos_count: number;
+      unidades_stock: number;
+      valor_costo: number;
+      valor_venta: number;
+    }>;
+
+    const emojis = (await db
+      .prepare(`SELECT nombre_categoria, emoji FROM categorias_producto WHERE estado = 'activo'`)
+      .all()) as Array<{ nombre_categoria: string; emoji: string | null }>;
+    const emojiMap = new Map<string, string>();
+    for (const c of emojis) {
+      if (c.emoji?.trim()) emojiMap.set(c.nombre_categoria.trim().toLowerCase(), c.emoji.trim());
+    }
+
+    const categorias = porCategoria.map((row) => ({
+      ...row,
+      emoji: emojiMap.get(row.categoria.trim().toLowerCase()) ?? null,
+    }));
+
+    return {
+      productos_total: totales.productos_total,
+      categorias_registradas: categoriasRegistradas.n,
+      categorias_con_productos: categorias.length,
+      unidades_stock: totales.unidades_stock,
+      valor_inventario_costo: totales.valor_costo,
+      valor_inventario_venta: totales.valor_venta,
+      productos_sin_categoria: totales.sin_categoria,
+      productos_bajo_stock: bajoStock.n,
+      categorias,
+    };
+  },
+
   /** Serie temporal simple para tendencia (promedio móvil deja para UI). */
   async ventasPorSemana(desde: string, hasta: string) {
     return await db

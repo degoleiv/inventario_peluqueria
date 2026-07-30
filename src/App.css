@@ -3957,11 +3957,11 @@ select {
 
 @media (max-width: 1100px) {
   /* POS apilado: ocupa todo el alto disponible; scroll solo dentro de carrito/catálogo/pago */
-  .main-pro-content:has(.page-pos--saas) {
+  .main-pro-content:has(.tab-pane-host--active .page-pos--saas) {
     overflow: hidden;
   }
 
-  .main-pro-content:has(.page-pos--saas) .tab-pane-mount > .tab-pane-host--active > .subnav-wrap + *:not(.drawer-root) {
+  .main-pro-content:has(.tab-pane-host--active .page-pos--saas) .tab-pane-mount > .tab-pane-host--active > .subnav-wrap + *:not(.drawer-root) {
     flex: 1 1 0;
     min-height: 0;
     max-height: 100%;
@@ -5007,33 +5007,33 @@ select {
 /* Ventas POS responsive: ocultar chrome y priorizar catálogo en pantallas estrechas */
 @media (max-width: 1100px) {
   /* Menos barras duplicadas arriba del POS */
-  .main-pro:has(.page-pos--saas) .main-pro-header {
+  .main-pro:has(.tab-pane-host--active .page-pos--saas) .main-pro-header {
     display: none;
   }
 
-  .main-pro:has(.page-pos--saas) .workspace-tabs {
+  .main-pro:has(.tab-pane-host--active .page-pos--saas) .workspace-tabs {
     display: none;
   }
 
-  .main-pro-content:has(.page-pos--saas) {
+  .main-pro-content:has(.tab-pane-host--active .page-pos--saas) {
     padding: 0.2rem 0.45rem 0;
   }
 
-  .main-pro-content:has(.page-pos--saas) .subnav-wrap {
+  .main-pro-content:has(.tab-pane-host--active .page-pos--saas) .subnav-wrap {
     margin-bottom: 0.1rem;
     padding: 0.05rem 0 0.1rem;
     border-bottom-width: 0;
   }
 
-  .main-pro-content:has(.page-pos--saas) .subnav-kbd {
+  .main-pro-content:has(.tab-pane-host--active .page-pos--saas) .subnav-kbd {
     display: none;
   }
 
-  .main-pro-content:has(.page-pos--saas) .subnav-quick {
+  .main-pro-content:has(.tab-pane-host--active .page-pos--saas) .subnav-quick {
     display: none;
   }
 
-  .main-pro-content:has(.page-pos--saas) .subnav-link {
+  .main-pro-content:has(.tab-pane-host--active .page-pos--saas) .subnav-link {
     padding: 0.22rem 0.45rem;
     font-size: 0.78rem;
   }
@@ -6405,7 +6405,7 @@ select {
 }
 
 /* Ventas POS: llenar viewport bajo header + tabs + subnav; scroll solo en paneles */
-.main-pro-content:has(.page-pos--saas) {
+.main-pro-content:has(.tab-pane-host--active .page-pos--saas) {
   max-width: 100%;
   flex: 1 1 0;
   min-height: 0;
@@ -6416,15 +6416,15 @@ select {
 }
 
 /* Historial / cierre: scroll del área principal */
-.main-pro-content:has(.sales-history-page),
-.main-pro-content:has(.cierre-dia-page) {
+.main-pro-content:has(.tab-pane-host--active .sales-history-page),
+.main-pro-content:has(.tab-pane-host--active .cierre-dia-page) {
   max-width: 1680px;
   overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
 
-.main-pro-content:has(.page-pos--saas) .tab-pane-mount > .tab-pane-host--active > .subnav-wrap + *:not(.drawer-root) {
+.main-pro-content:has(.tab-pane-host--active .page-pos--saas) .tab-pane-mount > .tab-pane-host--active > .subnav-wrap + *:not(.drawer-root) {
   flex: 1 1 0;
   align-self: stretch;
   min-height: 0;
@@ -6435,8 +6435,8 @@ select {
   overflow: hidden;
 }
 
-.main-pro-content:has(.sales-history-page) .tab-pane-mount > .tab-pane-host--active > .subnav-wrap + *:not(.drawer-root),
-.main-pro-content:has(.cierre-dia-page) .tab-pane-mount > .tab-pane-host--active > .subnav-wrap + *:not(.drawer-root) {
+.main-pro-content:has(.tab-pane-host--active .sales-history-page) .tab-pane-mount > .tab-pane-host--active > .subnav-wrap + *:not(.drawer-root),
+.main-pro-content:has(.tab-pane-host--active .cierre-dia-page) .tab-pane-mount > .tab-pane-host--active > .subnav-wrap + *:not(.drawer-root) {
   flex: 0 1 auto;
   align-self: stretch;
   min-height: min-content;
@@ -6446,17 +6446,17 @@ select {
 }
 
 /* Título y área principal más amplios cuando la vista es Ventas */
-.main-pro-content:has(.page-pos) {
+.main-pro-content:has(.tab-pane-host--active .page-pos) {
   padding: 0.35rem 0.85rem 0.5rem;
   max-width: 100%;
 }
 
-.main-pro-content:has(.page-pos) .main-pro-title {
+.main-pro-content:has(.tab-pane-host--active .page-pos) .main-pro-title {
   font-size: clamp(1.45rem, 2.5vw, 1.9rem);
 }
 
 /* Pedidos: aprovechar más ancho disponible del layout */
-.main-pro-content:has(.page-pedidos) {
+.main-pro-content:has(.tab-pane-host--active .page-pedidos) {
   max-width: 1440px;
   padding: 0.35rem 0.85rem 0.5rem;
 }
@@ -6475,7 +6475,7 @@ select {
 }
 
 /* Mismo ancho útil que Pedidos cuando Finanzas va sola en el main */
-.main-pro-content:has(.page-finanzas) {
+.main-pro-content:has(.tab-pane-host--active .page-finanzas) {
   max-width: 1440px;
   padding: 0.45rem 1.1rem 0.6rem;
 }
@@ -13945,8 +13945,8 @@ select {
 
 .main-pro-content .tab-pane-mount > .tab-pane-host--active > *:only-child:not(.drawer-root),
 .main-pro-content .tab-pane-mount > .tab-pane-host--active > .subnav-wrap + *:not(.drawer-root):not(.page-pos),
-.main-pro-content:has(.sales-history-page) .tab-pane-mount > .tab-pane-host--active > .subnav-wrap + *:not(.drawer-root),
-.main-pro-content:has(.cierre-dia-page) .tab-pane-mount > .tab-pane-host--active > .subnav-wrap + *:not(.drawer-root),
+.main-pro-content:has(.tab-pane-host--active .sales-history-page) .tab-pane-mount > .tab-pane-host--active > .subnav-wrap + *:not(.drawer-root),
+.main-pro-content:has(.tab-pane-host--active .cierre-dia-page) .tab-pane-mount > .tab-pane-host--active > .subnav-wrap + *:not(.drawer-root),
 .main-pro-content .tab-pane-mount > .tab-pane-host--active > .page-pedidos:only-child,
 .main-pro-content .tab-pane-mount > .tab-pane-host--active > .page-finanzas:only-child {
   flex: 0 1 auto;
@@ -13973,13 +13973,13 @@ select {
 }
 
 /* POS: mantiene layout viewport-fill con scroll interno en paneles */
-.main-pro-content:has(.page-pos--saas) {
+.main-pro-content:has(.tab-pane-host--active .page-pos--saas) {
   overflow: hidden;
   flex: 1 1 0;
   min-height: 0;
 }
 
-.main-pro-content:has(.page-pos--saas) .tab-pane-mount > .tab-pane-host--active > .subnav-wrap + *:not(.drawer-root) {
+.main-pro-content:has(.tab-pane-host--active .page-pos--saas) .tab-pane-mount > .tab-pane-host--active > .subnav-wrap + *:not(.drawer-root) {
   flex: 1 1 0;
   align-self: stretch;
   width: 100%;
